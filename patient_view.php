@@ -49,7 +49,7 @@ $photosStmt = $pdo->prepare("
     FROM wound_photos wp
     LEFT JOIN staff s ON s.id = wp.uploaded_by
     WHERE wp.patient_id = ?
-    ORDER BY wp.created_at DESC
+    ORDER BY wp.wound_location ASC, wp.created_at ASC
 ");
 $photosStmt->execute([$id]);
 $photos = $photosStmt->fetchAll();
@@ -972,24 +972,292 @@ document.getElementById('chkAll').addEventListener('change', function () {
     </p>
 </div>
 <?php else: ?>
-<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-    <?php foreach ($photos as $ph): ?>
-    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div class="aspect-square overflow-hidden bg-slate-50">
-            <img src="<?= BASE_URL ?>/uploads/photos/<?= h($ph['filename']) ?>"
-                 alt="Wound photo"
-                 class="w-full h-full object-cover hover:scale-105 transition-transform duration-300">
+<?php
+// Group photos by wound location
+$photosByLocation = [];
+foreach ($photos as $ph) {
+    $loc = $ph['wound_location'] ?: 'Unspecified';
+    $photosByLocation[$loc][] = $ph;
+}
+// Pass photo data to JS
+$photosJson = json_encode(array_map(fn($p) => [
+    'id'       => (int)$p['id'],
+    'filename' => $p['filename'],
+    'location' => $p['wound_location'] ?: 'Unspecified',
+    'date'     => date('M j, Y', strtotime($p['created_at'])),
+    'date_raw' => $p['created_at'],
+    'desc'     => $p['description'] ?? '',
+    'ma'       => $p['ma_name'] ?? '',
+    'url'      => BASE_URL . '/uploads/photos/' . $p['filename'],
+], $photos));
+?>
+
+<!-- Tab toolbar -->
+<div class="flex items-center justify-between mb-4 gap-3 flex-wrap">
+    <div class="flex items-center gap-2">
+        <span class="text-sm font-bold text-slate-600">
+            <i class="bi bi-camera-fill text-violet-500 mr-1"></i>
+            <?= count($photos) ?> photo<?= count($photos) !== 1 ? 's' : '' ?>
+            &nbsp;&middot;&nbsp;
+            <?= count($photosByLocation) ?> site<?= count($photosByLocation) !== 1 ? 's' : '' ?>
+        </span>
+    </div>
+    <div class="flex gap-2">
+        <button id="compareToggleBtn"
+                class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl border transition-all
+                       bg-white border-slate-200 text-slate-600 hover:border-violet-400 hover:text-violet-700">
+            <i class="bi bi-layout-split"></i> Compare Mode
+        </button>
+        <a href="<?= BASE_URL ?>/forms/wound_care.php?patient_id=<?= $id ?>"
+           class="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl
+                  bg-violet-600 hover:bg-violet-700 text-white transition-all shadow-sm">
+            <i class="bi bi-camera-fill"></i> Add Photos
+        </a>
+    </div>
+</div>
+
+<!-- ── Compare Panel (hidden until 2 selected) ───────────────────────────── -->
+<div id="comparePanel" class="hidden bg-white rounded-2xl shadow-sm border-2 border-violet-200 p-5 mb-5">
+    <div class="flex items-center justify-between mb-4">
+        <h4 class="text-sm font-bold text-slate-700 flex items-center gap-2">
+            <i class="bi bi-layout-split text-violet-500"></i> Side-by-Side Comparison
+        </h4>
+        <button id="clearCompareBtn"
+                class="text-xs font-semibold text-slate-400 hover:text-slate-600 px-3 py-1.5 rounded-lg
+                       hover:bg-slate-100 transition-colors">
+            <i class="bi bi-x-lg mr-1"></i>Clear
+        </button>
+    </div>
+    <div class="grid grid-cols-2 gap-4">
+        <!-- Left -->
+        <div id="cmpLeft" class="space-y-3">
+            <div class="aspect-square bg-slate-100 rounded-xl flex items-center justify-center text-slate-400
+                        border-2 border-dashed border-slate-200" id="cmpLeftEmpty">
+                <div class="text-center">
+                    <i class="bi bi-1-circle text-4xl opacity-30 block mb-1"></i>
+                    <span class="text-xs">Tap a photo to compare</span>
+                </div>
+            </div>
+            <div id="cmpLeftImg" class="hidden">
+                <div class="aspect-square rounded-xl overflow-hidden bg-slate-50 border-2 border-violet-400 shadow-md">
+                    <img id="cmpLeftSrc" src="" alt="" class="w-full h-full object-cover">
+                </div>
+                <div class="mt-2 px-1">
+                    <p id="cmpLeftLoc" class="text-xs font-bold text-slate-700"></p>
+                    <p id="cmpLeftDate" class="text-xs text-slate-500"></p>
+                    <p id="cmpLeftDesc" class="text-xs text-slate-400 mt-0.5 italic"></p>
+                    <p id="cmpLeftMa" class="text-xs text-slate-400"></p>
+                </div>
+            </div>
         </div>
-        <div class="p-3">
-            <p class="text-xs font-semibold text-slate-700 truncate"><?= h($ph['location'] ?: 'Unspecified') ?></p>
-            <p class="text-xs text-slate-400 mt-0.5"><?= date('M j, Y', strtotime($ph['created_at'])) ?></p>
-            <?php if ($ph['description']): ?>
-            <p class="text-xs text-slate-500 mt-1 line-clamp-2"><?= h($ph['description']) ?></p>
-            <?php endif; ?>
+        <!-- Right -->
+        <div id="cmpRight" class="space-y-3">
+            <div class="aspect-square bg-slate-100 rounded-xl flex items-center justify-center text-slate-400
+                        border-2 border-dashed border-slate-200" id="cmpRightEmpty">
+                <div class="text-center">
+                    <i class="bi bi-2-circle text-4xl opacity-30 block mb-1"></i>
+                    <span class="text-xs">Tap a second photo</span>
+                </div>
+            </div>
+            <div id="cmpRightImg" class="hidden">
+                <div class="aspect-square rounded-xl overflow-hidden bg-slate-50 border-2 border-indigo-400 shadow-md">
+                    <img id="cmpRightSrc" src="" alt="" class="w-full h-full object-cover">
+                </div>
+                <div class="mt-2 px-1">
+                    <p id="cmpRightLoc" class="text-xs font-bold text-slate-700"></p>
+                    <p id="cmpRightDate" class="text-xs text-slate-500"></p>
+                    <p id="cmpRightDesc" class="text-xs text-slate-400 mt-0.5 italic"></p>
+                    <p id="cmpRightMa" class="text-xs text-slate-400"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Progress indicator when same site selected -->
+    <div id="cmpProgressBar" class="hidden mt-4 pt-4 border-t border-slate-100">
+        <p class="text-xs font-semibold text-slate-500 mb-2 text-center">
+            <i class="bi bi-graph-down-arrow text-emerald-500 mr-1"></i>
+            Comparing same wound site — <span id="cmpSiteLabel" class="text-slate-700"></span>
+        </p>
+    </div>
+</div>
+
+<!-- Gallery grouped by wound site -->
+<div class="space-y-6" id="photoGallery">
+    <?php foreach ($photosByLocation as $location => $locPhotos): ?>
+    <div>
+        <div class="flex items-center gap-3 mb-3">
+            <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-violet-50 text-violet-700
+                         rounded-full text-xs font-bold border border-violet-100">
+                <i class="bi bi-geo-alt-fill text-violet-400 text-xs"></i>
+                <?= h($location) ?>
+            </span>
+            <span class="text-xs text-slate-400"><?= count($locPhotos) ?> photo<?= count($locPhotos) !== 1 ? 's' : '' ?></span>
+            <div class="flex-1 h-px bg-slate-100"></div>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            <?php foreach ($locPhotos as $ph): ?>
+            <div class="photo-card bg-white rounded-2xl shadow-sm border-2 border-slate-100 overflow-hidden
+                        cursor-pointer transition-all hover:shadow-md hover:border-violet-200 select-none"
+                 data-photo-id="<?= $ph['id'] ?>"
+                 onclick="photoCardClick(this)">
+                <!-- Selection ring overlay -->
+                <div class="photo-ring hidden absolute inset-0 rounded-2xl pointer-events-none z-10"></div>
+                <div class="relative">
+                    <div class="aspect-square overflow-hidden bg-slate-50">
+                        <img src="<?= BASE_URL ?>/uploads/photos/<?= h($ph['filename']) ?>"
+                             alt="Wound photo"
+                             class="w-full h-full object-cover hover:scale-105 transition-transform duration-300 pointer-events-none">
+                    </div>
+                    <!-- Selection badge -->
+                    <div class="photo-badge hidden absolute top-2 right-2 w-7 h-7 rounded-full flex items-center
+                                justify-center text-white text-xs font-extrabold shadow-lg z-10"></div>
+                </div>
+                <div class="p-3">
+                    <p class="text-xs font-semibold text-slate-700 truncate"><?= h($location) ?></p>
+                    <p class="text-xs text-slate-400 mt-0.5"><?= date('M j, Y', strtotime($ph['created_at'])) ?></p>
+                    <?php if ($ph['description']): ?>
+                    <p class="text-xs text-slate-500 mt-1 line-clamp-2"><?= h($ph['description']) ?></p>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php endforeach; ?>
         </div>
     </div>
     <?php endforeach; ?>
 </div>
+
+<script>
+(function () {
+    const PHOTOS      = <?= $photosJson ?>;
+    const photoMap    = {};
+    PHOTOS.forEach(p => photoMap[p.id] = p);
+
+    let compareMode   = false;
+    let selected      = []; // [{id, card}]
+
+    const toggleBtn   = document.getElementById('compareToggleBtn');
+    const clearBtn    = document.getElementById('clearCompareBtn');
+    const panel       = document.getElementById('comparePanel');
+
+    // Toggle compare mode
+    toggleBtn.addEventListener('click', () => {
+        compareMode = !compareMode;
+        if (compareMode) {
+            toggleBtn.classList.remove('bg-white','border-slate-200','text-slate-600','hover:border-violet-400','hover:text-violet-700');
+            toggleBtn.classList.add('bg-violet-600','border-violet-600','text-white');
+            toggleBtn.innerHTML = '<i class="bi bi-layout-split"></i> Compare ON';
+            panel.classList.remove('hidden');
+        } else {
+            exitCompare();
+        }
+    });
+
+    clearBtn.addEventListener('click', clearSelection);
+
+    function exitCompare() {
+        compareMode = false;
+        toggleBtn.classList.add('bg-white','border-slate-200','text-slate-600','hover:border-violet-400','hover:text-violet-700');
+        toggleBtn.classList.remove('bg-violet-600','border-violet-600','text-white');
+        toggleBtn.innerHTML = '<i class="bi bi-layout-split"></i> Compare Mode';
+        clearSelection();
+        panel.classList.add('hidden');
+    }
+
+    function clearSelection() {
+        selected.forEach(s => resetCard(s.card));
+        selected = [];
+        updatePanel();
+    }
+
+    function resetCard(card) {
+        card.classList.remove('border-violet-400','border-indigo-400','shadow-lg');
+        card.classList.add('border-slate-100');
+        card.querySelector('.photo-badge').classList.add('hidden');
+    }
+
+    window.photoCardClick = function(card) {
+        if (!compareMode) return;
+        const pid = parseInt(card.dataset.photoId);
+
+        // If already selected, deselect it
+        const existIdx = selected.findIndex(s => s.id === pid);
+        if (existIdx !== -1) {
+            resetCard(card);
+            selected.splice(existIdx, 1);
+            // Re-number remaining
+            selected.forEach((s, i) => {
+                const badge = s.card.querySelector('.photo-badge');
+                badge.textContent = i + 1;
+                badge.style.background = i === 0 ? '#7c3aed' : '#4f46e5';
+            });
+            updatePanel();
+            return;
+        }
+
+        // Max 2
+        if (selected.length >= 2) {
+            // Replace the oldest (index 0)
+            resetCard(selected[0].card);
+            selected.shift();
+            // Re-badge remaining
+            selected.forEach((s, i) => {
+                const badge = s.card.querySelector('.photo-badge');
+                badge.textContent = i + 1;
+                badge.style.background = i === 0 ? '#7c3aed' : '#4f46e5';
+            });
+        }
+
+        selected.push({id: pid, card});
+        const slotIndex = selected.length - 1;
+        const borderCls = slotIndex === 0 ? 'border-violet-400' : 'border-indigo-400';
+        card.classList.remove('border-slate-100');
+        card.classList.add(borderCls, 'shadow-lg');
+        const badge = card.querySelector('.photo-badge');
+        badge.textContent = slotIndex + 1;
+        badge.style.background = slotIndex === 0 ? '#7c3aed' : '#4f46e5';
+        badge.classList.remove('hidden');
+        badge.style.display = 'flex';
+
+        updatePanel();
+        // Scroll panel into view
+        panel.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+    };
+
+    function fillSlot(side, photo) {
+        const emptyEl = document.getElementById('cmp' + side + 'Empty');
+        const imgWrap = document.getElementById('cmp' + side + 'Img');
+        if (!photo) {
+            emptyEl.classList.remove('hidden');
+            imgWrap.classList.add('hidden');
+            return;
+        }
+        emptyEl.classList.add('hidden');
+        imgWrap.classList.remove('hidden');
+        document.getElementById('cmp' + side + 'Src').src  = photo.url;
+        document.getElementById('cmp' + side + 'Src').alt  = photo.location;
+        document.getElementById('cmp' + side + 'Loc').textContent  = photo.location;
+        document.getElementById('cmp' + side + 'Date').textContent = photo.date;
+        document.getElementById('cmp' + side + 'Desc').textContent = photo.desc || '';
+        document.getElementById('cmp' + side + 'Ma').textContent   = photo.ma ? 'Recorded by ' + photo.ma : '';
+    }
+
+    function updatePanel() {
+        const p1 = selected[0] ? photoMap[selected[0].id] : null;
+        const p2 = selected[1] ? photoMap[selected[1].id] : null;
+        fillSlot('Left',  p1);
+        fillSlot('Right', p2);
+
+        // Show progress hint when same site selected
+        const progressBar = document.getElementById('cmpProgressBar');
+        if (p1 && p2 && p1.location === p2.location) {
+            document.getElementById('cmpSiteLabel').textContent = p1.location;
+            progressBar.classList.remove('hidden');
+        } else {
+            progressBar.classList.add('hidden');
+        }
+    }
+})();
+</script>
 <?php endif; ?>
 
 <!-- Wounds Tab -->
