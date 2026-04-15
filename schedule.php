@@ -163,11 +163,93 @@ include __DIR__ . '/includes/header.php';
             <i class="bi bi-pencil-fill text-xs"></i> Manage
         </a>
         <?php endif; ?>
+        <button onclick="window.print()"
+                class="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-semibold transition-colors shadow-sm no-print">
+            <i class="bi bi-printer-fill text-slate-500"></i> Print
+        </button>
+    </div>
+</div>
+
+<style>
+@media print {
+    @page { margin: 12mm 10mm; size: A4 landscape; }
+
+    /* Hide all chrome */
+    nav, header, footer, .no-print { display: none !important; }
+    body, html { background: #fff !important; font-size: 9pt; }
+    .pt-20 { padding-top: 0 !important; }
+    #container, .container, [class*="max-w-"] { max-width: 100% !important; padding: 0 !important; margin: 0 !important; }
+
+    /* Print header */
+    .print-header { display: block !important; margin-bottom: 8pt !important; }
+
+    /* Status summary */
+    .print-stat-bar {
+        display: grid !important;
+        grid-template-columns: repeat(4, 1fr) !important;
+        gap: 4pt !important;
+        margin-bottom: 8pt !important;
+    }
+    .print-stat-bar > div {
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 4pt !important;
+        padding: 4pt 6pt !important;
+        box-shadow: none !important;
+        background: #fff !important;
+        font-size: 8pt !important;
+    }
+
+    /* Day view — visit cards */
+    #visitList { display: block !important; }
+    .print-visit-card {
+        break-inside: avoid !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 4pt !important;
+        margin-bottom: 5pt !important;
+        box-shadow: none !important;
+        background: #fff !important;
+    }
+    .print-visit-card > div:first-child { padding: 6pt 8pt !important; }
+
+    /* Week grid */
+    .print-week-grid-wrapper { overflow: visible !important; margin: 0 !important; padding: 0 !important; }
+    .print-week-grid {
+        display: grid !important;
+        grid-template-columns: repeat(7, 1fr) !important;
+        width: 100% !important;
+        gap: 3pt !important;
+        min-width: unset !important;
+    }
+    .print-week-col {
+        break-inside: avoid !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 4pt !important;
+        font-size: 7.5pt !important;
+        box-shadow: none !important;
+    }
+    .print-week-col > div:last-child { padding: 3pt !important; }
+}
+
+/* Hide print-only elements on screen */
+.print-header { display: none; }
+.print-stat-bar { display: grid; }   /* stat bar is always visible, just styled differently */
+</style>
+
+<!-- Print-only header (hidden on screen) -->
+<div class="print-header" style="margin-bottom:10pt; border-bottom:2pt solid #4f46e5; padding-bottom:6pt;">
+    <div style="font-size:14pt; font-weight:900; color:#1e293b;">
+        <?= $view === 'week'
+            ? 'Weekly Schedule: ' . date('M j', strtotime($weekStart)) . ' – ' . date('M j, Y', strtotime($weekEnd))
+            : 'Daily Schedule: ' . date('l, F j, Y', strtotime($date)) ?>
+    </div>
+    <div style="font-size:9pt; color:#64748b; margin-top:2pt;">
+        <?= h($ma['full_name']) ?> &mdash; Printed <?= date('M j, Y g:i a') ?>
     </div>
 </div>
 
 <!-- Status summary bar -->
-<div class="grid grid-cols-4 gap-3 mb-6">
+<div class="grid grid-cols-4 gap-3 mb-6 print-stat-bar"
+     style="display:grid; grid-template-columns:repeat(4,1fr); gap:6pt; margin-bottom:10pt;">
     <?php
     $statusDefs = [
         'pending'   => ['label'=>'Pending',   'bg'=>'bg-slate-100',   'text'=>'text-slate-600',   'dot'=>'bg-slate-400',   'icon'=>'bi-clock'],
@@ -191,8 +273,8 @@ include __DIR__ . '/includes/header.php';
 
 <?php if ($view === 'week'): ?>
 <!-- ═══════════════════════ WEEKLY VIEW ═══════════════════════ -->
-<div class="overflow-x-auto -mx-1 pb-2">
-    <div class="inline-grid gap-3 min-w-full" style="grid-template-columns: repeat(7, minmax(160px, 1fr));">
+<div class="overflow-x-auto -mx-1 pb-2 print-week-grid-wrapper">
+    <div class="inline-grid gap-3 min-w-full print-week-grid" style="grid-template-columns: repeat(7, minmax(160px, 1fr));">
         <?php
         for ($d = 0; $d < 7; $d++):
             $colDate  = date('Y-m-d', strtotime($weekStart . ' +' . $d . ' days'));
@@ -201,7 +283,7 @@ include __DIR__ . '/includes/header.php';
             $colCounts  = ['pending'=>0,'en_route'=>0,'completed'=>0,'missed'=>0];
             foreach ($colVisits as $cv) $colCounts[$cv['status']]++;
         ?>
-        <div class="flex flex-col rounded-2xl overflow-hidden border <?= $isColToday ? 'border-indigo-300 shadow-md' : 'border-slate-100 shadow-sm' ?> bg-white">
+        <div class="flex flex-col rounded-2xl overflow-hidden border print-week-col <?= $isColToday ? 'border-indigo-300 shadow-md' : 'border-slate-100 shadow-sm' ?> bg-white">
             <!-- Day header -->
             <div class="px-3 py-2.5 <?= $isColToday ? 'bg-indigo-600 text-white' : 'bg-slate-50 text-slate-600' ?> border-b <?= $isColToday ? 'border-indigo-500' : 'border-slate-100' ?>">
                 <div class="text-xs font-bold uppercase tracking-wide <?= $isColToday ? 'text-indigo-100' : 'text-slate-400' ?>">
@@ -252,7 +334,7 @@ include __DIR__ . '/includes/header.php';
             </div>
             <!-- Day footer: link to day view -->
             <a href="?date=<?= $colDate ?>&ma_id=<?= $viewMaId ?>&view=day"
-               class="block text-center text-[10px] font-semibold py-2 border-t border-slate-100
+               class="no-print block text-center text-[10px] font-semibold py-2 border-t border-slate-100
                       <?= $isColToday ? 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100' : 'text-slate-400 bg-slate-50 hover:bg-slate-100' ?> transition-colors">
                 View day <i class="bi bi-arrow-right-short"></i>
             </a>
@@ -286,7 +368,7 @@ include __DIR__ . '/includes/header.php';
         $addr    = $v['patient_address'] ? rawurlencode($v['patient_address']) : '';
         $mapsUrl = $addr ? 'https://www.google.com/maps/dir/?api=1&destination=' . $addr : '#';
     ?>
-    <div class="bg-white border border-slate-100 rounded-2xl shadow-sm hover:shadow-md transition-shadow"
+    <div class="bg-white border border-slate-100 rounded-2xl shadow-sm hover:shadow-md transition-shadow print-visit-card"
          id="visit-<?= $v['id'] ?>">
         <div class="flex items-start gap-4 p-4">
 
@@ -347,7 +429,7 @@ include __DIR__ . '/includes/header.php';
             </div>
 
             <!-- Actions -->
-            <div class="flex flex-col gap-2 shrink-0">
+            <div class="flex flex-col gap-2 shrink-0 no-print">
                 <?php if ($v['status'] === 'pending'): ?>
                 <button onclick="startVisit(<?= $v['id'] ?>, <?= $v['patient_id'] ?>, this)"
                         class="flex items-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95
@@ -375,7 +457,7 @@ include __DIR__ . '/includes/header.php';
         </div>
 
         <!-- Status update bar (MA action) -->
-        <div class="border-t border-slate-100 px-4 py-3 flex flex-wrap gap-2 bg-slate-50/60">
+        <div class="border-t border-slate-100 px-4 py-3 flex flex-wrap gap-2 bg-slate-50/60 no-print">
             <span class="text-xs text-slate-500 font-medium self-center mr-1">Update:</span>
             <?php foreach ($statusDefs as $sKey => $sDef): ?>
             <button onclick="updateStatus(<?= $v['id'] ?>, '<?= $sKey ?>')"
@@ -390,7 +472,7 @@ include __DIR__ . '/includes/header.php';
         </div>
 
         <!-- Quick Visit Notes -->
-        <div class="border-t border-slate-100 rounded-b-2xl overflow-hidden">
+        <div class="border-t border-slate-100 rounded-b-2xl overflow-hidden no-print">
             <!-- Toggle row -->
             <button type="button"
                     onclick="toggleNotes(this, <?= $v['id'] ?>)"
