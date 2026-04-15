@@ -88,78 +88,61 @@
     function startListening(target, btn) {
         var rec = new SpeechRecognition();
         rec.lang           = 'en-US';
-        rec.continuous     = true;
-        rec.interimResults = true;
+        rec.continuous     = false;   // more reliable on all browsers/iOS
+        rec.interimResults = false;   // only fire on final results — no cursor bugs
 
-        var interimStart = null;
-        var everStarted  = false; // guard against silent failure / infinite restart
+        var everStarted = false;
 
-        /* Set state immediately so the user sees a response on click */
+        /* Immediate visual feedback */
         activeRec = rec;
         activeBtn = btn;
         btn.innerHTML = stopIcon();
         btn.classList.add('pd-mic-recording');
         btn.title = 'Stop dictation';
-        showToast('Starting microphone…', false, true); // persist until onstart/error
+        showToast('Starting microphone\u2026', false, true);
 
         rec.onstart = function () {
             everStarted = true;
-            showToast('Listening…', false, true);
+            showToast('Listening\u2026', false, true);
         };
 
         rec.onresult = function (e) {
-            var interim = '';
-            var finalPart = '';
-            for (var i = e.resultIndex; i < e.results.length; i++) {
-                var t = e.results[i][0].transcript;
+            var text = '';
+            for (var i = 0; i < e.results.length; i++) {
                 if (e.results[i].isFinal) {
-                    finalPart += t;
-                } else {
-                    interim += t;
+                    text += e.results[i][0].transcript;
                 }
             }
+            text = text.trim();
+            if (!text) return;
 
-            if (finalPart) {
-                /* Remove any interim text we placed, append final */
-                if (interimStart !== null) {
-                    target.value = target.value.substring(0, interimStart);
-                    interimStart = null;
-                }
-                /* Insert at cursor or append */
-                var pos = target.selectionEnd != null ? target.selectionEnd : target.value.length;
-                var before = target.value.substring(0, pos);
-                var after  = target.value.substring(pos);
-                /* Add a space separator if needed */
-                var sep = (before.length > 0 && !/\s$/.test(before)) ? ' ' : '';
-                target.value = before + sep + finalPart.trimStart();
-                var newPos = target.value.length - after.length;
-                target.setSelectionRange(newPos, newPos);
-                /* Track where next interim text would start */
-                interimStart = newPos;
-                target.dispatchEvent(new Event('input', { bubbles: true }));
-            }
+            /* Append with a space separator */
+            var cur = target.value;
+            target.value = cur + (cur.length > 0 && !/\s$/.test(cur) ? ' ' : '') + text;
+            target.dispatchEvent(new Event('input', { bubbles: true }));
         };
 
         rec.onerror = function (e) {
-            if (e.error === 'no-speech') return; // harmless — keep listening
+            if (e.error === 'no-speech') return;
             var msg = {
-                'not-allowed':       'Microphone access denied. Check browser permissions.',
-                'service-not-allowed':'Microphone blocked. Ensure the page is HTTPS.',
-                'audio-capture':     'No microphone found.',
-                'network':           'Network error during speech recognition.',
-            }[e.error] || ('Microphone error: ' + e.error);
+                'not-allowed':        'Microphone access denied. Check browser permissions.',
+                'service-not-allowed':'Microphone blocked \u2014 page must be HTTPS.',
+                'audio-capture':      'No microphone found.',
+                'network':            'Network error during speech recognition.',
+            }[e.error] || ('Mic error: ' + e.error);
             showToast(msg, true, false);
             stopListening();
         };
 
         rec.onend = function () {
-            /* Only auto-restart if recognition actually started and is still active */
-            if (everStarted && activeRec === rec && btn.classList.contains('pd-mic-recording')) {
-                try { rec.start(); } catch (ex) { /* already stopped */ }
-            } else if (!everStarted) {
-                /* Never started — permission likely denied without an error event */
+            if (!everStarted) {
                 showToast('Could not access microphone. Check browser permissions.', true, false);
                 stopListening();
+                return;
+            }
+            /* Auto-restart only if still in active state — create a new instance */
+            if (activeRec === rec && btn.classList.contains('pd-mic-recording')) {
+                startListening(target, btn);
             }
         };
 
@@ -172,15 +155,15 @@
     }
 
     function stopListening() {
-        if (activeRec) {
-            try { activeRec.stop(); } catch (ex) {}
-            activeRec = null;
-        }
-        if (activeBtn) {
-            activeBtn.innerHTML = micIcon();
-            activeBtn.classList.remove('pd-mic-recording');
-            activeBtn.title = 'Dictate (voice-to-text)';
-            activeBtn = null;
+        var rec = activeRec;
+        var btn = activeBtn;
+        activeRec = null; // clear first so onend restart check fails
+        activeBtn = null;
+        if (rec) { try { rec.stop(); } catch (ex) {} }
+        if (btn) {
+            btn.innerHTML = micIcon();
+            btn.classList.remove('pd-mic-recording');
+            btn.title = 'Dictate (voice-to-text)';
         }
         dismissToast();
     }
