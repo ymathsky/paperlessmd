@@ -116,13 +116,11 @@ if (!function_exists('vdArr')) {
   /* ── Screen/print visibility ──────────────────────────── */
   @media print {
     .no-print   { display: none !important; }
-    .form-card  { display: none !important; }  /* hide screen cards when printing */
-    .print-only { display: block !important; }
     .page-break { page-break-after: always; break-after: page; }
     body        { background: white !important; }
+    .paper-card { box-shadow: none !important; border: none !important; max-width: 100% !important; }
   }
   @media screen {
-    .print-only { display: none !important; }
     .page-break { border-bottom: 3px dashed #e2e8f0; margin-bottom: 2.5rem; padding-bottom: 2.5rem; }
     .page-break:last-child { border-bottom: none; }
   }
@@ -203,7 +201,7 @@ if (!function_exists('vdArr')) {
     <!-- Cover banner -->
     <div id="exportContent">
 
-    <div class="bg-gradient-to-r from-blue-900 to-blue-700 rounded-2xl p-6 mb-8 text-white form-card">
+    <div class="no-print bg-gradient-to-r from-blue-900 to-blue-700 rounded-2xl p-6 mb-8 text-white">
         <div class="flex items-start justify-between gap-4 flex-wrap">
             <div>
                 <p class="text-blue-300 text-xs font-semibold uppercase tracking-widest mb-1"><?= h(APP_NAME) ?></p>
@@ -243,119 +241,80 @@ if (!function_exists('vdArr')) {
         $fd    = $formDefs[$f['form_type']] ?? ['label' => $f['form_type'], 'color' => '#475569'];
         $data  = json_decode($f['form_data'] ?? '{}', true) ?: [];
         $stLbl = $statusLabel[$f['status']] ?? 'Draft';
+        $stBg  = ['draft' => 'bg-slate-100 text-slate-600', 'signed' => 'bg-blue-100 text-blue-700', 'uploaded' => 'bg-emerald-100 text-emerald-700'][$f['status']] ?? 'bg-slate-100 text-slate-600';
         $isLast = $idx === count($forms) - 1;
+        $tplFile = __DIR__ . '/includes/print_templates/' . preg_replace('/[^a-z0-9_]/', '', $f['form_type']) . '.php';
     ?>
 
-    <div class="form-card bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-8 <?= $isLast ? '' : 'page-break' ?>">
-
-        <!-- Form header bar -->
-        <div style="background:<?= $fd['color'] ?>;" class="px-6 py-4 flex items-center justify-between gap-3">
+    <!-- Screen-only status / meta strip -->
+    <div class="no-print flex flex-wrap items-center justify-between gap-3 mb-4 px-5 py-3
+                bg-white rounded-2xl shadow-sm border border-slate-100 max-w-3xl">
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl grid place-items-center flex-shrink-0"
+                 style="background:<?= $fd['color'] ?>22;">
+                <span class="text-xs font-bold" style="color:<?= $fd['color'] ?>;"><?= $idx + 1 ?></span>
+            </div>
             <div>
-                <h2 class="text-white font-extrabold text-lg"><?= h($fd['label']) ?></h2>
-                <p class="text-white/70 text-xs mt-0.5"><?= h(PRACTICE_NAME) ?></p>
-            </div>
-            <div class="flex items-center gap-3 flex-shrink-0">
-                <span class="bg-white/20 text-white text-xs font-bold px-3 py-1.5 rounded-full">
-                    <?= h($stLbl) ?>
-                </span>
-                <span class="text-white/70 text-xs">
-                    Form <?= $idx + 1 ?> of <?= $formCount ?>
-                </span>
+                <p class="font-bold text-slate-800 text-sm"><?= h($fd['label']) ?></p>
+                <p class="text-xs text-slate-400">
+                    <?= date('M j, Y g:i a', strtotime($f['created_at'])) ?>
+                    <?= $f['ma_name'] ? ' &mdash; MA: ' . h($f['ma_name']) : '' ?>
+                    &mdash; Form <?= $idx + 1 ?> of <?= $formCount ?>
+                </p>
             </div>
         </div>
-
-        <!-- Meta row -->
-        <div class="px-6 py-3 bg-slate-50 border-b border-slate-100 flex flex-wrap gap-x-6 gap-y-1 text-sm">
-            <span class="text-slate-500"><span class="font-semibold text-slate-700">Patient</span> <?= h($patientName) ?></span>
-            <span class="text-slate-500"><span class="font-semibold text-slate-700">Date</span> <?= date('M j, Y g:i a', strtotime($f['created_at'])) ?></span>
-            <?php if ($f['ma_name']): ?>
-            <span class="text-slate-500"><span class="font-semibold text-slate-700">MA</span> <?= h($f['ma_name']) ?></span>
-            <?php endif; ?>
-        </div>
-
-        <!-- Form body -->
-        <div class="p-6">
-            <?php if (!empty($data)): ?>
-            <div class="space-y-3">
-            <?php foreach ($data as $key => $value):
-                if (in_array($key, ['csrf_token','patient_id','form_type'], true)) continue;
-                // Skip empty
-                if ($value === '' || $value === null) continue;
-                if (is_array($value) && empty($value)) continue;
-                $label = ucwords(str_replace(['_', 'ack'], [' ', 'Acknowledged: '], $key));
-            ?>
-            <?php if (is_array($value)): ?>
-            <div class="pb-3 border-b border-slate-100">
-                <div class="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1.5"><?= h($label) ?></div>
-                <div class="flex flex-wrap gap-2">
-                    <?php foreach ($value as $v): ?>
-                    <span class="inline-flex items-center px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded-lg border border-blue-100">
-                        <?= h((string)$v) ?>
-                    </span>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-            <?php elseif ($value === '1' || $value === 1): ?>
-            <div class="flex items-center gap-2 text-sm text-slate-700 bg-emerald-50 px-4 py-2.5 rounded-xl border border-emerald-100">
-                <i class="bi bi-check-circle-fill text-emerald-500 flex-shrink-0"></i>
-                <span class="font-medium"><?= h($label) ?></span>
-            </div>
-            <?php else: ?>
-            <div class="pb-3 border-b border-slate-100">
-                <div class="text-xs font-bold text-slate-400 uppercase tracking-wide mb-1"><?= h($label) ?></div>
-                <div class="text-sm text-slate-800 font-medium"><?= nl2br(h((string)$value)) ?></div>
-            </div>
-            <?php endif; ?>
-            <?php endforeach; ?>
-            </div>
-            <?php else: ?>
-            <p class="text-slate-400 text-sm italic">No form data.</p>
-            <?php endif; ?>
-
-            <!-- Signature -->
-            <?php if ($f['patient_signature']): ?>
-            <div class="mt-6 pt-5 border-t border-slate-200 flex items-end gap-6 flex-wrap">
-                <div>
-                    <div class="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">Patient Signature</div>
-                    <div class="border-2 border-slate-200 rounded-xl p-3 inline-block bg-white">
-                        <img src="<?= h($f['patient_signature']) ?>" alt="Signature"
-                             class="max-h-20 max-w-[240px] object-contain block">
-                    </div>
-                </div>
-                <div class="text-xs text-slate-400 pb-2">
-                    <i class="bi bi-shield-check mr-1 text-emerald-500"></i>
-                    Signed electronically<br><?= date('F j, Y \a\t g:i a', strtotime($f['created_at'])) ?>
-                </div>
-                <!-- Signature line for print/fax copies without captured sig -->
-                <div class="flex-1 min-w-[180px] pb-2">
-                    <div class="border-b-2 border-slate-300 h-12"></div>
-                    <div class="text-xs text-slate-400 mt-1">Authorised signature / Date</div>
-                </div>
-            </div>
-            <?php else: ?>
-            <div class="mt-6 pt-5 border-t border-slate-200 flex items-end gap-6 flex-wrap">
-                <div class="flex-1 min-w-[200px] pb-2">
-                    <div class="border-b-2 border-slate-300 h-12"></div>
-                    <div class="text-xs text-slate-400 mt-1">Patient Signature / Date</div>
-                </div>
-                <div class="flex-1 min-w-[200px] pb-2">
-                    <div class="border-b-2 border-slate-300 h-12"></div>
-                    <div class="text-xs text-slate-400 mt-1">Witness / Relationship / Date</div>
-                </div>
-            </div>
-            <?php endif; ?>
-        </div>
+        <span class="<?= $stBg ?> text-xs font-bold px-3 py-1.5 rounded-full"><?= h($stLbl) ?></span>
     </div>
 
-    <!-- Print-only: exact paper form replica (hidden on screen) -->
-    <div class="print-only <?= $isLast ? '' : 'page-break' ?>">
-        <?php
-        $tplFile = __DIR__ . '/includes/print_templates/' . preg_replace('/[^a-z0-9_]/', '', $f['form_type']) . '.php';
-        if (file_exists($tplFile)):
-            include $tplFile;
-        else: ?>
-        <div class="bwc-form">
-            <p style="font-style:italic;color:#999;font-size:9pt;">No print template available for form type: <?= h($f['form_type']) ?>.</p>
+    <!-- Paper card — matches view_document #printDoc -->
+    <div class="paper-card bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden mb-8 max-w-3xl <?= $isLast ? '' : 'page-break' ?>">
+        <div class="px-10 py-8">
+            <?php if (file_exists($tplFile)): include $tplFile;
+            else: ?>
+            <div class="bwc-form" style="font-family:Arial,sans-serif;font-size:11px;">
+                <div style="text-align:center;margin-bottom:16px;">
+                    <p style="font-size:18px;font-weight:bold;margin:0;">Beyond Wound Care Inc.</p>
+                    <p style="margin:2px 0;">1340 Remington RD, Ste P &nbsp; Schaumburg, IL 60173</p>
+                    <p style="margin:2px 0;">Phone: 847.873.8693 &nbsp;&nbsp; Fax: 847.873.8486</p>
+                </div>
+                <?php foreach ($data as $key => $value):
+                    if (in_array($key, ['csrf_token','patient_id','form_type'], true)) continue;
+                    if ($value === '' || $value === null) continue;
+                    if (is_array($value) && empty($value)) continue;
+                    $lbl = ucwords(str_replace('_', ' ', $key));
+                ?>
+                <?php if (is_array($value)): ?>
+                <div class="border-b border-slate-100 pb-3 mb-3">
+                    <div class="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1"><?= h($lbl) ?></div>
+                    <div class="flex flex-wrap gap-2">
+                        <?php foreach ($value as $v): ?>
+                        <span class="inline-flex items-center px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded-lg"><?= h((string)$v) ?></span>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <?php elseif ($value === '1' || $value === 1): ?>
+                <div class="flex items-center gap-2 text-sm bg-emerald-50 px-4 py-2.5 rounded-xl mb-2">
+                    <i class="bi bi-check-circle-fill text-emerald-500"></i>
+                    <span class="font-medium text-slate-700"><?= h($lbl) ?></span>
+                </div>
+                <?php else: ?>
+                <div class="border-b border-slate-100 pb-3 mb-3">
+                    <div class="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1"><?= h($lbl) ?></div>
+                    <div class="text-sm text-slate-800 font-medium"><?= nl2br(h((string)$value)) ?></div>
+                </div>
+                <?php endif; ?>
+                <?php endforeach; ?>
+            </div>
+            <?php endif; ?>
+        </div>
+
+        <!-- Screen-only: signed electronic notice -->
+        <?php if ($f['patient_signature']): ?>
+        <div class="no-print px-10 py-3 bg-emerald-50 border-t border-emerald-100 flex items-center gap-2">
+            <i class="bi bi-shield-check text-emerald-600"></i>
+            <span class="text-xs text-emerald-700 font-semibold">
+                Signed electronically on <?= date('F j, Y \a\t g:i a', strtotime($f['created_at'])) ?>
+            </span>
         </div>
         <?php endif; ?>
     </div>
