@@ -472,6 +472,79 @@ JS;
         </div>
     </div>
 </div>
+<?php
+$_pCsrf   = htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8');
+$_pDocId  = (int)$doc['id'];
+$_pBase   = BASE_URL;
+$extraJs  = <<<JS
+<script>
+(function () {
+    var provCanvas = document.getElementById('provCanvas');
+    if (!provCanvas) return;
+    function resizeProvCanvas() {
+        var rect = provCanvas.getBoundingClientRect();
+        provCanvas.width  = Math.floor(rect.width  * window.devicePixelRatio);
+        provCanvas.height = Math.floor(rect.height * window.devicePixelRatio);
+        provCanvas.getContext('2d').scale(window.devicePixelRatio, window.devicePixelRatio);
+    }
+    resizeProvCanvas();
+    window.addEventListener('resize', resizeProvCanvas);
+    var provPad = new SignaturePad(provCanvas, { penColor: '#3b0764', minWidth: 1.5, maxWidth: 3 });
+    var provPlaceholder = document.getElementById('provPlaceholder');
+    provPad.addEventListener('beginStroke', function () { provPlaceholder.style.display = 'none'; });
+    document.getElementById('provClearBtn').addEventListener('click', function () {
+        provPad.clear();
+        provPlaceholder.style.display = '';
+        document.getElementById('provMsg').classList.add('hidden');
+    });
+    document.getElementById('provSaveBtn').addEventListener('click', async function () {
+        var btn    = this;
+        var msgEl  = document.getElementById('provMsg');
+        if (provPad.isEmpty()) {
+            msgEl.textContent = 'Please sign before saving.';
+            msgEl.className   = 'text-sm font-semibold text-rose-600';
+            msgEl.classList.remove('hidden');
+            return;
+        }
+        btn.disabled  = true;
+        btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving\u2026';
+        msgEl.classList.add('hidden');
+        try {
+            var res  = await fetch('{$_pBase}/api/sign_provider.php', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({
+                    csrf:          '{$_pCsrf}',
+                    id:            {$_pDocId},
+                    signature:     provPad.toDataURL('image/png'),
+                    provider_name: document.getElementById('provName').value.trim(),
+                }),
+            });
+            var json = await res.json();
+            if (json.ok) {
+                btn.innerHTML = '<i class="bi bi-check2-circle"></i> Saved!';
+                btn.classList.replace('bg-violet-600', 'bg-emerald-600');
+                btn.classList.replace('hover:bg-violet-700', 'hover:bg-emerald-700');
+                document.getElementById('provPanel').classList.replace('border-violet-200', 'border-emerald-200');
+                msgEl.textContent = 'Provider signature saved. Refreshing\u2026';
+                msgEl.className   = 'text-sm font-semibold text-emerald-600';
+                msgEl.classList.remove('hidden');
+                setTimeout(function () { location.reload(); }, 1200);
+            } else {
+                throw new Error(json.error || 'Unknown error');
+            }
+        } catch (err) {
+            btn.disabled  = false;
+            btn.innerHTML = '<i class="bi bi-check-circle-fill"></i> Save Provider Signature';
+            msgEl.textContent = 'Error: ' + err.message;
+            msgEl.className   = 'text-sm font-semibold text-rose-600';
+            msgEl.classList.remove('hidden');
+        }
+    });
+})();
+</script>
+JS;
+?>
 <?php endif; ?>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>
