@@ -28,7 +28,8 @@ $schedStmt = $pdo->prepare("
            CONCAT(p.first_name, ' ', p.last_name) AS patient_name,
            p.address AS patient_address,
            p.phone   AS patient_phone,
-           p.id      AS patient_id
+           p.id      AS patient_id,
+           sc.visit_notes
     FROM `schedule` sc
     JOIN patients p ON p.id = sc.patient_id
     WHERE sc.ma_id = ? AND sc.visit_date = ?
@@ -228,7 +229,7 @@ include __DIR__ . '/includes/header.php';
         </div>
 
         <!-- Status update bar (MA action) -->
-        <div class="border-t border-slate-100 px-4 py-3 flex flex-wrap gap-2 bg-slate-50/60 rounded-b-2xl">
+        <div class="border-t border-slate-100 px-4 py-3 flex flex-wrap gap-2 bg-slate-50/60">
             <span class="text-xs text-slate-500 font-medium self-center mr-1">Update:</span>
             <?php foreach ($statusDefs as $sKey => $sDef): ?>
             <button onclick="updateStatus(<?= $v['id'] ?>, '<?= $sKey ?>')"
@@ -240,6 +241,47 @@ include __DIR__ . '/includes/header.php';
                 <i class="bi <?= $sDef['icon'] ?> mr-0.5"></i> <?= $sDef['label'] ?>
             </button>
             <?php endforeach; ?>
+        </div>
+
+        <!-- Quick Visit Notes -->
+        <div class="border-t border-slate-100 rounded-b-2xl overflow-hidden">
+            <!-- Toggle row -->
+            <button type="button"
+                    onclick="toggleNotes(this, <?= $v['id'] ?>)"
+                    class="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-semibold
+                           text-left transition-colors
+                           <?= !empty($v['visit_notes']) ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' : 'bg-slate-50/80 text-slate-500 hover:bg-slate-100' ?>">
+                <i class="bi bi-pencil-square text-sm"></i>
+                <?php if (!empty($v['visit_notes'])): ?>
+                    <span class="truncate flex-1"><?= h(mb_strimwidth($v['visit_notes'], 0, 80, '…')) ?></span>
+                    <span class="shrink-0 px-2 py-0.5 bg-amber-200 text-amber-800 rounded-full text-[10px] font-bold">Note saved</span>
+                <?php else: ?>
+                    <span class="flex-1">Add quick note…</span>
+                <?php endif; ?>
+                <i class="bi bi-chevron-down text-xs shrink-0 note-chevron transition-transform"></i>
+            </button>
+            <!-- Expandable note area -->
+            <div class="note-panel hidden px-4 pb-4 pt-3 bg-amber-50/60">
+                <textarea
+                    id="note-<?= $v['id'] ?>"
+                    class="w-full px-3 py-2.5 border border-amber-200 rounded-xl text-sm bg-white
+                           focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent
+                           resize-none transition"
+                    rows="3"
+                    placeholder="Quick clinical observation — e.g. wound looks improved, patient reports pain 3/10…"
+                    ><?= h($v['visit_notes'] ?? '') ?></textarea>
+                <div class="flex items-center gap-2 mt-2">
+                    <button type="button"
+                            onclick="saveNote(<?= $v['id'] ?>, this)"
+                            class="px-4 py-2 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white
+                                   text-xs font-bold rounded-xl transition-all shadow-sm">
+                        <i class="bi bi-floppy-fill mr-1"></i> Save Note
+                    </button>
+                    <span class="note-saved-msg hidden text-xs text-emerald-600 font-semibold">
+                        <i class="bi bi-check-circle-fill mr-0.5"></i> Saved!
+                    </span>
+                </div>
+            </div>
         </div>
     </div>
     <?php endforeach; ?>
@@ -276,6 +318,63 @@ function startVisit(visitId, patientId, btn) {
         btn.innerHTML = '<i class="bi bi-play-fill text-sm"></i> Start Visit';
         alert('Network error. Please try again.');
     });
+}
+
+// ── Quick Visit Notes ────────────────────────────────────────────────────────
+function toggleNotes(btn, visitId) {
+    const card  = btn.closest('[id^="visit-"]');
+    const panel = card.querySelector('.note-panel');
+    const chev  = btn.querySelector('.note-chevron');
+    const open  = panel.classList.toggle('hidden');
+    chev.style.transform = open ? '' : 'rotate(180deg)';
+    if (!open) {
+        // focus textarea
+        const ta = document.getElementById('note-' + visitId);
+        if (ta) { ta.focus(); ta.selectionStart = ta.value.length; }
+    }
+}
+
+async function saveNote(visitId, btn) {
+    const ta  = document.getElementById('note-' + visitId);
+    const msg = btn.closest('.flex').querySelector('.note-saved-msg');
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split mr-1"></i> Saving…';
+    try {
+        const r = await fetch(BASE + '/api/schedule_update.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ csrf: CSRF, id: visitId, action: 'save_note', visit_notes: ta.value })
+        });
+        const d = await r.json();
+        if (d.ok) {
+            // Update the toggle button preview text
+            const card    = ta.closest('[id^="visit-"]');
+            const togBtn  = card.querySelector('button[onclick^="toggleNotes"]');
+            const preview = togBtn.querySelector('span.flex-1');
+            const badge   = togBtn.querySelector('span.shrink-0');
+            if (ta.value.trim()) {
+                preview.textContent = ta.value.length > 80 ? ta.value.slice(0,80) + '…' : ta.value;
+                togBtn.classList.remove('bg-slate-50/80','text-slate-500','hover:bg-slate-100');
+                togBtn.classList.add('bg-amber-50','text-amber-700','hover:bg-amber-100');
+                if (!badge) {
+                    const b = document.createElement('span');
+                    b.className = 'shrink-0 px-2 py-0.5 bg-amber-200 text-amber-800 rounded-full text-[10px] font-bold';
+                    b.textContent = 'Note saved';
+                    togBtn.querySelector('.note-chevron').before(b);
+                } else { badge.textContent = 'Note saved'; }
+            } else {
+                preview.textContent = 'Add quick note…';
+                togBtn.classList.add('bg-slate-50/80','text-slate-500','hover:bg-slate-100');
+                togBtn.classList.remove('bg-amber-50','text-amber-700','hover:bg-amber-100');
+                if (badge) badge.remove();
+            }
+            msg.classList.remove('hidden');
+            setTimeout(() => msg.classList.add('hidden'), 2500);
+        } else { alert(d.error || 'Could not save note.'); }
+    } catch { alert('Network error.'); }
+    btn.disabled = false;
+    btn.innerHTML = orig;
 }
 
 // ── Status update (status bar buttons) ───────────────────────────────────────

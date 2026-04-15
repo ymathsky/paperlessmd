@@ -52,6 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 visit_order SMALLINT NOT NULL DEFAULT 0,
                 status ENUM('pending','en_route','completed','missed') NOT NULL DEFAULT 'pending',
                 notes TEXT NULL,
+                visit_notes TEXT NULL,
                 created_by INT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

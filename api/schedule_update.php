@@ -53,4 +53,29 @@ if ($action === 'status') {
     exit;
 }
 
+if ($action === 'save_note') {
+    $id   = (int)($body['id'] ?? 0);
+    $note = trim($body['visit_notes'] ?? '');
+
+    if (!$id) {
+        echo json_encode(['ok' => false, 'error' => 'Invalid parameters']);
+        exit;
+    }
+
+    if (isAdmin()) {
+        $stmt = $pdo->prepare("UPDATE `schedule` SET visit_notes=? WHERE id=?");
+        $stmt->execute([$note ?: null, $id]);
+    } else {
+        $stmt = $pdo->prepare("UPDATE `schedule` SET visit_notes=? WHERE id=? AND ma_id=?");
+        $stmt->execute([$note ?: null, $id, $_SESSION['user_id']]);
+    }
+
+    if ($stmt->rowCount() === 0 && !$note) {
+        // rowCount is 0 when value didn't change — still OK
+    }
+
+    echo json_encode(['ok' => true]);
+    exit;
+}
+
 echo json_encode(['ok' => false, 'error' => 'Unknown action']);
