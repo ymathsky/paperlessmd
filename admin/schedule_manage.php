@@ -19,6 +19,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add')
     $patientId = (int)($_POST['patient_id'] ?? 0);
     $visitDate = $_POST['visit_date'] ?? $date;
     $visitTime = $_POST['visit_time'] ?: null;
+    $visitType = $_POST['visit_type'] ?? 'routine';
+    $allowedTypes = ['routine','new_patient','wound_care','awv','ccm','il'];
+    if (!in_array($visitType, $allowedTypes, true)) $visitType = 'routine';
     $notes     = trim($_POST['notes'] ?? '');
 
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $visitDate)) $errors[] = 'Invalid date.';
@@ -38,9 +41,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add')
         $orderStmt->execute([$maId, $visitDate]);
         $nextOrder = (int)$orderStmt->fetchColumn();
 
-        $ins = $pdo->prepare("INSERT INTO `schedule` (visit_date,ma_id,patient_id,visit_time,visit_order,notes,created_by)
-                               VALUES (?,?,?,?,?,?,?)");
-        $ins->execute([$visitDate, $maId, $patientId, $visitTime, $nextOrder, $notes ?: null, $_SESSION['user_id']]);
+        $ins = $pdo->prepare("INSERT INTO `schedule` (visit_date,ma_id,patient_id,visit_time,visit_order,visit_type,notes,created_by)
+                               VALUES (?,?,?,?,?,?,?,?)");
+        $ins->execute([$visitDate, $maId, $patientId, $visitTime, $nextOrder, $visitType, $notes ?: null, $_SESSION['user_id']]);
         $date = $visitDate;
         header('Location: ' . BASE_URL . '/admin/schedule_manage.php?date=' . $date . '&saved=1');
         exit;
@@ -215,7 +218,21 @@ include __DIR__ . '/../includes/header.php';
                               focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition focus:bg-white">
             </div>
 
-            <div class="sm:col-span-2 lg:col-span-2">
+            <div>
+                <label class="block text-sm font-semibold text-slate-700 mb-1.5">Visit Type</label>
+                <select name="visit_type"
+                        class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
+                               focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition focus:bg-white">
+                    <option value="routine"     <?= ($_POST['visit_type']??'routine')==='routine'     ?'selected':'' ?>>Routine Visit</option>
+                    <option value="new_patient" <?= ($_POST['visit_type']??'')==='new_patient' ?'selected':'' ?>>New Patient</option>
+                    <option value="wound_care"  <?= ($_POST['visit_type']??'')==='wound_care'  ?'selected':'' ?>>Wound Care</option>
+                    <option value="awv"         <?= ($_POST['visit_type']??'')==='awv'         ?'selected':'' ?>>Annual Wellness (AWV)</option>
+                    <option value="ccm"         <?= ($_POST['visit_type']??'')==='ccm'         ?'selected':'' ?>>CCM Visit</option>
+                    <option value="il"          <?= ($_POST['visit_type']??'')==='il'          ?'selected':'' ?>>IL Disclosure</option>
+                </select>
+            </div>
+
+            <div class="sm:col-span-2 lg:col-span-1">
                 <label class="block text-sm font-semibold text-slate-700 mb-1.5">Notes <span class="font-normal text-slate-400">(optional)</span></label>
                 <input type="text" name="notes" value="<?= h($_POST['notes'] ?? '') ?>" placeholder="e.g. Use back entrance, patient has a dog..."
                        class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
@@ -281,6 +298,11 @@ include __DIR__ . '/../includes/header.php';
                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold <?= $sd['bg'] ?> <?= $sd['text'] ?>">
                         <i class="bi <?= $sd['icon'] ?> text-xs"></i> <?= $sd['label'] ?>
                     </span>
+                    <?php
+                    $vtLabels = ['routine'=>'Routine','new_patient'=>'New Pt','wound_care'=>'Wound Care','awv'=>'AWV','ccm'=>'CCM','il'=>'IL Disc.'];
+                    $vtLabel  = $vtLabels[$v['visit_type'] ?? 'routine'] ?? 'Routine';
+                    ?>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-700"><?= h($vtLabel) ?></span>
                 </div>
                 <?php if ($v['patient_address']): ?>
                 <div class="text-xs text-slate-400 mt-0.5 truncate"><?= h($v['patient_address']) ?></div>

@@ -2,6 +2,7 @@
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/db.php';
 require_once __DIR__ . '/includes/audit.php';
+require_once __DIR__ . '/includes/visit_types.php';
 requireLogin();
 
 $id = (int)($_GET['id'] ?? 0);
@@ -116,7 +117,7 @@ try {
 $lastVisit = null;
 try {
     $lvStmt = $pdo->prepare("
-        SELECT sc.visit_date, sc.visit_time, sc.status, sc.notes,
+        SELECT sc.visit_date, sc.visit_time, sc.status, sc.notes, sc.visit_type,
                s.full_name AS ma_name
         FROM `schedule` sc
         LEFT JOIN staff s ON s.id = sc.ma_id
@@ -760,6 +761,69 @@ function completeVisit(visitId) {
 <?php endif; ?>
 
 <!-- Form Tiles -->
+<?php
+// ── Required Forms Checklist ──────────────────────────────────────────────────
+// Use active visit type if present, otherwise fall back to last visit type.
+$checklistVisitType = null;
+$checklistVisitDate = null;
+if ($activeVisit) {
+    $checklistVisitType = $activeVisit['visit_type'] ?? 'routine';
+    $checklistVisitDate = $activeVisit['visit_date'] ?? null;
+} elseif ($lastVisit) {
+    $checklistVisitType = $lastVisit['visit_type'] ?? 'routine';
+    $checklistVisitDate = $lastVisit['visit_date'] ?? null;
+}
+
+// Build set of form types submitted on that visit date
+$completedForms = [];
+if ($checklistVisitDate) {
+    foreach ($forms as $f) {
+        if (substr($f['created_at'], 0, 10) === $checklistVisitDate) {
+            $completedForms[] = $f['form_type'];
+        }
+    }
+}
+$vtDef    = VISIT_TYPES[$checklistVisitType] ?? VISIT_TYPES['routine'];
+$required = $vtDef['required'];
+$allDone  = count(array_diff($required, $completedForms)) === 0;
+?>
+<?php if ($checklistVisitType && canAccessClinical()): ?>
+<div class="bg-white rounded-2xl shadow-sm border <?= $allDone ? 'border-emerald-200' : 'border-amber-200' ?> p-4 mb-6 no-print">
+    <div class="flex items-center gap-2 mb-3">
+        <i class="bi bi-list-check <?= $allDone ? 'text-emerald-500' : 'text-amber-500' ?> text-lg"></i>
+        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Required Forms</span>
+        <span class="ml-1 text-xs font-semibold px-2 py-0.5 rounded-full <?= $allDone ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700' ?>">
+            <?= $allDone ? 'All Complete' : (count($completedForms) . '/' . count($required) . ' done') ?>
+        </span>
+        <span class="ml-auto text-xs text-slate-400 font-medium"><?= h($vtDef['label']) ?></span>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <?php foreach ($required as $reqType):
+            $done    = in_array($reqType, $completedForms, true);
+            $flabel  = FORM_LABELS[$reqType] ?? $reqType;
+            $formUrl = BASE_URL . '/forms/' . $reqType . '.php?patient_id=' . $id;
+        ?>
+        <a href="<?= h($formUrl) ?>"
+           class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-colors
+                  <?= $done ? 'bg-emerald-50 border border-emerald-200 cursor-default pointer-events-none' : 'bg-slate-50 border border-slate-200 hover:border-blue-300 hover:bg-blue-50' ?>">
+            <div class="w-6 h-6 rounded-full flex-shrink-0 grid place-items-center
+                        <?= $done ? 'bg-emerald-500' : 'bg-white border-2 border-slate-300' ?>">
+                <?php if ($done): ?>
+                <i class="bi bi-check text-white text-xs font-bold"></i>
+                <?php endif; ?>
+            </div>
+            <span class="text-sm font-medium <?= $done ? 'text-emerald-700 line-through decoration-emerald-400' : 'text-slate-700' ?>">
+                <?= h($flabel) ?>
+            </span>
+            <?php if (!$done): ?>
+            <i class="bi bi-pencil-fill text-slate-300 ml-auto text-xs"></i>
+            <?php endif; ?>
+        </a>
+        <?php endforeach; ?>
+    </div>
+</div>
+<?php endif; ?>
+
 <?php if (canAccessClinical()): ?>
 <div class="mb-6">
     <h3 class="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3">Start a Form</h3>

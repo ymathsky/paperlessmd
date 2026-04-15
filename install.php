@@ -51,6 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 visit_time TIME NULL,
                 visit_order SMALLINT NOT NULL DEFAULT 0,
                 status ENUM('pending','en_route','completed','missed') NOT NULL DEFAULT 'pending',
+                visit_type VARCHAR(30) NOT NULL DEFAULT 'routine',
                 notes TEXT NULL,
                 visit_notes TEXT NULL,
                 created_by INT NULL,

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/db.php';
+require_once __DIR__ . '/includes/visit_types.php';
 requireNotBilling();
 
 $pageTitle = 'My Schedule';
@@ -166,6 +167,13 @@ include __DIR__ . '/includes/header.php';
                     <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold <?= $sd['bg'] ?> <?= $sd['text'] ?>">
                         <span class="w-1.5 h-1.5 rounded-full <?= $sd['dot'] ?>"></span>
                         <?= $sd['label'] ?>
+                    </span>
+                    <?php
+                    $vt = $v['visit_type'] ?? 'routine';
+                    $vtLabels = ['routine'=>'Routine','new_patient'=>'New Pt','wound_care'=>'Wound Care','awv'=>'AWV','ccm'=>'CCM','il'=>'IL Disc.'];
+                    ?>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-700">
+                        <?= h($vtLabels[$vt] ?? 'Routine') ?>
                     </span>
                 </div>
 
