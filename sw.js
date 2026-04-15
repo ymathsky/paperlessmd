@@ -44,7 +44,10 @@ self.addEventListener('activate', event => {
 // ── Fetch ─────────────────────────────────────────────────────────────────
 self.addEventListener('fetch', event => {
     const req = event.request;
-    if (req.method !== 'GET') return; // POST handled by offline.js on the client
+    if (req.method !== 'GET') return;
+
+    // Skip non-http(s) requests (chrome-extension://, etc.)
+    if (!req.url.startsWith('http')) return;
 
     const url = new URL(req.url);
 
@@ -68,7 +71,7 @@ async function cdnStrategy(req) {
     const cache  = await caches.open(STATIC_CACHE);
     const cached = await cache.match(req);
     const online = fetch(req)
-        .then(r => { cache.put(req, r.clone()); return r; })
+        .then(r => { if (r.ok) cache.put(req, r.clone()); return r; })
         .catch(() => null);
     return cached || await online || new Response('', { status: 504 });
 }
@@ -82,7 +85,7 @@ async function pageStrategy(req) {
     } catch {
         const cached   = await cache.match(req);
         if (cached) return cached;
-        const fallback = await caches.match('/pd/offline.html');
+        const fallback = await caches.match(BASE + '/offline.html');
         return fallback || new Response('Offline', {
             status: 503,
             headers: { 'Content-Type': 'text/plain' },
