@@ -1,0 +1,7 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/mdoffic1/docs.md-officesupport.com/
+    - /bin/cp -R . $DEPLOYPATH
+    - /bin/mkdir -p ${DEPLOYPATH}uploads
+    - /bin/chmod 755 ${DEPLOYPATH}uploads
