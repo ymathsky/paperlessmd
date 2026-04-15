@@ -25,6 +25,8 @@ if ($action !== 'list' && !verifyCsrf($body['csrf'] ?? null)) {
     exit;
 }
 
+try {
+
 switch ($action) {
 
     case 'add':
@@ -93,4 +95,9 @@ switch ($action) {
     default:
         http_response_code(400);
         echo json_encode(['error' => 'Unknown action']);
+}
+
+} catch (Throwable $e) {
+    http_response_code(500);
+    echo json_encode(['error' => 'Server error: ' . $e->getMessage()]);
 }
