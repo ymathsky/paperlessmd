@@ -168,7 +168,7 @@ include __DIR__ . '/includes/header.php';
     <h3 class="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4">
         <i class="bi bi-lightning-charge-fill text-amber-400 mr-1"></i> Quick Actions
     </h3>
-    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <?php if (canAccessClinical()): ?>
         <a href="<?= BASE_URL ?>/patient_add.php"
            class="flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-blue-100 hover:border-blue-400 hover:bg-blue-50 transition-all group">
@@ -198,6 +198,13 @@ include __DIR__ . '/includes/header.php';
                 <i class="bi bi-people-fill text-emerald-600 text-xl"></i>
             </div>
             <span class="text-sm font-semibold text-slate-700">All Patients</span>
+        </a>
+        <a href="<?= BASE_URL ?>/user_manual.html" target="_blank"
+           class="flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-violet-100 hover:border-violet-400 hover:bg-violet-50 transition-all group">
+            <div class="w-12 h-12 bg-violet-100 group-hover:bg-violet-200 rounded-xl grid place-items-center transition-colors">
+                <i class="bi bi-book-half text-violet-600 text-xl"></i>
+            </div>
+            <span class="text-sm font-semibold text-slate-700">User Manual</span>
         </a>
     </div>
 </div>
