@@ -8,7 +8,7 @@
  * ──────────────────────────────────────────────────────────────────────── */
 (function () {
 
-    var INTERVAL_MS  = 30000;
+    var INTERVAL_MS  = 15000;
     var EXPIRY_MS    = 86400000; // discard drafts older than 24 h
     var SKIP_NAMES   = ['csrf_token', 'patient_signature', 'poa_signature', '__ts'];
 
