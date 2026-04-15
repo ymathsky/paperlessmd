@@ -422,11 +422,12 @@ if (isset($prev['icd10_codes']) && is_array($prev['icd10_codes'])) {
 }
 $icdPrefillJson = json_encode($prevIcdCodes, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_UNICODE);
 $icdApiBase     = BASE_URL;
+$icdApiBaseJson = json_encode(BASE_URL);
 
 $extraJs = <<<JSBLOCK
 <script>
 (function () {
-    var BASE     = <?= json_encode(BASE_URL) ?>;
+    var BASE     = $icdApiBaseJson;
     var MAX      = 6;
     var selected = []; // array of {code, desc, cat}
     var debTimer = null;
@@ -554,7 +555,7 @@ $extraJs = <<<JSBLOCK
     });
 
     /* ── Pre-fill from last visit ────────────────────────────── */
-    var prefill = <?= $icdPrefillJson ?>;
+    var prefill = $icdPrefillJson;
     if (Array.isArray(prefill)) {
         prefill.forEach(function (raw) {
             // raw is "CODE — desc" string
