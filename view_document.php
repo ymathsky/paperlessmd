@@ -49,8 +49,76 @@ $statusCfg = [
 ];
 $sc = $statusCfg[$doc['status']] ?? $statusCfg['draft'];
 
+/* ── Aliases expected by print templates ── */
+$patient = [
+    'first_name' => $doc['first_name'],
+    'last_name'  => $doc['last_name'],
+    'dob'        => $doc['dob'],
+    'insurance'  => $doc['insurance'],
+    'phone'      => '',
+    'address'    => '',
+    'email'      => '',
+];
+$f = $doc; // templates use $f for the submission row
+
+if (!function_exists('vd')) {
+    function vd(array $d, string $k): string {
+        return isset($d[$k]) ? htmlspecialchars((string)$d[$k], ENT_QUOTES, 'UTF-8') : '';
+    }
+}
+if (!function_exists('vdArr')) {
+    function vdArr(array $d, string $k): array {
+        if (!isset($d[$k])) return [];
+        return is_array($d[$k]) ? $d[$k] : array_filter(array_map('trim', explode(',', (string)$d[$k])));
+    }
+}
+
 include __DIR__ . '/includes/header.php';
 ?>
+<style>
+  @page { size: letter; margin: 0.5in; }
+  @media print {
+    .no-print  { display: none !important; }
+    .sign-panel{ display: none !important; }
+    body       { background: white !important; }
+    #printDoc  { box-shadow: none !important; border: none !important; max-width: 100% !important; }
+    .screen-strip { display: none !important; }
+  }
+  /* BWC paper form classes */
+  .bwc-form            { max-width: 100%; font-family: Arial, sans-serif; font-size: 10pt; color: #000; }
+  .bwc-header          { text-align: center; margin-bottom: 10pt; line-height: 1.5; }
+  .bwc-header p        { margin: 1pt 0; }
+  .bwc-practice-name   { font-size: 14pt; font-weight: bold; margin: 0 !important; }
+  .bwc-form-title      { font-size: 12pt; font-weight: bold; text-decoration: underline; margin: 8pt 0 4pt !important; }
+  .bwc-patient-line,
+  .bwc-provider-line,
+  .bwc-visit-row,
+  .bwc-homebound-row,
+  .bwc-row             { margin: 4pt 0; line-height: 1.8; font-size: 10pt; }
+  .bwc-fill            { display: inline-block; min-width: 120pt; border-bottom: 1px solid #000; vertical-align: bottom; }
+  .bwc-fill-sm         { display: inline-block; min-width: 40pt;  border-bottom: 1px solid #000; vertical-align: bottom; }
+  .bwc-vitals-table    { width: 100%; border-collapse: collapse; margin: 6pt 0; }
+  .bwc-vitals-table td { border: 1px solid #000; padding: 4pt 6pt; min-height: 28pt; vertical-align: top; width: 25%; font-size: 9.5pt; }
+  .bwc-med-table       { width: 100%; border-collapse: collapse; margin: 6pt 0; }
+  .bwc-med-table td,
+  .bwc-med-table th    { border: 1px solid #000; padding: 3pt 5pt; font-size: 9.5pt; }
+  .bwc-med-header th   { background: #f0f0f0; font-weight: bold; text-align: left; }
+  .bwc-race-chip       { display: inline; margin-right: 6pt; }
+  .bwc-checked         { font-weight: bold; text-decoration: underline; }
+  .bwc-sigs            { margin-top: 20pt; }
+  .bwc-sig-row         { display: flex; align-items: flex-end; gap: 20pt; margin-bottom: 2pt; }
+  .bwc-sig-line        { flex: 1; border-bottom: 1px solid #000; min-height: 32pt; position: relative; }
+  .bwc-sig-date        { white-space: nowrap; width: 140pt; border-bottom: 1px solid #000; min-height: 32pt; }
+  .bwc-sig-label       { font-size: 9pt; color: #333; margin-bottom: 12pt; }
+  .bwc-sig-img         { max-height: 30pt; max-width: 200pt; object-fit: contain; position: absolute; bottom: 2pt; }
+  .bwc-section-hdr     { background: #333; color: #fff; font-weight: bold; padding: 3pt 6pt; font-size: 10pt; margin: 6pt 0 4pt; }
+  .bwc-cog-table       { width: 100%; border-collapse: collapse; margin-bottom: 6pt; }
+  .bwc-cog-table td    { border: 1px solid #ccc; padding: 4pt 6pt; font-size: 9.5pt; vertical-align: top; }
+  /* Screen: make the paper form look like a real document */
+  .bwc-form            { font-size: 11px; }
+  .bwc-practice-name   { font-size: 18px; }
+  .bwc-form-title      { font-size: 14px; }
+</style>
 
 <!-- Breadcrumb -->
 <nav class="flex items-center gap-2 text-sm text-slate-400 mb-6 flex-wrap no-print">
@@ -84,137 +152,87 @@ include __DIR__ . '/includes/header.php';
     </a>
 </div>
 
-<!-- Document Card (printable) -->
-<div id="printDoc" class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden max-w-3xl">
-    <!-- Header -->
-    <div class="bg-gradient-to-r <?= $fm['bg'] ?> px-6 py-5 flex items-center gap-3">
-        <div class="bg-white/20 p-2.5 rounded-xl">
-            <i class="bi <?= $fm['icon'] ?> text-white text-2xl"></i>
+<!-- Screen-only status / meta bar -->
+<div class="screen-strip no-print flex flex-wrap items-center justify-between gap-3 mb-4 px-5 py-3
+            bg-white rounded-2xl shadow-sm border border-slate-100 max-w-3xl">
+    <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl grid place-items-center bg-slate-100 flex-shrink-0">
+            <i class="bi <?= $fm['icon'] ?> <?= $fm['color'] ?> text-lg"></i>
         </div>
         <div>
-            <h2 class="text-white font-extrabold text-xl"><?= $fm['label'] ?></h2>
-            <p class="text-white/75 text-sm mt-0.5"><?= h(PRACTICE_NAME) ?></p>
-        </div>
-        <div class="ml-auto">
-            <span class="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold bg-white/20 text-white">
-                <?= $sc['label'] ?>
-            </span>
+            <p class="font-bold text-slate-800 text-sm"><?= $fm['label'] ?></p>
+            <p class="text-xs text-slate-400"><?= date('M j, Y g:i a', strtotime($doc['created_at'])) ?><?= $doc['ma_name'] ? ' &mdash; MA: ' . h($doc['ma_name']) : '' ?></p>
         </div>
     </div>
+    <span class="<?= $sc['bg'] ?> <?= $sc['text'] ?> text-xs font-bold px-3 py-1.5 rounded-full">
+        <?= $sc['label'] ?>
+    </span>
+</div>
 
-    <!-- Patient Info -->
-    <div class="px-6 py-4 bg-slate-50 border-b border-slate-100">
-        <div class="flex flex-wrap gap-x-6 gap-y-2 text-sm">
-            <div>
-                <span class="text-slate-500 text-xs font-semibold uppercase tracking-wide">Patient</span>
-                <div class="font-bold text-slate-800"><?= h($doc['first_name'] . ' ' . $doc['last_name']) ?></div>
+<!-- Document Card (printable) -->
+<div id="printDoc" class="bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden max-w-3xl">
+    <!-- Paper body -->
+    <div class="px-10 py-8">
+        <?php
+            $tplFile = __DIR__ . '/includes/print_templates/' . preg_replace('/[^a-z0-9_]/', '', $doc['form_type']) . '.php';
+            if (file_exists($tplFile)):
+                include $tplFile;
+            else:
+        ?>
+        <!-- Fallback: generic key-value rendering -->
+        <div class="space-y-4" style="font-family:Arial,sans-serif;font-size:11px;">
+            <!-- Practice header fallback -->
+            <div style="text-align:center;margin-bottom:16px;">
+                <p style="font-size:18px;font-weight:bold;margin:0;">Beyond Wound Care Inc.</p>
+                <p style="margin:2px 0;">1340 Remington RD, Ste P &nbsp; Schaumburg, IL 60173</p>
+                <p style="margin:2px 0;">Phone: 847.873.8693 &nbsp;&nbsp; Fax: 847.873.8486</p>
+                <p style="margin:2px 0;">Email: Support@beyondwoundcare.com</p>
             </div>
-            <?php if ($doc['dob']): ?>
-            <div>
-                <span class="text-slate-500 text-xs font-semibold uppercase tracking-wide">DOB</span>
-                <div class="font-semibold text-slate-700"><?= date('M j, Y', strtotime($doc['dob'])) ?></div>
-            </div>
-            <?php endif; ?>
-            <?php if ($doc['insurance']): ?>
-            <div>
-                <span class="text-slate-500 text-xs font-semibold uppercase tracking-wide">Insurance</span>
-                <div class="font-semibold text-slate-700"><?= h($doc['insurance']) ?></div>
-            </div>
-            <?php endif; ?>
-            <div>
-                <span class="text-slate-500 text-xs font-semibold uppercase tracking-wide">Date</span>
-                <div class="font-semibold text-slate-700"><?= date('M j, Y g:i a', strtotime($doc['created_at'])) ?></div>
-            </div>
-            <?php if ($doc['ma_name']): ?>
-            <div>
-                <span class="text-slate-500 text-xs font-semibold uppercase tracking-wide">MA</span>
-                <div class="font-semibold text-slate-700"><?= h($doc['ma_name']) ?></div>
-            </div>
-            <?php endif; ?>
-        </div>
-    </div>
-
-    <!-- Document Body -->
-    <div class="p-6">
-        <?php if (!empty($data)): ?>
-        <div class="space-y-4">
             <?php foreach ($data as $key => $value):
-                if ($key === 'csrf_token' || $key === 'patient_id' || $key === 'form_type') continue;
-                // Billing users see only billing-relevant fields
-                if (isBilling() && in_array($key, CLINICAL_ONLY_FIELDS, true)) continue;
-
-                /* ── ICD-10 codes: special billing-friendly block ── */
-                if ($key === 'icd10_codes' && is_array($value) && !empty($value)):
+                if (in_array($key, ['csrf_token','patient_id','form_type'], true)) continue;
+                if ($value === '' || $value === null) continue;
+                if (is_array($value) && empty($value)) continue;
+                $label = ucwords(str_replace('_', ' ', $key));
             ?>
-            <div class="border border-red-200 bg-red-50/40 rounded-xl p-4">
-                <div class="flex items-center gap-2 mb-3">
-                    <i class="bi bi-clipboard2-pulse-fill text-red-600 text-base"></i>
-                    <span class="text-xs font-bold text-red-700 uppercase tracking-wide">Diagnosis / ICD-10 Codes</span>
-                    <span class="ml-auto text-xs text-slate-400"><?= count($value) ?> code<?= count($value) !== 1 ? 's' : '' ?></span>
-                </div>
-                <div class="space-y-1.5">
-                    <?php foreach ($value as $icdRaw):
-                        $m = preg_match('/^([A-Z0-9.]+)\s+[—–-]+\s+(.+)$/', $icdRaw, $mt);
-                        $icdCode = $m ? $mt[1] : $icdRaw;
-                        $icdDesc = $m ? $mt[2] : '';
-                    ?>
-                    <div class="flex items-start gap-3 bg-white border border-red-100 rounded-lg px-3 py-2">
-                        <span class="font-mono text-xs font-bold text-red-600 shrink-0 mt-0.5 w-20"><?= h($icdCode) ?></span>
-                        <span class="text-xs text-slate-700"><?= h($icdDesc) ?></span>
-                    </div>
-                    <?php endforeach; ?>
-                </div>
-            </div>
-            <?php continue; endif; ?>
-
-                <?php $label = ucwords(str_replace(['_', 'ack'], [' ', 'Acknowledged: '], $key)); ?>
             <?php if (is_array($value)): ?>
             <div class="border-b border-slate-100 pb-3">
                 <div class="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1"><?= h($label) ?></div>
                 <div class="flex flex-wrap gap-2">
                     <?php foreach ($value as $v): ?>
-                    <span class="inline-flex items-center px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded-lg">
-                        <?= h($v) ?>
-                    </span>
+                    <span class="inline-flex items-center px-2.5 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded-lg"><?= h((string)$v) ?></span>
                     <?php endforeach; ?>
                 </div>
             </div>
-            <?php elseif ($value === '1'): ?>
-            <div class="flex items-center gap-2 text-sm text-slate-700 bg-emerald-50 px-4 py-2.5 rounded-xl">
-                <i class="bi bi-check-circle-fill text-emerald-500 flex-shrink-0"></i>
-                <span><?= h($label) ?></span>
+            <?php elseif ($value === '1' || $value === 1): ?>
+            <div class="flex items-center gap-2 text-sm bg-emerald-50 px-4 py-2.5 rounded-xl">
+                <i class="bi bi-check-circle-fill text-emerald-500"></i>
+                <span class="font-medium text-slate-700"><?= h($label) ?></span>
             </div>
-            <?php elseif ($value !== '' && $value !== null): ?>
+            <?php else: ?>
             <div class="border-b border-slate-100 pb-3">
                 <div class="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1"><?= h($label) ?></div>
-                <div class="text-sm text-slate-800 font-medium"><?= nl2br(h($value)) ?></div>
+                <div class="text-sm text-slate-800 font-medium"><?= nl2br(h((string)$value)) ?></div>
             </div>
             <?php endif; ?>
             <?php endforeach; ?>
         </div>
-        <?php else: ?>
-        <p class="text-slate-400 text-sm italic">No form data available.</p>
-        <?php endif; ?>
-
-        <!-- Signature -->
-        <?php if ($doc['patient_signature']): ?>
-        <div class="mt-8 pt-6 border-t border-slate-200">
-            <div class="text-xs font-bold text-slate-500 uppercase tracking-wide mb-3">Patient Signature</div>
-            <div class="border-2 border-slate-200 rounded-2xl p-4 inline-block bg-slate-50">
-                <img src="<?= h($doc['patient_signature']) ?>" alt="Patient signature"
-                     class="max-h-24 max-w-xs object-contain">
-            </div>
-            <p class="text-xs text-slate-400 mt-2">
-                Signed electronically on <?= date('F j, Y \a\t g:i a', strtotime($doc['created_at'])) ?>
-            </p>
-        </div>
         <?php endif; ?>
     </div>
+
+    <!-- Screen-only: signed electronic notice -->
+    <?php if ($doc['patient_signature']): ?>
+    <div class="no-print px-10 py-3 bg-emerald-50 border-t border-emerald-100 flex items-center gap-2">
+        <i class="bi bi-shield-check text-emerald-600"></i>
+        <span class="text-xs text-emerald-700 font-semibold">
+            Signed electronically on <?= date('F j, Y \a\t g:i a', strtotime($doc['created_at'])) ?>
+        </span>
+    </div>
+    <?php endif; ?>
 </div>
 
 <?php if ($doc['status'] === 'draft' && !isBilling()): ?>
 <!-- ─── Signature Capture Panel ───────────────────────────────────────── -->
-<div id="signPanel" class="max-w-3xl mt-6 bg-white rounded-2xl shadow-sm border-2 border-rose-200 overflow-hidden no-print">
+<div id="signPanel" class="sign-panel max-w-3xl mt-6 bg-white rounded-2xl shadow-sm border-2 border-rose-200 overflow-hidden no-print">
     <div class="flex items-center gap-3 px-6 py-4 bg-gradient-to-r from-rose-50 to-orange-50 border-b border-rose-100">
         <div class="w-9 h-9 bg-rose-100 rounded-xl grid place-items-center flex-shrink-0">
             <i class="bi bi-pen-fill text-rose-600"></i>
