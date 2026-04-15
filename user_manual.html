@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PaperlessMD — User Manual</title>
+<style>
+  :root {
+    --indigo: #4f46e5;
+    --indigo-light: #eef2ff;
+    --slate: #334155;
+    --slate-light: #f8fafc;
+    --green: #16a34a;
+    --amber: #d97706;
+    --red: #dc2626;
+    --sky: #0284c7;
+    --emerald: #059669;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    color: #1e293b;
+    background: #f8fafc;
+    line-height: 1.7;
+  }
+  /* ── Cover ── */
+  .cover {
+    background: linear-gradient(135deg, #1e293b 0%, #334155 60%, #4f46e5 100%);
+    color: white;
+    padding: 80px 60px;
+    min-height: 280px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .cover .logo { font-size: 2.8rem; font-weight: 800; letter-spacing: -1px; }
+  .cover .logo span { color: #818cf8; }
+  .cover .subtitle { font-size: 1.15rem; color: #cbd5e1; margin-top: 8px; }
+  .cover .meta { margin-top: 24px; font-size: 0.85rem; color: #94a3b8; }
+  /* ── Layout ── */
+  .container { max-width: 960px; margin: 0 auto; padding: 0 24px 80px; }
+  /* ── TOC ── */
+  .toc {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 32px 36px;
+    margin: 40px 0;
+  }
+  .toc h2 { font-size: 1rem; font-weight: 700; text-transform: uppercase;
+            letter-spacing: 0.08em; color: #64748b; margin-bottom: 20px; }
+  .toc ol { padding-left: 20px; }
+  .toc li { margin: 6px 0; }
+  .toc a { color: var(--indigo); text-decoration: none; font-size: 0.95rem; }
+  .toc a:hover { text-decoration: underline; }
+  .toc .sub { padding-left: 20px; list-style: none; }
+  .toc .sub li::before { content: "↳ "; color: #94a3b8; }
+  /* ── Section headings ── */
+  h1.section {
+    font-size: 1.7rem; font-weight: 800; color: #0f172a;
+    border-bottom: 3px solid var(--indigo);
+    padding-bottom: 10px; margin: 56px 0 24px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  h1.section .num {
+    background: var(--indigo); color: white;
+    border-radius: 8px; padding: 2px 10px;
+    font-size: 1rem;
+  }
+  h2.sub { font-size: 1.2rem; font-weight: 700; color: #1e293b; margin: 32px 0 12px; }
+  h3.sub { font-size: 1rem; font-weight: 700; color: #475569; margin: 20px 0 8px; }
+  /* ── Prose ── */
+  p { margin: 10px 0; color: #334155; }
+  ul, ol { padding-left: 22px; margin: 10px 0; }
+  li { margin: 5px 0; color: #334155; }
+  code {
+    background: #f1f5f9; border: 1px solid #e2e8f0;
+    border-radius: 4px; padding: 1px 6px;
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-size: 0.875rem; color: #be185d;
+  }
+  /* ── Info boxes ── */
+  .note {
+    background: var(--indigo-light); border-left: 4px solid var(--indigo);
+    border-radius: 0 8px 8px 0; padding: 14px 18px; margin: 16px 0;
+    font-size: 0.92rem;
+  }
+  .warn {
+    background: #fffbeb; border-left: 4px solid var(--amber);
+    border-radius: 0 8px 8px 0; padding: 14px 18px; margin: 16px 0;
+    font-size: 0.92rem;
+  }
+  .tip {
+    background: #f0fdf4; border-left: 4px solid var(--green);
+    border-radius: 0 8px 8px 0; padding: 14px 18px; margin: 16px 0;
+    font-size: 0.92rem;
+  }
+  /* ── Tables ── */
+  .tbl-wrap { overflow-x: auto; margin: 16px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  th {
+    background: #1e293b; color: white; text-align: left;
+    padding: 10px 14px; font-weight: 600; font-size: 0.82rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  td { padding: 9px 14px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  tr:hover td { background: #eff6ff; }
+  /* ── Badges ── */
+  .badge {
+    display: inline-block; border-radius: 999px; padding: 2px 10px;
+    font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .badge-admin   { background: #eef2ff; color: #4f46e5; }
+  .badge-ma      { background: #f1f5f9; color: #475569; }
+  .badge-billing { background: #fffbeb; color: #92400e; }
+  .badge-green   { background: #dcfce7; color: #166534; }
+  .badge-red     { background: #fee2e2; color: #991b1b; }
+  .badge-blue    { background: #dbeafe; color: #1e40af; }
+  .badge-amber   { background: #fef3c7; color: #92400e; }
+  /* ── Step list ── */
+  .steps { counter-reset: step; list-style: none; padding: 0; }
+  .steps > li {
+    counter-increment: step;
+    display: flex; gap: 16px; align-items: flex-start;
+    margin: 12px 0; padding: 14px 16px;
+    background: white; border: 1px solid #e2e8f0; border-radius: 10px;
+  }
+  .steps > li::before {
+    content: counter(step);
+    background: var(--indigo); color: white;
+    border-radius: 999px; min-width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 0.85rem; flex-shrink: 0;
+  }
+  /* ── Feature card grid ── */
+  .features {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px; margin: 20px 0;
+  }
+  .feature-card {
+    background: white; border: 1px solid #e2e8f0; border-radius: 12px;
+    padding: 20px; display: flex; flex-direction: column; gap: 8px;
+  }
+  .feature-card .icon { font-size: 1.5rem; }
+  .feature-card h3 { font-size: 0.95rem; font-weight: 700; color: #0f172a; }
+  .feature-card p { font-size: 0.85rem; color: #64748b; margin: 0; }
+  /* ── Form cards ── */
+  .form-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(260px,1fr));
+    gap: 14px; margin: 20px 0;
+  }
+  .form-card {
+    background: white; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 16px;
+  }
+  .form-card h3 { font-size: 0.9rem; font-weight: 700; margin-bottom: 4px; }
+  .form-card p  { font-size: 0.82rem; color: #64748b; margin: 0; }
+  /* ── HR ── */
+  hr { border: none; border-top: 1px solid #e2e8f0; margin: 40px 0; }
+  /* ── Footer ── */
+  footer {
+    text-align: center; padding: 40px 20px;
+    font-size: 0.82rem; color: #94a3b8;
+    border-top: 1px solid #e2e8f0;
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════
+     COVER
+═══════════════════════════════════════════════ -->
+<div class="cover">
+  <div class="logo">Paperless<span>MD</span></div>
+  <div class="subtitle">Electronic Health Record System &mdash; Complete User Manual</div>
+  <div class="meta">
+    Beyond Wound Care Inc. &nbsp;·&nbsp; 1340 Remington Rd, STE P, Schaumburg IL 60173<br>
+    Version 1.0 &nbsp;·&nbsp; April 2026
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ═══════════════════════════════════════════════
+     TABLE OF CONTENTS
+═══════════════════════════════════════════════ -->
+<div class="toc">
+  <h2>Table of Contents</h2>
+  <ol>
+    <li><a href="#s1">System Overview</a></li>
+    <li><a href="#s2">Getting Started — Login &amp; Navigation</a>
+      <ul class="sub">
+        <li><a href="#s2a">Logging In</a></li>
+        <li><a href="#s2b">Session Timeout</a></li>
+        <li><a href="#s2c">Navigation Bar</a></li>
+      </ul>
+    </li>
+    <li><a href="#s3">User Roles &amp; Permissions</a></li>
+    <li><a href="#s4">Dashboard</a></li>
+    <li><a href="#s5">Patients</a>
+      <ul class="sub">
+        <li><a href="#s5a">Patient List</a></li>
+        <li><a href="#s5b">Adding a Patient</a></li>
+        <li><a href="#s5c">Patient View — Tabs</a></li>
+        <li><a href="#s5d">Medications</a></li>
+        <li><a href="#s5e">Wound Measurements</a></li>
+        <li><a href="#s5f">Wound Photos</a></li>
+      </ul>
+    </li>
+    <li><a href="#s6">Forms</a>
+      <ul class="sub">
+        <li><a href="#s6a">Available Forms</a></li>
+        <li><a href="#s6b">Completing a Form</a></li>
+        <li><a href="#s6c">Auto-Save Draft</a></li>
+        <li><a href="#s6d">Voice-to-Text Dictation</a></li>
+        <li><a href="#s6e">Signing &amp; Submitting</a></li>
+        <li><a href="#s6f">Form Statuses</a></li>
+        <li><a href="#s6g">Exporting as PDF</a></li>
+      </ul>
+    </li>
+    <li><a href="#s7">Visit Types &amp; Required Forms Checklist</a></li>
+    <li><a href="#s8">Schedule (MA Daily View)</a>
+      <ul class="sub">
+        <li><a href="#s8a">Navigating the Schedule</a></li>
+        <li><a href="#s8b">Visit Actions</a></li>
+        <li><a href="#s8c">Google Maps Navigation</a></li>
+      </ul>
+    </li>
+    <li><a href="#s9">Admin — Manage Schedule</a>
+      <ul class="sub">
+        <li><a href="#s9a">Adding a Visit</a></li>
+        <li><a href="#s9b">Reordering Visits</a></li>
+        <li><a href="#s9c">Route Optimizer</a></li>
+        <li><a href="#s9d">Deleting a Visit</a></li>
+      </ul>
+    </li>
+    <li><a href="#s10">Admin — Staff Management</a></li>
+    <li><a href="#s11">Admin — Audit Log</a></li>
+    <li><a href="#s12">Offline Mode (PWA)</a></li>
+    <li><a href="#s13">Security &amp; Privacy</a></li>
+    <li><a href="#s14">Troubleshooting</a></li>
+    <li><a href="#s15">Quick-Reference Cheat Sheet</a></li>
+  </ol>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════
+     1. SYSTEM OVERVIEW
+═══════════════════════════════════════════════ -->
+<h1 class="section" id="s1"><span class="num">1</span> System Overview</h1>
+
+<p><strong>PaperlessMD</strong> is a browser-based Electronic Health Record (EHR) system built for
+<strong>Beyond Wound Care Inc.</strong> It replaces paper forms and clipboards with a mobile-friendly
+web application that works on any phone, tablet, or laptop — with offline support so field staff
+can continue working even when connectivity is temporarily lost.</p>
+
+<div class="features">
+  <div class="feature-card">
+    <div class="icon">📋</div>
+    <h3>Digital Forms</h3>
+    <p>8 clinical and consent forms with patient e-signature, ICD-10 search, and PDF export.</p>
+  </div>
+  <div class="feature-card">
+    <div class="icon">📅</div>
+    <h3>Daily Schedule</h3>
+    <p>Drag-sortable visit list per MA with status tracking and one-tap navigation.</p>
+  </div>
+  <div class="feature-card">
+    <div class="icon">📸</div>
+    <h3>Wound Photos</h3>
+    <p>Camera capture or file upload, grouped by wound site, with side-by-side comparison.</p>
+  </div>
+  <div class="feature-card">
+    <div class="icon">📏</div>
+    <h3>Wound Measurements</h3>
+    <p>Healing trend charts tracking width, depth, and granulation over time.</p>
+  </div>
+  <div class="feature-card">
+    <div class="icon">💊</div>
+    <h3>Medication List</h3>
+    <p>Master active medication list per patient, pre-filled on every visit consent form.</p>
+  </div>
+  <div class="feature-card">
+    <div class="icon">🗺️</div>
+    <h3>Route Optimizer</h3>
+    <p>Auto-sorts a day's visits by geographic proximity to minimize total drive time.</p>
+  </div>
+  <div class="feature-card">
+    <div class="icon">🎤</div>
+    <h3>Voice Dictation</h3>
+    <p>Tap the mic icon on any text area to dictate notes hands-free.</p>
+  </div>
+  <div class="feature-card">
+    <div class="icon">💾</div>
+    <h3>Auto-Save Drafts</h3>
+    <p>Form progress saved every 15 seconds to localStorage — never lose a half-done form.</p>
+  </div>
+  <div class="feature-card">
+    <div class="icon">🔒</div>
+    <h3>Audit Log</h3>
+    <p>Every login, document view, and export is recorded with user + IP address.</p>
+  </div>
+</div>
+
+<div class="tbl-wrap">
+<table>
+  <tr><th>Item</th><th>Detail</th></tr>
+  <tr><td>Production URL</td><td><code>https://docs.md-officesupport.com</code></td></tr>
+  <tr><td>Practice Name</td><td>Beyond Wound Care Inc.</td></tr>
+  <tr><td>Practice Address</td><td>1340 Remington Rd, STE P, Schaumburg, IL 60173</td></tr>
+  <tr><td>Practice Phone</td><td>847-873-8693</td></tr>
+  <tr><td>Practice Fax</td><td>847-873-8486</td></tr>
+  <tr><td>Support Email</td><td>Support@beyondwoundcare.com</td></tr>
+  <tr><td>Browser Support</td><td>Chrome 90+, Edge 90+, Safari 14+, Firefox 90+</td></tr>
+  <tr><td>Session Timeout</td><td>2 hours of inactivity (rolling)</td></tr>
+</table>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════
+     2. GETTING STARTED
+═══════════════════════════════════════════════ -->
+<h1 class="section" id="s2"><span class="num">2</span> Getting Started</h1>
+
+<h2 class="sub" id="s2a">2.1 Logging In</h2>
+<ul class="steps">
+  <li>Open your browser and go to <strong>https://docs.md-officesupport.com</strong></li>
+  <li>Enter your <strong>Username</strong> and <strong>Password</strong>. Use the eye icon to toggle password visibility.</li>
+  <li>Click <strong>Sign In</strong>. You will be redirected to your Dashboard.</li>
+</ul>
+
+<div class="warn">
+  <strong>⚠ Account must be active.</strong> If your account has been deactivated by an administrator, login will be refused even with correct credentials. Contact your admin.
+</div>
+<div class="note">
+  <strong>Failed logins</strong> are recorded in the audit log. After too many failed attempts, contact your administrator.
+</div>
+
+<h2 class="sub" id="s2b">2.2 Session Timeout</h2>
+<p>PaperlessMD automatically signs you out after <strong>2 hours of inactivity</strong>. The timer resets
+on every page you visit. When the session expires you see a yellow banner:</p>
+<blockquote style="background:#fffbeb;border-left:3px solid #d97706;padding:10px 16px;margin:12px 0;border-radius:0 6px 6px 0;font-style:italic;">
+  "Your session expired. Please sign in again."
+</blockquote>
+<p>Simply log in again. Any forms you were filling out will be <strong>restored from the auto-save draft</strong>
+if they were saved within the last 24 hours.</p>
+
+<h2 class="sub" id="s2c">2.3 Navigation Bar</h2>
+<div class="tbl-wrap">
+<table>
+  <tr><th>Nav Item</th><th>Goes to</th><th>Visible to</th></tr>
+  <tr><td>🏠 Dashboard</td><td>dashboard.php</td><td>All roles</td></tr>
+  <tr><td>👥 Patients</td><td>patients.php</td><td>All roles</td></tr>
+  <tr><td>📅 Schedule</td><td>schedule.php</td><td>Admin, MA</td></tr>
+  <tr><td>⚙ Admin</td><td>admin/ (dropdown)</td><td>Admin only</td></tr>
+  <tr><td>🚪 Logout</td><td>logout.php</td><td>All roles</td></tr>
+</table>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════
+     3. ROLES & PERMISSIONS
+═══════════════════════════════════════════════ -->
+<h1 class="section" id="s3"><span class="num">3</span> User Roles &amp; Permissions</h1>
+
+<p>Every staff account has one of three roles assigned by an administrator:</p>
+
+<div class="tbl-wrap">
+<table>
+  <tr>
+    <th>Feature / Page</th>
+    <th><span class="badge badge-admin">Admin</span></th>
+    <th><span class="badge badge-ma">MA</span></th>
+    <th><span class="badge badge-billing">Billing</span></th>
+  </tr>
+  <tr><td>Dashboard</td><td>Full stats + all drafts</td><td>Own schedule + drafts</td><td>Billing stats only</td></tr>
+  <tr><td>Patient List</td><td>✅ Full</td><td>✅ Full</td><td>✅ Forms tab only</td></tr>
+  <tr><td>Patient → Forms tab</td><td>✅</td><td>✅</td><td>✅ (clinical fields hidden)</td></tr>
+  <tr><td>Patient → Photos tab</td><td>✅</td><td>✅</td><td>❌</td></tr>
+  <tr><td>Patient → Medications tab</td><td>✅</td><td>✅</td><td>❌</td></tr>
+  <tr><td>Patient → Wounds tab</td><td>✅</td><td>✅</td><td>❌</td></tr>
+  <tr><td>Fill / submit forms</td><td>✅</td><td>✅</td><td>❌ (view only)</td></tr>
+  <tr><td>Export PDF</td><td>✅</td><td>✅</td><td>✅</td></tr>
+  <tr><td>Schedule (daily view)</td><td>✅ All MAs</td><td>✅ Own only</td><td>❌</td></tr>
+  <tr><td>Manage Schedule</td><td>✅</td><td>❌</td><td>❌</td></tr>
+  <tr><td>Staff Management</td><td>✅</td><td>❌</td><td>❌</td></tr>
+  <tr><td>Audit Log</td><td>✅</td><td>❌</td><td>❌</td></tr>
+  <tr><td>View clinical fields in documents</td><td>✅</td><td>✅</td><td>❌ (hidden)</td></tr>
+</table>
+</div>
+
+<div class="note">
+  <strong>Billing role clinical field restriction:</strong> When a billing user views a document, fields such as
+  vitals (BP, HR, temp, O₂ sat), chief complaint, medications, allergies, race, and homebound reason
+  are automatically hidden from the page.
+</div>
+
+
+<!-- ═══════════════════════════════════════════════
+     4. DASHBOARD
+═══════════════════════════════════════════════ -->
+<h1 class="section" id="s4"><span class="num">4</span> Dashboard</h1>
+
+<p>The Dashboard is the first screen after login. It provides an at-a-glance summary of today's activity.</p>
+
+<h2 class="sub">4.1 Stat Cards</h2>
+<div class="tbl-wrap">
+<table>
+  <tr><th>Card</th><th>Shown to</th><th>What it counts</th></tr>
+  <tr><td>Total Patients</td><td>Admin, MA</td><td>All patients in the system</td></tr>
+  <tr><td>Forms Today</td><td>Admin, MA</td><td>Form submissions created today</td></tr>
+  <tr><td>Photos Today</td><td>Admin, MA</td><td>Wound photos uploaded today</td></tr>
+  <tr><td>Pending Upload</td><td>Admin, MA</td><td>Signed forms not yet uploaded to billing software</td></tr>
+  <tr><td>Signed Forms (total)</td><td>Billing</td><td>All forms with status signed or uploaded</td></tr>
+  <tr><td>Signed Today</td><td>Billing</td><td>Signed/uploaded forms created today</td></tr>
+</table>
+</div>
+
+<h2 class="sub">4.2 Today's Schedule</h2>
+<p>Shows up to <strong>6 upcoming visits</strong> for the logged-in MA (admins see their own account's visits here).
+Click any visit to jump to the patient record. For the full schedule, click <strong>Schedule</strong> in the top nav.</p>
+
+<h2 class="sub">4.3 Unsigned (Draft) Forms</h2>
+<p>A list of forms saved as draft but not yet signed. Age is color-coded:</p>
+<ul>
+  <li><span class="badge badge-amber">Amber</span> — saved less than 1 hour ago</li>
+  <li><span class="badge" style="background:#fed7aa;color:#9a3412;">Orange</span> — saved 1–24 hours ago</li>
+  <li><span class="badge badge-red">Red</span> — saved more than 1 day ago</li>
+</ul>
+<div class="warn"><strong>MAs</strong> only see their own drafts. <strong>Admins</strong> see all drafts from all staff.</div>
+
+
+<!-- ═══════════════════════════════════════════════
+     5. PATIENTS
+═══════════════════════════════════════════════ -->
+<h1 class="section" id="s5"><span class="num">5</span> Patients</h1>
+
+<h2 class="sub" id="s5a">5.1 Patient List</h2>
+<p>Click <strong>Patients</strong> in the nav bar. The list shows all patients, 20 per page.</p>
+<ul>
+  <li><strong>Search:</strong> Type in the search box to filter by first name, last name, phone number, or date of birth.</li>
+  <li><strong>All / Pending Upload tabs:</strong> "Pending Upload" shows only patients who have at least one signed form not yet uploaded.</li>
+  <li>Each patient row shows a count of their forms and photos.</li>
+</ul>
+
+<h2 class="sub" id="s5b">5.2 Adding a Patient</h2>
+<ul class="steps">
+  <li>On the Patients page, click <strong>Add Patient</strong> (top-right button).</li>
+  <li>Fill in the required fields: <strong>First Name, Last Name, Date of Birth, Address</strong>.</li>
+  <li>Optionally add phone number, insurance info, and emergency contact.</li>
+  <li>Click <strong>Save Patient</strong>. You are redirected to the new patient's record.</li>
+</ul>
+
+<h2 class="sub" id="s5c">5.3 Patient View — Tabs</h2>
+<p>Click any patient name to open their record. The record has five tabs:</p>
+
+<div class="tbl-wrap">
+<table>
+  <tr><th>Tab</th><th>Contents</th><th>Available to</th></tr>
+  <tr><td><strong>Forms</strong></td><td>All submitted forms in reverse-date order; links to view or export PDF; form-filling buttons; required forms checklist</td><td>All roles</td></tr>
+  <tr><td><strong>Photos</strong></td><td>Wound photos grouped by wound location; side-by-side compare mode</td><td>Admin, MA</td></tr>
+  <tr><td><strong>Medications</strong></td><td>Active and discontinued medication list</td><td>Admin, MA</td></tr>
+  <tr><td><strong>Wounds</strong></td><td>Wound measurement entries with healing trend chart</td><td>Admin, MA</td></tr>
+  <tr><td><strong>Last Visit</strong></td><td>Summary strip: date, MA name, vitals snapshot, form count, visit notes</td><td>Admin, MA</td></tr>
+</table>
+</div>
+
+<h3 class="sub">Last Visit Summary Card</h3>
+<p>At the top of the patient record (above the tabs) a summary strip shows the most recent visit:
+last visit date, the MA who attended, a vitals snapshot (BP / HR / O₂), and the number of forms submitted.</p>
+
+<h3 class="sub">Required Forms Checklist</h3>
+<p>On the <strong>Forms</strong> tab, a checklist shows which forms are required for the current visit type.
+Forms already submitted on today's visit date show a green check ✅. Missing forms have a tappable
+link to open and complete them immediately.</p>
+
+<h2 class="sub" id="s5d">5.4 Medications</h2>
+<p>The <strong>Medications</strong> tab shows two sections:</p>
+<ul>
+  <li><strong>Active Medications</strong> — shown in sorted order. These are auto-filled into the
+    Visit Consent form's medication list when the form is opened.</li>
+  <li><strong>Discontinued</strong> — historical list, ordered by the date discontinued.</li>
+</ul>
+<p>To add, edit, or discontinue a medication, use the controls on the Medications tab.
+Changes take effect on the next form that is opened for this patient.</p>
+
+<h2 class="sub" id="s5e">5.5 Wound Measurements</h2>
+<p>On the <strong>Wounds</strong> tab you can:</p>
+<ul>
+  <li>Add a new measurement (length × width × depth in cm, plus granulation tissue %).</li>
+  <li>View a healing trend chart (Chart.js line chart over time).</li>
+  <li>Review the full measurement history table.</li>
+</ul>
+
+<h2 class="sub" id="s5f">5.6 Wound Photos</h2>
+<p>On the <strong>Photos</strong> tab:</p>
+<ul>
+  <li>Photos are grouped by <strong>wound location</strong> (e.g., "Left heel", "Right ankle").</li>
+  <li>Click any photo for a full-screen lightbox view.</li>
+  <li><strong>Compare mode:</strong> Select two photos from the same wound site and click
+    <em>Compare</em> to view them side by side for healing assessment.</li>
+  <li>New photos are added via the <strong>Wound Care Photos</strong> form (see Forms section).</li>
+</ul>
+
+
+<!-- ═══════════════════════════════════════════════
+     6. FORMS
+═══════════════════════════════════════════════ -->
+<h1 class="section" id="s6"><span class="num">6</span> Forms</h1>
+
+<h2 class="sub" id="s6a">6.1 Available Forms</h2>
+
+<div class="form-grid">
+  <div class="form-card">
+    <h3>📋 Visit Consent (vital_cs)</h3>
+    <p>Captures vitals (BP, HR, temp, weight, O₂ sat), race, chief complaint, homebound reason, and active medications. Requires patient signature. Pre-fills vitals and meds from the previous visit.</p>
+  </div>
+  <div class="form-card">
+    <h3>👤 New Patient Consent</h3>
+    <p>Practice disclosure and consent for services. Required for every first-time patient.</p>
+  </div>
+  <div class="form-card">
+    <h3>📄 ABN (CMS-R-131)</h3>
+    <p>Advance Beneficiary Notice. Notifies Medicare patients that a service may not be covered. Patient selects Option A, B, or C and signs.</p>
+  </div>
+  <div class="form-card">
+    <h3>📧 PF Portal Consent</h3>
+    <p>Patient's consent to enroll in the Practice Fusion (PF) patient portal for electronic communication.</p>
+  </div>
+  <div class="form-card">
+    <h3>❤️ CCM Consent</h3>
+    <p>Chronic Care Management enrollment consent. Required for CCM visit types.</p>
+  </div>
+  <div class="form-card">
+    <h3>🧠 Cognitive Wellness Exam</h3>
+    <p>Multi-step cognitive assessment. Step 1 score auto-calculated (0–12). Results interpreted as: &lt;7 impairment indicated, 7–10 more info needed, ≥11 no impairment.</p>
+  </div>
+  <div class="form-card">
+    <h3>🩺 Medicare AWV</h3>
+    <p>Annual Wellness Visit health history. Includes the 15-question Geriatric Depression Scale (GDS) with auto-scoring.</p>
+  </div>
+  <div class="form-card">
+    <h3>📜 IL DHS Disclosure Auth.</h3>
+    <p>Illinois Department of Human Services Authorization to Disclose Protected Health Information.</p>
+  </div>
+</div>
+
+<div class="note">
+  <strong>Note:</strong> All forms are blocked for the <strong>Billing</strong> role. Billing users can only view already-submitted forms.
+</div>
+
+<h2 class="sub" id="s6b">6.2 Completing a Form</h2>
+<ul class="steps">
+  <li>Open the patient record and go to the <strong>Forms</strong> tab.</li>
+  <li>Click the button for the form you need (e.g., <em>Visit Consent</em>).</li>
+  <li>Fill in all required fields. Fields marked with a red asterisk (<strong>*</strong>) are mandatory.</li>
+  <li>For ICD-10 codes, type at least 3 characters in the diagnosis search box. Results from the WHO ICD-10 API appear as you type — click to select.</li>
+  <li>Have the patient sign in the <strong>signature pad</strong> at the bottom.</li>
+  <li>Click <strong>Submit Form</strong>.</li>
+</ul>
+
+<h2 class="sub" id="s6c">6.3 Auto-Save Draft</h2>
+<p>While filling a form, PaperlessMD <strong>automatically saves your progress every 15 seconds</strong>
+to the device's local storage (browser storage — <em>not</em> sent to the server yet).</p>
+<ul>
+  <li>A small dark pill badge appears in the bottom-right corner: <em>"Draft saved"</em>.</li>
+  <li>If you close the tab, navigate away, or your session expires, reopen the same form
+    for the same patient to see: <em>"Draft restored (X min ago)"</em>.</li>
+  <li>Drafts expire automatically after <strong>24 hours</strong>.</li>
+  <li>The draft is permanently cleared once you submit the form.</li>
+</ul>
+<div class="tip">
+  <strong>💡 Tip:</strong> The auto-save does <em>not</em> save the patient signature or CSRF token —
+  the patient always needs to sign fresh on the final submission.
+</div>
+
+<h2 class="sub" id="s6d">6.4 Voice-to-Text Dictation</h2>
+<p>Every text area on a form has a small <strong>microphone button</strong> (🎤) in its top-right corner.</p>
+<ul class="steps">
+  <li>Tap the mic icon on the field you want to dictate into.</li>
+  <li>The button turns red — speak clearly into your device microphone.</li>
+  <li>Your speech is transcribed and <strong>appended</strong> to any existing text in that field.</li>
+  <li>Tap the button again (or tap another field's mic) to stop recording.</li>
+</ul>
+<div class="warn">
+  <strong>Browser support:</strong> Voice dictation uses the Web Speech API, which is fully supported in
+  <strong>Chrome</strong> and <strong>Edge</strong>. It is not available in Firefox. On unsupported browsers
+  the mic button simply does not appear.
+</div>
+<div class="note">
+  Dictation also works on text inputs named <em>notes</em>, <em>description</em>, or <em>complaint</em>.
+</div>
+
+<h2 class="sub" id="s6e">6.5 Signing &amp; Submitting</h2>
+<p>Every form requires a patient (or POA) signature before it can be submitted:</p>
+<ul>
+  <li>Scroll to the <strong>Signature</strong> section at the bottom of the form.</li>
+  <li>The patient draws their signature using a finger (on a touch screen) or mouse.</li>
+  <li>If a POA is signing, check the "Signing as POA" checkbox and fill in the POA name.</li>
+  <li>Click <strong>Clear Signature</strong> to redo if needed.</li>
+  <li>Click <strong>Submit Form</strong>. The form is saved with status <span class="badge badge-green">Signed</span>.</li>
+</ul>
+
+<h2 class="sub" id="s6f">6.6 Form Statuses</h2>
+<div class="tbl-wrap">
+<table>
+  <tr><th>Status</th><th>Meaning</th></tr>
+  <tr><td><span class="badge" style="background:#f1f5f9;color:#475569;">Draft</span></td><td>Form has been started / auto-saved to server but not yet signed</td></tr>
+  <tr><td><span class="badge badge-blue">Signed</span></td><td>Form submitted with valid patient signature — ready for billing upload</td></tr>
+  <tr><td><span class="badge badge-green">Uploaded</span></td><td>Form has been exported / uploaded to the billing system</td></tr>
+</table>
+</div>
+
+<h2 class="sub" id="s6g">6.7 Exporting as PDF</h2>
+<p>Any signed or uploaded form can be exported as a printable PDF:</p>
+<ul>
+  <li>From the patient's <strong>Forms</strong> tab, click the <strong>PDF</strong> button next to the form.</li>
+  <li>A print-optimised page opens. Use your browser's <strong>Print</strong> (Ctrl+P / Cmd+P) and choose <em>Save as PDF</em>.</li>
+  <li>You can also export <strong>all forms for a visit date</strong> at once: on the Schedule page, click the
+    <em>Export PDF</em> link next to a completed visit.</li>
+</ul>
+<div class="note">Every export is recorded in the Audit Log.</div>
+
+
+<!-- ═══════════════════════════════════════════════
+     7. VISIT TYPES & REQUIRED FORMS
+═══════════════════════════════════════════════ -->
+<h1 class="section" id="s7"><span class="num">7</span> Visit Types &amp; Required Forms Checklist</h1>
+
+<p>When a visit is scheduled, an administrator assigns a <strong>Visit Type</strong>. Each type defines
+which forms <em>must</em> be completed before that visit is considered clinically complete.</p>
+
+<div class="tbl-wrap">
+<table>
+  <tr><th>Visit Type</th><th>Label</th><th>Required Forms</th></tr>
+  <tr>
+    <td><code>routine</code></td>
+    <td>Routine Visit</td>
+    <td>Visit Consent, ABN</td>
+  </tr>
+  <tr>
+    <td><code>new_patient</code></td>
+    <td>New Patient</td>
+    <td>New Patient Consent, Visit Consent, ABN, PF Portal Consent</td>
+  </tr>
+  <tr>
+    <td><code>wound_care</code></td>
+    <td>Wound Care</td>
+    <td>Visit Consent, ABN</td>
+  </tr>
+  <tr>
+    <td><code>awv</code></td>
+    <td>Annual Wellness Visit</td>
+    <td>Visit Consent, Medicare AWV, ABN</td>
+  </tr>
+  <tr>
+    <td><code>ccm</code></td>
+    <td>CCM Visit</td>
+    <td>Visit Consent, CCM Consent, ABN</td>
+  </tr>
+  <tr>
+    <td><code>il</code></td>
+    <td>IL Disclosure</td>
+    <td>Visit Consent, IL Disclosure Auth., ABN</td>
+  </tr>
+</table>
+</div>
+
+<p>The <strong>Required Forms Checklist</strong> appears on the patient record's Forms tab when a visit
+is in progress. Complete forms show a green checkmark; incomplete forms show as tappable links so
+the MA can open them instantly without searching.</p>
+
+<div class="tip">
+  <strong>💡 Tip:</strong> The visit type badge is also visible as a coloured pill on the daily schedule and
+  on the Manage Schedule page so admins can quickly verify the type at a glance.
+</div>
+
+
+<!-- ═══════════════════════════════════════════════
+     8. SCHEDULE (MA VIEW)
+═══════════════════════════════════════════════ -->
+<h1 class="section" id="s8"><span class="num">8</span> Schedule — Daily View</h1>
+
+<p>The Schedule page (accessible from the nav bar) shows all visits for <strong>one day</strong>.
+MAs see only their own visits. Admins can switch to any MA using the MA selector dropdown.</p>
+
+<h2 class="sub" id="s8a">8.1 Navigating the Schedule</h2>
+<ul>
+  <li>Use the <strong>← Prev</strong> and <strong>Next →</strong> buttons to move between days.</li>
+  <li>Click <strong>Today</strong> to jump back to the current date.</li>
+  <li>The date is also shown in the URL (<code>?date=YYYY-MM-DD</code>) — bookmark any date directly.</li>
+  <li>A stats strip shows counts for: Pending / En Route / Completed / Missed visits.</li>
+</ul>
+
+<h2 class="sub" id="s8b">8.2 Visit Actions</h2>
+<div class="tbl-wrap">
+<table>
+  <tr><th>Button / Action</th><th>What it does</th></tr>
+  <tr><td><span class="badge badge-amber">En Route</span></td><td>Mark yourself as heading to the patient; triggers Google Maps link for navigation</td></tr>
+  <tr><td><span class="badge badge-green">Complete</span></td><td>Mark visit as completed</td></tr>
+  <tr><td><span class="badge badge-red">Missed</span></td><td>Mark visit as missed / patient not available</td></tr>
+  <tr><td>📋 Open Patient</td><td>Jump to the patient record (Forms tab pre-selected)</td></tr>
+  <tr><td>🗒 Quick Note</td><td>Expand inline visit note panel to add a note for this visit</td></tr>
+</table>
+</div>
+
+<h2 class="sub" id="s8c">8.3 Google Maps Navigation</h2>
+<p>Each visit card shows the patient's address. Tapping <strong>Navigate</strong> (or marking a visit
+<em>En Route</em>) opens <strong>Google Maps</strong> with turn-by-turn directions to the patient's address.</p>
+<ul>
+  <li>On mobile, this opens the Google Maps app automatically.</li>
+  <li>On desktop, it opens in a new browser tab.</li>
+</ul>
+
+
+<!-- ═══════════════════════════════════════════════
+     9. ADMIN — MANAGE SCHEDULE
+═══════════════════════════════════════════════ -->
+<h1 class="section" id="s9"><span class="num">9</span> Admin — Manage Schedule</h1>
+
+<p>Accessible via <strong>Admin &rarr; Manage Schedule</strong>. Admin role only.</p>
+<p>This page shows all visits for a selected date, grouped by Medical Assistant. Visits can be
+added, reordered, route-optimised, and deleted.</p>
+
+<h2 class="sub" id="s9a">9.1 Adding a Visit</h2>
+<ul class="steps">
+  <li>Select the <strong>Date</strong> using the date picker at the top.</li>
+  <li>Click <strong>Add Visit</strong>.</li>
+  <li>In the panel that appears, select: <strong>MA</strong>, <strong>Patient</strong>, <strong>Visit Time</strong>, <strong>Visit Type</strong>, and optional <strong>Notes</strong>.</li>
+  <li>Click <strong>Save</strong>. The visit is appended to that MA's list for the day.</li>
+</ul>
+<div class="warn">
+  Duplicate prevention: you cannot schedule the same MA to visit the same patient twice on the same day.
+</div>
+
+<h2 class="sub" id="s9b">9.2 Reordering Visits (Drag &amp; Drop)</h2>
+<ul>
+  <li>Grab the <strong>drag handle</strong> (⠿ icon) on the left of any visit row.</li>
+  <li>Drag the row up or down to the desired position.</li>
+  <li>Click <strong>Save Order</strong> at the bottom of that MA's group to persist the change.</li>
+</ul>
+<p>The new order is saved as <code>visit_order</code> and the MA's daily schedule page reflects it
+immediately.</p>
+
+<h2 class="sub" id="s9c">9.3 Route Optimizer</h2>
+<p>When an MA has 2 or more visits, an <strong>✨ Optimize Route</strong> button appears in that
+MA group's header.</p>
+
+<ul class="steps">
+  <li>Click <strong>✨ Optimize Route</strong>.</li>
+  <li>The system geocodes each patient address using OpenStreetMap's Nominatim service (free,
+    no API key). Progress is shown as <em>"Geocoding 2/5…"</em></li>
+  <li>A <strong>nearest-neighbor algorithm</strong> (Travelling Salesman heuristic) calculates
+    the order that minimizes total drive distance, starting from the first visit.</li>
+  <li>Visit rows are reordered with a green flash animation and the new order is automatically saved.</li>
+</ul>
+
+<div class="note">
+  <strong>Rate limit:</strong> Nominatim allows one request per second. For a 5-visit route the
+  optimization takes approximately 6 seconds. The button shows a progress counter during this time.
+</div>
+<div class="tip">
+  <strong>💡 Tip:</strong> After optimization, you can still manually drag-reorder individual visits
+  if you need to override — for example, to put a time-sensitive visit first regardless of geography.
+</div>
+
+<h2 class="sub" id="s9d">9.4 Deleting a Visit</h2>
+<ul>
+  <li>Click the red <strong>🗑 Delete</strong> icon on the right of a visit row.</li>
+  <li>A confirmation dialog appears. Click <strong>Confirm</strong> to proceed.</li>
+  <li>Deletion is permanent. If the visit was started (status not <em>pending</em>), consider
+    marking it <em>Missed</em> from the schedule page instead.</li>
+</ul>
+
+
+<!-- ═══════════════════════════════════════════════
+     10. ADMIN — STAFF MANAGEMENT
+═══════════════════════════════════════════════ -->
+<h1 class="section" id="s10"><span class="num">10</span> Admin — Staff Management</h1>
+
+<p>Accessible via <strong>Admin &rarr; Users</strong>. Admin role only.</p>
+
+<h2 class="sub">10.1 Viewing Staff</h2>
+<p>The users list shows all staff accounts with their role badge and active/inactive status.
+Sorted by role then name.</p>
+
+<h2 class="sub">10.2 Adding a New Staff Member</h2>
+<ul class="steps">
+  <li>Click <strong>Add Staff</strong>.</li>
+  <li>Enter <strong>Full Name</strong> and <strong>Username</strong> (required).</li>
+  <li>Select a <strong>Role</strong>:
+    <ul>
+      <li><span class="badge badge-ma">MA</span> — Medical Assistant (clinical access)</li>
+      <li><span class="badge badge-billing">Billing</span> — Billing only (no clinical data)</li>
+      <li><span class="badge badge-admin">Admin</span> — Full system access</li>
+    </ul>
+  </li>
+  <li>Enter a <strong>Password</strong> (minimum 6 characters) and confirm it.</li>
+  <li>Click <strong>Save</strong>.</li>
+</ul>
+
+<h2 class="sub">10.3 Editing a Staff Member</h2>
+<p>Click <strong>Edit</strong> next to any staff row. You can change the full name, username, role,
+and password. <strong>Leave the password fields blank</strong> to keep the existing password.</p>
+
+<h2 class="sub">10.4 Activating / Deactivating</h2>
+<p>Click the <strong>Deactivate</strong> / <strong>Activate</strong> toggle on any staff row.
+Inactive staff <strong>cannot log in</strong>. Their historical records and forms are preserved.</p>
+<div class="warn">
+  You cannot deactivate your own account. Ensure at least one other admin account is active before
+  deactivating yourself.
+</div>
+
+
+<!-- ═══════════════════════════════════════════════
+     11. ADMIN — AUDIT LOG
+═══════════════════════════════════════════════ -->
+<h1 class="section" id="s11"><span class="num">11</span> Admin — Audit Log</h1>
+
+<p>Accessible via <strong>Admin &rarr; Audit Log</strong>. Admin role only. Shows all system events,
+newest first, 50 records per page.</p>
+
+<h2 class="sub">11.1 Logged Events</h2>
+<div class="tbl-wrap">
+<table>
+  <tr><th>Event</th><th>Triggered by</th></tr>
+  <tr><td><code>login</code></td><td>Successful login</td></tr>
+  <tr><td><code>login_fail</code></td><td>Failed login attempt (username logged)</td></tr>
+  <tr><td><code>patient_view</code></td><td>Opening any patient record</td></tr>
+  <tr><td><code>form_view</code></td><td>Viewing a form document (view_document.php)</td></tr>
+  <tr><td><code>form_export</code></td><td>Exporting a form to PDF (export_pdf.php)</td></tr>
+  <tr><td><code>form_sign</code></td><td>Submitting a signed form</td></tr>
+  <tr><td><code>schedule_update</code></td><td>Changing a visit status</td></tr>
+</table>
+</div>
+
+<h2 class="sub">11.2 Filtering the Log</h2>
+<p>Use the filter bar at the top to narrow results:</p>
+<ul>
+  <li><strong>Action</strong> — select a specific event type</li>
+  <li><strong>User</strong> — filter by staff username</li>
+  <li><strong>Date From / To</strong> — narrow to a date range</li>
+  <li><strong>Search</strong> — free-text search across labels, usernames, IP addresses, and details</li>
+</ul>
+
+<div class="note">
+  Every audit record includes: timestamp, action, username who performed it, IP address, and
+  a description of what was accessed (e.g., patient name, form type).
+</div>
+
+
+<!-- ═══════════════════════════════════════════════
+     12. OFFLINE MODE
+═══════════════════════════════════════════════ -->
+<h1 class="section" id="s12"><span class="num">12</span> Offline Mode (PWA)</h1>
+
+<p>PaperlessMD is a <strong>Progressive Web App (PWA)</strong>. Key pages and assets are cached by
+the browser's Service Worker so you can continue working with limited or no connectivity.</p>
+
+<h2 class="sub">12.1 Installing on Your Device</h2>
+<ul>
+  <li><strong>Android/Chrome:</strong> A banner may appear "Add PaperlessMD to Home Screen".
+    Alternatively, tap the browser menu ⋮ → <em>Add to Home screen</em>.</li>
+  <li><strong>iOS/Safari:</strong> Tap the Share icon → <em>Add to Home Screen</em>.</li>
+  <li><strong>Desktop Chrome/Edge:</strong> Click the install icon (⊕) in the address bar.</li>
+</ul>
+
+<h2 class="sub">12.2 What Works Offline</h2>
+<ul>
+  <li>Viewing previously cached pages (dashboard, patient list, schedule).</li>
+  <li>Filling forms — auto-save saves to <code>localStorage</code> on the device.</li>
+  <li>If you navigate to an uncached page, a branded offline page is shown with a "Retry" button.</li>
+</ul>
+
+<div class="warn">
+  <strong>Forms cannot be submitted offline.</strong> The final submit requires a live server connection.
+  Draft data is preserved in auto-save storage until connectivity is restored.
+</div>
+
+
+<!-- ═══════════════════════════════════════════════
+     13. SECURITY & PRIVACY
+═══════════════════════════════════════════════ -->
+<h1 class="section" id="s13"><span class="num">13</span> Security &amp; Privacy</h1>
+
+<div class="tbl-wrap">
+<table>
+  <tr><th>Control</th><th>Detail</th></tr>
+  <tr><td>Passwords</td><td>Stored as bcrypt hashes (PHP <code>password_hash()</code>). Never stored in plaintext.</td></tr>
+  <tr><td>Session security</td><td>Session ID regenerated on login. HTTPOnly, SameSite=Strict cookie flags.</td></tr>
+  <tr><td>CSRF protection</td><td>All write operations require a CSRF token validated server-side via <code>hash_equals()</code>.</td></tr>
+  <tr><td>Session timeout</td><td>Rolling 2-hour inactivity timeout. Expired sessions are destroyed on next request.</td></tr>
+  <tr><td>Role enforcement</td><td>PHP checks role on every request — there is no client-side role bypass.</td></tr>
+  <tr><td>Output encoding</td><td>All user-supplied data run through <code>htmlspecialchars()</code> before display (XSS prevention).</td></tr>
+  <tr><td>Audit trail</td><td>All logins, patient views, form views, and exports are logged with timestamp + IP.</td></tr>
+  <tr><td>HTTPS</td><td>Production runs over TLS (HTTPS). Credentials and PHI are never sent in plaintext.</td></tr>
+</table>
+</div>
+
+<div class="warn">
+  <strong>Never share your login credentials.</strong> Each staff member must have their own account
+  so the audit trail accurately reflects who accessed patient records.
+</div>
+
+<div class="warn">
+  <strong>Device security:</strong> Always log out when leaving a shared device. Do not use PaperlessMD
+  on a public or untrusted computer. The 2-hour timeout is a safeguard but is not a substitute for
+  manually logging out.
+</div>
+
+
+<!-- ═══════════════════════════════════════════════
+     14. TROUBLESHOOTING
+═══════════════════════════════════════════════ -->
+<h1 class="section" id="s14"><span class="num">14</span> Troubleshooting</h1>
+
+<div class="tbl-wrap">
+<table>
+  <tr><th>Problem</th><th>Likely Cause</th><th>Solution</th></tr>
+  <tr>
+    <td>Login says "Invalid username or password"</td>
+    <td>Wrong credentials or account deactivated</td>
+    <td>Double-check username spelling. Contact admin if account may be deactivated.</td>
+  </tr>
+  <tr>
+    <td>Redirected to login with "session expired" message</td>
+    <td>2 hours of inactivity</td>
+    <td>Log in again. Any draft forms will auto-restore on the form page.</td>
+  </tr>
+  <tr>
+    <td>Form won't submit — "CSRF token invalid" error</td>
+    <td>Session expired between opening and submitting the form</td>
+    <td>Do not leave the form open for hours without interaction. Log in again and the draft will restore.</td>
+  </tr>
+  <tr>
+    <td>Mic button not appearing on form fields</td>
+    <td>Browser does not support Web Speech API</td>
+    <td>Use Chrome or Edge. On Firefox, voice dictation is unavailable.</td>
+  </tr>
+  <tr>
+    <td>Draft not restoring after page reload</td>
+    <td>Draft is older than 24 hours, or a different patient/form combination</td>
+    <td>Drafts expire after 24h. Older data cannot be recovered from auto-save.</td>
+  </tr>
+  <tr>
+    <td>Route optimizer says "Geocoding failed" for some addresses</td>
+    <td>Address not recognized by OpenStreetMap Nominatim</td>
+    <td>Verify the patient address is complete and correctly formatted. Unrecognized addresses are placed at the end of the optimized route.</td>
+  </tr>
+  <tr>
+    <td>Photos not uploading / camera not opening</td>
+    <td>Browser blocked camera permission</td>
+    <td>Click the camera icon in the browser address bar and allow camera access. On iOS, grant permission in Settings → Safari → Camera.</td>
+  </tr>
+  <tr>
+    <td>Schedule page shows "Access denied"</td>
+    <td>Logged in as Billing role</td>
+    <td>The Schedule is not accessible to Billing users. Log in with an MA or Admin account.</td>
+  </tr>
+  <tr>
+    <td>Page loads blank / server error (500)</td>
+    <td>Database migration not yet run on production</td>
+    <td>Contact admin to run the pending migration scripts at <code>/migrate_*.php</code>.</td>
+  </tr>
+  <tr>
+    <td>Offline page showing even with internet</td>
+    <td>Stale Service Worker cache</td>
+    <td>Open browser DevTools → Application → Service Workers → click "Update", then hard-reload (Ctrl+Shift+R).</td>
+  </tr>
+</table>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════
+     15. QUICK REFERENCE
+═══════════════════════════════════════════════ -->
+<h1 class="section" id="s15"><span class="num">15</span> Quick-Reference Cheat Sheet</h1>
+
+<h2 class="sub">Daily MA Workflow</h2>
+<ol class="steps">
+  <li>Log in → <strong>Dashboard</strong> shows today's schedule and any pending drafts.</li>
+  <li>Go to <strong>Schedule</strong> to see the full day's visit list in order.</li>
+  <li>Tap a visit → tap <strong>Navigate</strong> to open Google Maps.</li>
+  <li>Tap <strong>En Route</strong> when leaving for the patient.</li>
+  <li>On arrival, tap the patient name to open their record.</li>
+  <li>Complete required forms (check the <strong>Required Forms Checklist</strong> on the Forms tab).</li>
+  <li>Patient signs each form → tap <strong>Submit Form</strong>.</li>
+  <li>Add wound photos via the <strong>Wound Care Photos</strong> form if applicable.</li>
+  <li>Update wound measurements on the <strong>Wounds</strong> tab.</li>
+  <li>Mark visit <strong>Completed</strong> on the Schedule page.</li>
+</ol>
+
+<h2 class="sub">Daily Admin Workflow</h2>
+<ol class="steps">
+  <li>Log in → check <strong>Dashboard</strong> for pending signed forms and today's stats.</li>
+  <li>Go to <strong>Admin &rarr; Manage Schedule</strong> to set up the next day's visits.</li>
+  <li>Add visits for each MA, assign visit type, set approximate times.</li>
+  <li>Run <strong>✨ Optimize Route</strong> per MA group to minimize drive time.</li>
+  <li>Review any MA's daily progress via <strong>Schedule &rarr; MA dropdown</strong>.</li>
+  <li>Export PDFs for completed visits for billing upload.</li>
+</ol>
+
+<h2 class="sub">Keyboard &amp; Gesture Shortcuts</h2>
+<div class="tbl-wrap">
+<table>
+  <tr><th>Action</th><th>Shortcut</th></tr>
+  <tr><td>Print / Save PDF</td><td>Ctrl+P (Cmd+P on Mac)</td></tr>
+  <tr><td>Hard reload (clear cache)</td><td>Ctrl+Shift+R (Cmd+Shift+R on Mac)</td></tr>
+  <tr><td>Toggle password visibility (login)</td><td>Click the 👁 eye icon</td></tr>
+  <tr><td>Start voice dictation</td><td>Tap 🎤 mic button on any text area</td></tr>
+  <tr><td>Clear signature pad</td><td>Click "Clear Signature" button</td></tr>
+  <tr><td>Drag-reorder a visit</td><td>Hold the ⠿ handle on the left of a visit row</td></tr>
+</table>
+</div>
+
+<h2 class="sub">Role Matrix Summary</h2>
+<div class="tbl-wrap">
+<table>
+  <tr>
+    <th></th>
+    <th><span class="badge badge-admin">Admin</span></th>
+    <th><span class="badge badge-ma">MA</span></th>
+    <th><span class="badge badge-billing">Billing</span></th>
+  </tr>
+  <tr><td>Dashboard</td><td>Full</td><td>Own stats</td><td>Billing stats</td></tr>
+  <tr><td>Patients</td><td>Full</td><td>Full</td><td>Forms tab only</td></tr>
+  <tr><td>Fill forms</td><td>✅</td><td>✅</td><td>❌</td></tr>
+  <tr><td>View forms</td><td>✅ All fields</td><td>✅ All fields</td><td>✅ No clinical fields</td></tr>
+  <tr><td>Export PDF</td><td>✅</td><td>✅</td><td>✅</td></tr>
+  <tr><td>Schedule (view)</td><td>✅ All MAs</td><td>✅ Own only</td><td>❌</td></tr>
+  <tr><td>Manage Schedule</td><td>✅</td><td>❌</td><td>❌</td></tr>
+  <tr><td>Staff / Users</td><td>✅</td><td>❌</td><td>❌</td></tr>
+  <tr><td>Audit Log</td><td>✅</td><td>❌</td><td>❌</td></tr>
+</table>
+</div>
+
+<hr>
+
+</div><!-- /container -->
+
+<footer>
+  PaperlessMD &mdash; Beyond Wound Care Inc. &nbsp;|&nbsp;
+  847-873-8693 &nbsp;|&nbsp; Support@beyondwoundcare.com<br>
+  This document is confidential and intended for authorized Beyond Wound Care staff only.
+</footer>
+
+</body>
+</html>
