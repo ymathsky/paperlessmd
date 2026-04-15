@@ -108,6 +108,10 @@
                            class="flex items-center gap-3 px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
                             <i class="bi bi-shield-lock-fill text-emerald-500 text-base"></i> Audit Log
                         </a>
+                        <a href="<?= BASE_URL ?>/admin/settings.php"
+                           class="flex items-center gap-3 px-4 py-3 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                            <i class="bi bi-sliders2-vertical text-violet-500 text-base"></i> Global Settings
+                        </a>
                         <?php endif; ?>
                         <a href="<?= BASE_URL ?>/logout.php"
                            class="flex items-center gap-3 px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors border-t border-slate-100">

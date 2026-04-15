@@ -18,3 +18,14 @@ try {
          <p>Could not connect. Run <a href="' . BASE_URL . '/install.php">install.php</a> first.</p>
          </div>');
 }
+
+/* ── Apply timezone from settings table (falls back to America/Chicago) ── */
+try {
+    $tzVal = $pdo->query("SELECT `value` FROM settings WHERE `key` = 'timezone' LIMIT 1")
+                 ->fetchColumn();
+    $tz = ($tzVal && @timezone_open($tzVal)) ? $tzVal : 'America/Chicago';
+} catch (PDOException $e) {
+    $tz = 'America/Chicago'; // table may not exist yet (before migration)
+}
+date_default_timezone_set($tz);
+define('APP_TIMEZONE', $tz);
