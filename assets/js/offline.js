@@ -295,7 +295,7 @@
     function registerSW() {
         if (!('serviceWorker' in navigator)) return;
 
-        navigator.serviceWorker.register(window._pdBase + '/sw.js', { scope: '/pd/' })
+        navigator.serviceWorker.register(window._pdBase + '/sw.js', { scope: window._pdBase + '/' })
             .then(function (reg) {
                 console.log('[PWA] Service worker registered, scope:', reg.scope);
 

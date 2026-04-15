@@ -8,18 +8,23 @@ const STATIC_CACHE = 'pd-static-v1';
 const PAGES_CACHE  = 'pd-pages-v1';
 const SYNC_TAG     = 'pd-form-sync';
 
+// Derive base path from sw.js location (/pd on local, '' on production)
+const BASE = self.location.pathname.replace(/\/sw\.js$/, '');
+
 const PRECACHE_URLS = [
-    '/pd/offline.html',
-    '/pd/assets/css/style.css',
-    '/pd/assets/js/app.js',
-    '/pd/assets/js/offline.js',
+    BASE + '/offline.html',
+    BASE + '/assets/css/style.css',
+    BASE + '/assets/js/app.js',
+    BASE + '/assets/js/offline.js',
 ];
 
-// ── Install: pre-cache critical shell ────────────────────────────────────
+// ── Install: pre-cache critical shell (ignore individual failures) ────────
 self.addEventListener('install', event => {
     event.waitUntil(
         caches.open(STATIC_CACHE)
-              .then(c => c.addAll(PRECACHE_URLS))
+              .then(c => Promise.all(
+                  PRECACHE_URLS.map(url => c.add(url).catch(() => { /* skip missing */ }))
+              ))
               .then(() => self.skipWaiting())
     );
 });
