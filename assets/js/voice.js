@@ -91,15 +91,20 @@
         rec.continuous     = true;
         rec.interimResults = true;
 
-        var interimStart = null; // caret position where interim text begins
+        var interimStart = null;
+        var everStarted  = false; // guard against silent failure / infinite restart
+
+        /* Set state immediately so the user sees a response on click */
+        activeRec = rec;
+        activeBtn = btn;
+        btn.innerHTML = stopIcon();
+        btn.classList.add('pd-mic-recording');
+        btn.title = 'Stop dictation';
+        showToast('Starting microphone…', false, true); // persist until onstart/error
 
         rec.onstart = function () {
-            activeRec = rec;
-            activeBtn = btn;
-            btn.innerHTML = stopIcon();
-            btn.classList.add('pd-mic-recording');
-            btn.title = 'Stop dictation';
-            showToast('Listening…');
+            everStarted = true;
+            showToast('Listening…', false, true);
         };
 
         rec.onresult = function (e) {
@@ -136,22 +141,33 @@
         };
 
         rec.onerror = function (e) {
-            if (e.error === 'no-speech') return;
-            showToast('Microphone error: ' + e.error, true);
+            if (e.error === 'no-speech') return; // harmless — keep listening
+            var msg = {
+                'not-allowed':       'Microphone access denied. Check browser permissions.',
+                'service-not-allowed':'Microphone blocked. Ensure the page is HTTPS.',
+                'audio-capture':     'No microphone found.',
+                'network':           'Network error during speech recognition.',
+            }[e.error] || ('Microphone error: ' + e.error);
+            showToast(msg, true, false);
             stopListening();
         };
 
         rec.onend = function () {
-            /* Auto-restart if still active (browser stops after silence) */
-            if (activeRec === rec && btn.classList.contains('pd-mic-recording')) {
+            /* Only auto-restart if recognition actually started and is still active */
+            if (everStarted && activeRec === rec && btn.classList.contains('pd-mic-recording')) {
                 try { rec.start(); } catch (ex) { /* already stopped */ }
+            } else if (!everStarted) {
+                /* Never started — permission likely denied without an error event */
+                showToast('Could not access microphone. Check browser permissions.', true, false);
+                stopListening();
             }
         };
 
         try {
             rec.start();
         } catch (ex) {
-            showToast('Could not start microphone.', true);
+            showToast('Could not start microphone: ' + ex.message, true, false);
+            stopListening();
         }
     }
 
@@ -171,7 +187,7 @@
 
     /* ── Toast indicator ─────────────────────────────────────────────────── */
     var toast = null;
-    function showToast(msg, isErr) {
+    function showToast(msg, isErr, persist) {
         dismissToast();
         toast = document.createElement('div');
         toast.id = 'pdVoiceToast';
@@ -193,7 +209,7 @@
             'white-space:nowrap',
         ].join(';');
         document.body.appendChild(toast);
-        if (isErr) setTimeout(dismissToast, 4000);
+        if (!persist) setTimeout(dismissToast, 4000);
     }
     function dismissToast() {
         if (toast) { toast.remove(); toast = null; }
