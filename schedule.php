@@ -17,6 +17,15 @@ $isToday  = $date === date('Y-m-d');
 // View mode: day | week
 $view = in_array($_GET['view'] ?? '', ['day','week']) ? $_GET['view'] : 'day';
 
+// Admins can view any MA's schedule via ?ma_id=X
+$viewMaId = isAdmin() && isset($_GET['ma_id']) ? (int)$_GET['ma_id'] : (int)$_SESSION['user_id'];
+
+// Fetch MA info
+$maStmt = $pdo->prepare("SELECT id, full_name FROM staff WHERE id = ?");
+$maStmt->execute([$viewMaId]);
+$ma = $maStmt->fetch();
+if (!$ma) { header('Location: ' . BASE_URL . '/dashboard.php'); exit; }
+
 // Week bounds (Monday–Sunday of the week containing $date)
 $dow       = (int)date('N', strtotime($date));   // 1=Mon … 7=Sun
 $weekStart = date('Y-m-d', strtotime($date . ' -' . ($dow - 1) . ' days'));
@@ -45,15 +54,6 @@ if ($view === 'week') {
         $weekCounts[$wv['status']]++;
     }
 }
-
-// Admins can view any MA's schedule via ?ma_id=X
-$viewMaId = isAdmin() && isset($_GET['ma_id']) ? (int)$_GET['ma_id'] : (int)$_SESSION['user_id'];
-
-// Fetch MA info
-$maStmt = $pdo->prepare("SELECT id, full_name FROM staff WHERE id = ?");
-$maStmt->execute([$viewMaId]);
-$ma = $maStmt->fetch();
-if (!$ma) { header('Location: ' . BASE_URL . '/dashboard.php'); exit; }
 
 // Fetch schedule for this MA + date, ordered by visit_order
 $schedStmt = $pdo->prepare("
