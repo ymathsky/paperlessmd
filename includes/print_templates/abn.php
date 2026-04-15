@@ -99,16 +99,20 @@ $option     = vd($data, 'abn_option'); // 'option1', 'option2', 'option3'
     <!-- Signature Row -->
     <table style="width:100%;border:2px solid #000;border-top:none;border-collapse:collapse;">
         <tr>
-            <td style="border-right:1px solid #000;padding:8pt 7pt;width:70%;vertical-align:bottom;">
+            <td style="border-right:1px solid #000;padding:8pt 7pt;width:70%;vertical-align:bottom;position:relative;">
                 <strong>I. Signature:</strong><br>
+                <div style="min-height:44pt;position:relative;">
                 <?php if ($f['patient_signature']): ?>
-                <img src="<?= h($f['patient_signature']) ?>" class="bwc-sig-img" alt="Signature" style="max-height:40pt;">
-                <?php else: ?>&nbsp;<?php endif; ?>
-                <div style="border-top:1px solid #000;margin-top:22pt;"></div>
+                <img src="<?= h($f['patient_signature']) ?>" alt="Signature"
+                     style="max-height:38pt;max-width:200pt;object-fit:contain;display:block;">
+                <?php endif; ?>
+                </div>
+                <div style="border-top:1px solid #000;"></div>
             </td>
             <td style="padding:8pt 7pt;vertical-align:bottom;">
                 <strong>J. Date:</strong><br>
-                <div style="border-top:1px solid #000;margin-top:42pt;"><?= $sigDate ?></div>
+                <div style="min-height:44pt;"></div>
+                <div style="border-top:1px solid #000;"><?= $sigDate ?></div>
             </td>
         </tr>
     </table>
