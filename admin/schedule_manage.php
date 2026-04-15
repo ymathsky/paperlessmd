@@ -276,13 +276,21 @@ include __DIR__ . '/../includes/header.php';
            class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
             <i class="bi bi-eye"></i> MA View
         </a>
+        <?php if (count($maGroup['visits']) > 1): ?>
+        <button type="button"
+                onclick="optimizeRoute(<?= $maId ?>, this)"
+                class="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100
+                       text-emerald-700 text-xs font-bold rounded-xl transition-colors border border-emerald-200">
+            <i class="bi bi-magic"></i> Optimize Route
+        </button>
+        <?php endif; ?>
     </div>
 
     <div class="divide-y divide-slate-100" id="sortable-<?= $maId ?>">
         <?php foreach ($maGroup['visits'] as $idx => $v):
             $sd = $statusDefs[$v['status']];
         ?>
-        <div class="flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50 transition-colors" data-id="<?= $v['id'] ?>">
+        <div class="flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50 transition-colors" data-id="<?= $v['id'] ?>" data-address="<?= h($v['patient_address'] ?? '') ?>">
             <!-- Drag handle -->
             <div class="cursor-grab text-slate-300 hover:text-slate-500 drag-handle">
                 <i class="bi bi-grip-vertical text-lg"></i>
@@ -358,6 +366,84 @@ document.querySelectorAll('[id^="sortable-"]').forEach(function(el) {
         }
     });
 });
+
+// ── Route Optimizer ────────────────────────────────────────────────────────
+function haversine(lat1, lon1, lat2, lon2) {
+    const R = 3958.8;
+    const toRad = x => x * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat/2)**2 +
+              Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+async function geocode(address) {
+    try {
+        const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&addressdetails=0&q='
+                    + encodeURIComponent(address);
+        const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+        const data = await res.json();
+        if (data[0]) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+    } catch (_) {}
+    return null;
+}
+
+async function optimizeRoute(maId, btn) {
+    const container = document.getElementById('sortable-' + maId);
+    const rows = Array.from(container.querySelectorAll('[data-id]'));
+    if (rows.length < 2) { alert('Need at least 2 visits to optimize.'); return; }
+
+    const origHtml = btn.innerHTML;
+    btn.disabled = true;
+
+    // Geocode each address sequentially (Nominatim: 1 req/sec)
+    const points = [];
+    for (let i = 0; i < rows.length; i++) {
+        const addr = (rows[i].dataset.address || '').trim();
+        btn.innerHTML = `<i class="bi bi-hourglass-split"></i> Geocoding ${i + 1}/${rows.length}…`;
+        const coords = addr ? await geocode(addr) : null;
+        points.push({ row: rows[i], lat: coords?.lat ?? null, lng: coords?.lng ?? null });
+        if (i < rows.length - 1) await new Promise(r => setTimeout(r, 1150));
+    }
+
+    const withCoords    = points.filter(p => p.lat !== null);
+    const withoutCoords = points.filter(p => p.lat === null);
+
+    let ordered;
+    if (withCoords.length > 1) {
+        // Nearest-neighbour TSP from first geocoded point
+        const result    = [withCoords[0]];
+        const remaining = withCoords.slice(1);
+        while (remaining.length) {
+            const last = result[result.length - 1];
+            let minDist = Infinity, minIdx = 0;
+            remaining.forEach((p, idx) => {
+                const d = haversine(last.lat, last.lng, p.lat, p.lng);
+                if (d < minDist) { minDist = d; minIdx = idx; }
+            });
+            result.push(remaining.splice(minIdx, 1)[0]);
+        }
+        ordered = [...result, ...withoutCoords];
+    } else {
+        ordered = points; // nothing to reorder
+    }
+
+    // Re-append rows in optimised order, animate
+    ordered.forEach(p => {
+        p.row.style.transition = 'background 0.4s';
+        p.row.style.background = '#ecfdf5';
+        container.appendChild(p.row);
+        setTimeout(() => { p.row.style.background = ''; }, 800);
+    });
+
+    // Persist new order
+    const ids = ordered.map(p => p.row.dataset.id);
+    document.getElementById('orderInput-' + maId).value = ids.join(',');
+    document.getElementById('orderForm-' + maId).requestSubmit();
+
+    btn.innerHTML = '<i class="bi bi-check-lg"></i> Optimized!';
+    setTimeout(() => { btn.innerHTML = origHtml; btn.disabled = false; }, 2500);
+}
 </script>
 <?php endif; ?>
 
