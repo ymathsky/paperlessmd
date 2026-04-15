@@ -33,8 +33,9 @@ function csrfToken(): string
     return $_SESSION['csrf_token'];
 }
 
-function verifyCsrf(string $token): bool
+function verifyCsrf(?string $token = null): bool
 {
+    $token = $token ?? ($_POST['csrf_token'] ?? '');
     return hash_equals($_SESSION['csrf_token'] ?? '', $token);
 }
 
