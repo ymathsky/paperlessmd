@@ -1,0 +1,81 @@
+/* PaperlessMD — app.js */
+
+document.addEventListener('DOMContentLoaded', function () {
+
+    // ── Signature Pad Setup ──────────────────────────────────────────
+    const canvas  = document.getElementById('signaturePad');
+    const sigData = document.getElementById('sigData');
+    let sigPad    = null;
+
+    if (canvas && typeof SignaturePad !== 'undefined') {
+        const wrapper = canvas.closest('.sig-wrapper') || canvas.parentElement;
+
+        sigPad = new SignaturePad(canvas, {
+            backgroundColor: 'rgb(255, 255, 255)',
+            penColor:        'rgb(0, 0, 100)',
+            minWidth:        1.5,
+            maxWidth:        3.5,
+        });
+
+        function resizeCanvas() {
+            const ratio = Math.max(window.devicePixelRatio || 1, 1);
+            const w     = wrapper.clientWidth  || wrapper.offsetWidth;
+            const h     = 200;
+            canvas.width        = w * ratio;
+            canvas.height       = h * ratio;
+            canvas.style.width  = w + 'px';
+            canvas.style.height = h + 'px';
+            canvas.getContext('2d').scale(ratio, ratio);
+            sigPad.clear();
+        }
+
+        setTimeout(resizeCanvas, 150);
+        window.addEventListener('resize', resizeCanvas);
+
+        const clearBtn = document.getElementById('clearSig');
+        if (clearBtn) {
+            clearBtn.addEventListener('click', () => sigPad.clear());
+        }
+    }
+
+    // ── POA Toggle ────────────────────────────────────────────────────
+    const poaCheck  = document.getElementById('poaCheck');
+    const poaFields = document.getElementById('poaFields');
+    if (poaCheck && poaFields) {
+        poaCheck.addEventListener('change', function () {
+            poaFields.classList.toggle('hidden', !this.checked);
+            if (this.checked) poaFields.querySelector('input')?.focus();
+        });
+    }
+
+    // ── Form Submission — capture signature then submit ───────────────
+    const mainForm  = document.getElementById('mainForm');
+    const submitBtn = document.getElementById('submitBtn');
+
+    function captureAndSubmit() {
+        if (!mainForm) return;
+
+        if (sigPad && sigData && !sigPad.isEmpty()) {
+            sigData.value = sigPad.toDataURL('image/png');
+        }
+
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="bi bi-arrow-repeat text-xl" style="display:inline-block;animation:spin 1s linear infinite"></i> Saving…';
+        }
+
+        mainForm.submit();
+    }
+
+    if (submitBtn) {
+        submitBtn.addEventListener('click', captureAndSubmit);
+    }
+
+    if (mainForm) {
+        mainForm.addEventListener('submit', function () {
+            if (sigPad && sigData && !sigPad.isEmpty()) {
+                sigData.value = sigPad.toDataURL('image/png');
+            }
+        });
+    }
+});

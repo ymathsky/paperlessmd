@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
+  <rect width="192" height="192" rx="38" fill="#1e3a8a"/>
+  <rect x="30" y="22" width="96" height="120" rx="10" fill="white" fill-opacity="0.15"/>
+  <rect x="38" y="30" width="80" height="104" rx="8" fill="white"/>
+  <!-- Clipboard clip -->
+  <rect x="64" y="18" width="48" height="20" rx="8" fill="#1e3a8a"/>
+  <rect x="76" y="22" width="24" height="12" rx="4" fill="#93c5fd"/>
+  <!-- Lines -->
+  <rect x="50" y="58" width="56" height="5" rx="2.5" fill="#dbeafe"/>
+  <rect x="50" y="72" width="40" height="5" rx="2.5" fill="#dbeafe"/>
+  <rect x="50" y="86" width="48" height="5" rx="2.5" fill="#dbeafe"/>
+  <!-- Heart pulse -->
+  <polyline points="50,112 60,112 65,100 72,120 78,106 84,112 96,112"
+            fill="none" stroke="#2563eb" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Offline cloud + arrow down at bottom-right -->
+  <circle cx="148" cy="148" r="36" fill="#1d4ed8"/>
+  <path d="M148 136 v20 m-8-8 l8 8 8-8" stroke="white" stroke-width="4"
+        fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="132" y="160" width="32" height="5" rx="2.5" fill="white" fill-opacity="0.5"/>
+</svg>

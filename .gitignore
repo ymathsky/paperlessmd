@@ -1,0 +1,43 @@
+# ----- Dependencies / package managers -----
+/vendor/
+/node_modules/
+
+# ----- User-uploaded files (patient data — never commit) -----
+/uploads/
+/assets/uploads/
+
+# ----- Sensitive config (override locally) -----
+/includes/config.local.php
+*.env
+.env
+.env.*
+
+# ----- Offline / service-worker cache -----
+/cache/
+/sw-cache/
+
+# ----- Exported PDFs -----
+/exports/
+*.pdf
+
+# ----- OS clutter -----
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ----- IDE / editor -----
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# ----- PHP error logs -----
+php_errors.log
+error_log
+*.log
+
+# ----- Composer lock (optional – keep if you add deps later) -----
+# composer.lock
+
+# ----- One-time scripts (safe to keep in source, but flag here) -----
+# migrate_billing_role.php  # keep tracked so team can run it
