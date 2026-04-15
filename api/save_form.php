@@ -41,6 +41,22 @@ foreach ($_POST as $key => $value) {
 }
 
 $status = $signature ? 'signed' : 'draft';
+
+// One-signature rule: if submitting with a signature and one already exists today, redirect
+if ($signature) {
+    $dupChk = $pdo->prepare("
+        SELECT id FROM form_submissions
+        WHERE patient_id = ? AND form_type = ? AND status IN ('signed','uploaded')
+        AND DATE(created_at) = CURDATE()
+        LIMIT 1
+    ");
+    $dupChk->execute([$patientId, $formType]);
+    if ($dupId = $dupChk->fetchColumn()) {
+        header('Location: ' . BASE_URL . '/view_document.php?id=' . (int)$dupId . '&already_signed=1');
+        exit;
+    }
+}
+
 $stmt   = $pdo->prepare("
     INSERT INTO form_submissions
         (patient_id, form_type, form_data, patient_signature, poa_name, poa_relationship, ma_id, status, signed_at)

@@ -10,6 +10,11 @@ $pStmt->execute([$patient_id]);
 $patient = $pStmt->fetch();
 if (!$patient) { header('Location: ' . BASE_URL . '/patients.php'); exit; }
 
+// One-signature rule: redirect to existing signed form if already signed today
+$_dupQ = $pdo->prepare("SELECT id FROM form_submissions WHERE patient_id = ? AND form_type = 'ccm_consent' AND status IN ('signed','uploaded') AND DATE(created_at) = CURDATE() LIMIT 1");
+$_dupQ->execute([$patient_id]);
+if ($_dupId = $_dupQ->fetchColumn()) { header('Location: ' . BASE_URL . '/view_document.php?id=' . (int)$_dupId . '&already_signed=1'); exit; }
+
 $pageTitle = 'CCM Consent';
 $activeNav = 'patients';
 include __DIR__ . '/../includes/header.php';

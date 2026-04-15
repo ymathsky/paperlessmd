@@ -133,6 +133,12 @@ include __DIR__ . '/includes/header.php';
 
 <!-- Action Bar -->
 <div class="flex flex-wrap items-center gap-3 mb-6 no-print">
+    <?php if (!empty($_GET['already_signed'])): ?>
+    <div class="w-full flex items-center gap-3 px-5 py-3 bg-amber-50 border border-amber-200 rounded-2xl text-sm text-amber-800">
+        <i class="bi bi-exclamation-triangle-fill text-amber-500 flex-shrink-0"></i>
+        <span>This form was already signed today. Showing the existing signed document.</span>
+    </div>
+    <?php endif; ?>
     <button onclick="window.print()"
             class="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-700 hover:bg-slate-800 text-white
                    font-semibold rounded-xl transition-all shadow-sm text-sm">
