@@ -118,7 +118,7 @@ if (!function_exists('yn2')) { function yn2(array $d, string $k): string {
     </div>
 
     <!-- Step 1 Score -->
-    <div style="border:2px solid #000;padding:6pt 8pt;margin-bottom:10pt;font-size:10pt;page-break-inside:avoid;">
+    <div style="border:2px solid #000;padding:6pt 8pt;margin-top:14pt;margin-bottom:10pt;font-size:10pt;page-break-inside:avoid;">
         <strong>Step 1 Scoring:</strong> <em>To get a total score, add the number of items answered correctly.</em><br>
         Total Correct (score out of 12) = <strong style="font-size:14pt;"><?= $step1Score ?> / 12</strong><br>
         <div style="border:1px solid #ccc;padding:4pt 6pt;margin-top:5pt;font-size:9.5pt;">
