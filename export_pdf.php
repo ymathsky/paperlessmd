@@ -87,6 +87,19 @@ $formDefs = [
     'il_disclosure'      => ['label' => 'IL Disclosure Auth.',       'color' => '#475569'],
 ];
 $statusLabel = ['draft' => 'Draft', 'signed' => 'Signed', 'uploaded' => 'Uploaded to PF'];
+
+/* ── Print template helpers (shared across all templates) ── */
+if (!function_exists('vd')) {
+    function vd(array $d, string $k): string {
+        return isset($d[$k]) ? htmlspecialchars((string)$d[$k], ENT_QUOTES, 'UTF-8') : '';
+    }
+}
+if (!function_exists('vdArr')) {
+    function vdArr(array $d, string $k): array {
+        if (!isset($d[$k])) return [];
+        return is_array($d[$k]) ? $d[$k] : array_filter(array_map('trim', explode(',', (string)$d[$k])));
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -100,16 +113,53 @@ $statusLabel = ['draft' => 'Draft', 'signed' => 'Signed', 'uploaded' => 'Uploade
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <style>
+  /* ── Screen/print visibility ──────────────────────────── */
   @media print {
-    .no-print { display: none !important; }
+    .no-print   { display: none !important; }
+    .form-card  { display: none !important; }  /* hide screen cards when printing */
+    .print-only { display: block !important; }
     .page-break { page-break-after: always; break-after: page; }
-    body { background: white !important; }
-    .form-card { box-shadow: none !important; border: 1px solid #e2e8f0 !important; border-radius: 8px !important; }
+    body        { background: white !important; }
   }
   @media screen {
+    .print-only { display: none !important; }
     .page-break { border-bottom: 3px dashed #e2e8f0; margin-bottom: 2.5rem; padding-bottom: 2.5rem; }
     .page-break:last-child { border-bottom: none; }
   }
+
+  /* ── Page setup ────────────────────────────────────────── */
+  @page { size: letter; margin: 0.5in; }
+
+  /* ── BWC Paper Form Classes (.bwc-*) ───────────────────── */
+  .bwc-form            { max-width: 6.5in; margin: 0 auto; font-family: Arial, sans-serif; font-size: 10pt; color: #000; }
+  .bwc-header          { text-align: center; margin-bottom: 10pt; line-height: 1.5; }
+  .bwc-header p        { margin: 1pt 0; }
+  .bwc-practice-name   { font-size: 14pt; font-weight: bold; margin: 0 !important; }
+  .bwc-form-title      { font-size: 12pt; font-weight: bold; text-decoration: underline; margin: 8pt 0 4pt !important; }
+  .bwc-patient-line,
+  .bwc-provider-line,
+  .bwc-visit-row,
+  .bwc-homebound-row,
+  .bwc-row             { margin: 4pt 0; line-height: 1.8; font-size: 10pt; }
+  .bwc-fill            { display: inline-block; min-width: 120pt; border-bottom: 1px solid #000; vertical-align: bottom; }
+  .bwc-fill-sm         { display: inline-block; min-width: 40pt;  border-bottom: 1px solid #000; vertical-align: bottom; }
+  .bwc-vitals-table    { width: 100%; border-collapse: collapse; margin: 6pt 0; }
+  .bwc-vitals-table td { border: 1px solid #000; padding: 4pt 6pt; min-height: 28pt; vertical-align: top; width: 25%; font-size: 9.5pt; }
+  .bwc-med-table       { width: 100%; border-collapse: collapse; margin: 6pt 0; }
+  .bwc-med-table td,
+  .bwc-med-table th    { border: 1px solid #000; padding: 3pt 5pt; font-size: 9.5pt; }
+  .bwc-med-header th   { background: #f0f0f0; font-weight: bold; text-align: left; }
+  .bwc-race-chip       { display: inline; margin-right: 6pt; }
+  .bwc-checked         { font-weight: bold; text-decoration: underline; }
+  .bwc-sigs            { margin-top: 20pt; }
+  .bwc-sig-row         { display: flex; align-items: flex-end; gap: 20pt; margin-bottom: 2pt; }
+  .bwc-sig-line        { flex: 1; border-bottom: 1px solid #000; min-height: 32pt; position: relative; }
+  .bwc-sig-date        { white-space: nowrap; width: 140pt; border-bottom: 1px solid #000; min-height: 32pt; }
+  .bwc-sig-label       { font-size: 9pt; color: #333; margin-bottom: 12pt; }
+  .bwc-sig-img         { max-height: 30pt; max-width: 200pt; object-fit: contain; position: absolute; bottom: 2pt; }
+  .bwc-section-hdr     { background: #333; color: #fff; font-weight: bold; padding: 3pt 6pt; font-size: 10pt; margin: 6pt 0 4pt; }
+  .bwc-cog-table       { width: 100%; border-collapse: collapse; margin-bottom: 6pt; }
+  .bwc-cog-table td    { border: 1px solid #ccc; padding: 4pt 6pt; font-size: 9.5pt; vertical-align: top; }
 </style>
 </head>
 <body class="bg-slate-100 font-sans min-h-screen">
@@ -295,6 +345,19 @@ $statusLabel = ['draft' => 'Draft', 'signed' => 'Signed', 'uploaded' => 'Uploade
             </div>
             <?php endif; ?>
         </div>
+    </div>
+
+    <!-- Print-only: exact paper form replica (hidden on screen) -->
+    <div class="print-only <?= $isLast ? '' : 'page-break' ?>">
+        <?php
+        $tplFile = __DIR__ . '/includes/print_templates/' . preg_replace('/[^a-z0-9_]/', '', $f['form_type']) . '.php';
+        if (file_exists($tplFile)):
+            include $tplFile;
+        else: ?>
+        <div class="bwc-form">
+            <p style="font-style:italic;color:#999;font-size:9pt;">No print template available for form type: <?= h($f['form_type']) ?>.</p>
+        </div>
+        <?php endif; ?>
     </div>
 
     <?php endforeach; ?>
