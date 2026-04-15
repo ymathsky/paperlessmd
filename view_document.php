@@ -425,11 +425,20 @@ JS;
 
 <?php if (!isBilling() && !empty($doc['provider_signature'])): ?>
 <!-- ─── Provider Signature Already Captured ─────────────────────── -->
-<div class="max-w-3xl mt-4 px-5 py-3 bg-violet-50 border border-violet-200 rounded-2xl flex items-center gap-2 no-print">
-    <i class="bi bi-person-check-fill text-violet-500"></i>
-    <span class="text-xs text-violet-700 font-semibold">
-        Provider countersigned<?= $doc['provider_name'] ? ' — ' . h($doc['provider_name']) : '' ?>
-    </span>
+<div class="max-w-3xl mt-4 bg-white rounded-2xl shadow-sm border border-violet-200 overflow-hidden no-print">
+    <div class="flex items-center gap-3 px-5 py-3 bg-violet-50 border-b border-violet-100">
+        <i class="bi bi-person-check-fill text-violet-500"></i>
+        <span class="text-sm font-bold text-violet-700">Provider Countersignature</span>
+        <?php if ($doc['provider_name']): ?>
+        <span class="text-xs text-slate-500 font-medium">— <?= h($doc['provider_name']) ?></span>
+        <?php endif; ?>
+        <span class="ml-auto text-xs text-slate-400"><?= date('M j, Y', strtotime($doc['updated_at'] ?? $doc['created_at'])) ?></span>
+    </div>
+    <div class="px-5 py-4">
+        <img src="<?= h($doc['provider_signature']) ?>"
+             alt="Provider Signature"
+             class="max-h-20 max-w-xs object-contain border border-slate-100 rounded-lg bg-slate-50 p-2">
+    </div>
 </div>
 <?php elseif (!isBilling() && $doc['status'] !== 'draft'): ?>
 <!-- ─── Provider Signature Capture Panel ────────────────────────── -->
