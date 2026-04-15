@@ -23,12 +23,12 @@ auditLog($pdo, 'form_view', 'form', $id, $doc['form_type'] . ' — ' . $doc['fir
 $data = json_decode($doc['form_data'] ?? '{}', true) ?: [];
 
 // Fields billing users must NOT see (vitals, clinical notes, PHI not needed for coding)
-const CLINICAL_ONLY_FIELDS = [
+define('CLINICAL_ONLY_FIELDS', [
     'chief_complaint', 'bp', 'pulse', 'temp', 'o2sat', 'glucose',
     'height', 'weight', 'resp', 'pharmacy_name', 'pharmacy_phone',
     'allergies', 'race', 'assistive_device', 'missed_visit_reason',
     'homebound_reason', 'current_medications', 'medication_list',
-];
+]);
 
 $pageTitle = 'View Document';
 $activeNav = 'patients';

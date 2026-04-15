@@ -193,7 +193,7 @@ document.getElementById("pfSearchBtn").addEventListener("click", function() {
                             <i class="bi bi-person-check-fill text-emerald-600 text-xl"></i>
                             <div>
                                 <div class="font-bold text-slate-800">${this.dataset.name}</div>
-                                ${this.dataset.dob ? "<div class='text-xs text-slate-500'>DOB: " + this.dataset.dob + "</div>" : ""}
+                                ${this.dataset.dob ? "<div class=\'text-xs text-slate-500\'>DOB: " + this.dataset.dob + "</div>" : ""}
                             </div>
                         </div>`;
                     document.getElementById("step2").classList.remove("hidden");
