@@ -14,6 +14,38 @@ $prevDate = date('Y-m-d', strtotime($date . ' -1 day'));
 $nextDate = date('Y-m-d', strtotime($date . ' +1 day'));
 $isToday  = $date === date('Y-m-d');
 
+// View mode: day | week
+$view = in_array($_GET['view'] ?? '', ['day','week']) ? $_GET['view'] : 'day';
+
+// Week bounds (Monday–Sunday of the week containing $date)
+$dow       = (int)date('N', strtotime($date));   // 1=Mon … 7=Sun
+$weekStart = date('Y-m-d', strtotime($date . ' -' . ($dow - 1) . ' days'));
+$weekEnd   = date('Y-m-d', strtotime($weekStart . ' +6 days'));
+$prevWeek  = date('Y-m-d', strtotime($weekStart . ' -7 days'));
+$nextWeek  = date('Y-m-d', strtotime($weekStart . ' +7 days'));
+
+// Week query (only executed when needed)
+$visitsByDate = [];
+$weekVisits   = [];
+$weekCounts   = ['pending'=>0,'en_route'=>0,'completed'=>0,'missed'=>0];
+if ($view === 'week') {
+    $wkStmt = $pdo->prepare("
+        SELECT sc.*,
+               CONCAT(p.first_name, ' ', p.last_name) AS patient_name,
+               p.id AS patient_id
+        FROM `schedule` sc
+        JOIN patients p ON p.id = sc.patient_id
+        WHERE sc.ma_id = ? AND sc.visit_date BETWEEN ? AND ?
+        ORDER BY sc.visit_date ASC, sc.visit_order ASC, sc.visit_time ASC
+    ");
+    $wkStmt->execute([$viewMaId, $weekStart, $weekEnd]);
+    $weekVisits = $wkStmt->fetchAll();
+    foreach ($weekVisits as $wv) {
+        $visitsByDate[$wv['visit_date']][] = $wv;
+        $weekCounts[$wv['status']]++;
+    }
+}
+
 // Admins can view any MA's schedule via ?ma_id=X
 $viewMaId = isAdmin() && isset($_GET['ma_id']) ? (int)$_GET['ma_id'] : (int)$_SESSION['user_id'];
 
@@ -58,8 +90,13 @@ include __DIR__ . '/includes/header.php';
             <i class="bi bi-calendar3 text-indigo-500 mr-1"></i> Daily Schedule
         </h2>
         <p class="text-slate-500 text-sm mt-0.5">
-            <?= h($ma['full_name']) ?> &mdash; <?= date('l, F j, Y', strtotime($date)) ?>
-            <?php if ($isToday): ?><span class="ml-2 px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-full">TODAY</span><?php endif; ?>
+            <?= h($ma['full_name']) ?> &mdash;
+            <?php if ($view === 'week'): ?>
+                <?= date('M j', strtotime($weekStart)) ?> – <?= date('M j, Y', strtotime($weekEnd)) ?>
+            <?php else: ?>
+                <?= date('l, F j, Y', strtotime($date)) ?>
+                <?php if ($isToday): ?><span class="ml-2 px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-full">TODAY</span><?php endif; ?>
+            <?php endif; ?>
         </p>
     </div>
     <div class="flex items-center gap-2">
@@ -67,6 +104,7 @@ include __DIR__ . '/includes/header.php';
         <?php if (isAdmin() && $allMas): ?>
         <form method="GET" class="flex items-center gap-2">
             <input type="hidden" name="date" value="<?= h($date) ?>">
+            <input type="hidden" name="view" value="<?= h($view) ?>">
             <select name="ma_id" onchange="this.form.submit()"
                     class="px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
                 <?php foreach ($allMas as $m): ?>
@@ -78,19 +116,46 @@ include __DIR__ . '/includes/header.php';
         </form>
         <?php endif; ?>
 
+        <!-- Day / Week toggle -->
+        <div class="flex items-center bg-slate-100 rounded-xl p-1 gap-0.5">
+            <a href="?date=<?= $date ?>&ma_id=<?= $viewMaId ?>&view=day"
+               class="px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-all <?= $view === 'day' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700' ?>">
+                <i class="bi bi-calendar3 mr-1"></i>Day
+            </a>
+            <a href="?date=<?= $weekStart ?>&ma_id=<?= $viewMaId ?>&view=week"
+               class="px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-all <?= $view === 'week' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700' ?>">
+                <i class="bi bi-calendar-week mr-1"></i>Week
+            </a>
+        </div>
+
         <!-- Date navigation -->
-        <a href="?date=<?= $prevDate ?>&ma_id=<?= $viewMaId ?>"
+        <?php if ($view === 'week'): ?>
+        <a href="?date=<?= $prevWeek ?>&ma_id=<?= $viewMaId ?>&view=week"
            class="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors text-slate-600">
             <i class="bi bi-chevron-left text-sm"></i>
         </a>
-        <a href="?date=<?= date('Y-m-d') ?>&ma_id=<?= $viewMaId ?>"
-           class="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors <?= $isToday ? 'border-indigo-300 text-indigo-600' : '' ?>">
+        <a href="?date=<?= date('Y-m-d') ?>&ma_id=<?= $viewMaId ?>&view=week"
+           class="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors <?= (date('Y-m-d') >= $weekStart && date('Y-m-d') <= $weekEnd) ? 'border-indigo-300 text-indigo-600' : '' ?>">
             Today
         </a>
-        <a href="?date=<?= $nextDate ?>&ma_id=<?= $viewMaId ?>"
+        <a href="?date=<?= $nextWeek ?>&ma_id=<?= $viewMaId ?>&view=week"
            class="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors text-slate-600">
             <i class="bi bi-chevron-right text-sm"></i>
         </a>
+        <?php else: ?>
+        <a href="?date=<?= $prevDate ?>&ma_id=<?= $viewMaId ?>&view=day"
+           class="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors text-slate-600">
+            <i class="bi bi-chevron-left text-sm"></i>
+        </a>
+        <a href="?date=<?= date('Y-m-d') ?>&ma_id=<?= $viewMaId ?>&view=day"
+           class="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors <?= $isToday ? 'border-indigo-300 text-indigo-600' : '' ?>">
+            Today
+        </a>
+        <a href="?date=<?= $nextDate ?>&ma_id=<?= $viewMaId ?>&view=day"
+           class="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors text-slate-600">
+            <i class="bi bi-chevron-right text-sm"></i>
+        </a>
+        <?php endif; ?>
 
         <?php if (isAdmin()): ?>
         <a href="<?= BASE_URL ?>/admin/schedule_manage.php?date=<?= $date ?>"
@@ -110,20 +175,94 @@ include __DIR__ . '/includes/header.php';
         'completed' => ['label'=>'Completed', 'bg'=>'bg-emerald-100', 'text'=>'text-emerald-700', 'dot'=>'bg-emerald-500', 'icon'=>'bi-check-circle-fill'],
         'missed'    => ['label'=>'Missed',    'bg'=>'bg-red-100',     'text'=>'text-red-700',     'dot'=>'bg-red-400',     'icon'=>'bi-x-circle-fill'],
     ];
+    $displayCounts = ($view === 'week') ? $weekCounts : $counts;
     foreach ($statusDefs as $key => $def): ?>
     <div class="bg-white border border-slate-100 rounded-2xl p-4 flex items-center gap-3 shadow-sm">
         <div class="<?= $def['bg'] ?> p-2.5 rounded-xl">
             <i class="bi <?= $def['icon'] ?> <?= $def['text'] ?> text-lg leading-none"></i>
         </div>
         <div>
-            <div class="text-2xl font-extrabold text-slate-800"><?= $counts[$key] ?></div>
+            <div class="text-2xl font-extrabold text-slate-800"><?= $displayCounts[$key] ?></div>
             <div class="text-xs text-slate-500 font-medium"><?= $def['label'] ?></div>
         </div>
     </div>
     <?php endforeach; ?>
 </div>
 
-<!-- Visit list -->
+<?php if ($view === 'week'): ?>
+<!-- ═══════════════════════ WEEKLY VIEW ═══════════════════════ -->
+<div class="overflow-x-auto -mx-1 pb-2">
+    <div class="inline-grid gap-3 min-w-full" style="grid-template-columns: repeat(7, minmax(160px, 1fr));">
+        <?php
+        for ($d = 0; $d < 7; $d++):
+            $colDate  = date('Y-m-d', strtotime($weekStart . ' +' . $d . ' days'));
+            $isColToday = $colDate === date('Y-m-d');
+            $colVisits  = $visitsByDate[$colDate] ?? [];
+            $colCounts  = ['pending'=>0,'en_route'=>0,'completed'=>0,'missed'=>0];
+            foreach ($colVisits as $cv) $colCounts[$cv['status']]++;
+        ?>
+        <div class="flex flex-col rounded-2xl overflow-hidden border <?= $isColToday ? 'border-indigo-300 shadow-md' : 'border-slate-100 shadow-sm' ?> bg-white">
+            <!-- Day header -->
+            <div class="px-3 py-2.5 <?= $isColToday ? 'bg-indigo-600 text-white' : 'bg-slate-50 text-slate-600' ?> border-b <?= $isColToday ? 'border-indigo-500' : 'border-slate-100' ?>">
+                <div class="text-xs font-bold uppercase tracking-wide <?= $isColToday ? 'text-indigo-100' : 'text-slate-400' ?>">
+                    <?= date('D', strtotime($colDate)) ?>
+                </div>
+                <div class="text-sm font-extrabold leading-tight <?= $isColToday ? 'text-white' : 'text-slate-700' ?>">
+                    <?= date('M j', strtotime($colDate)) ?>
+                </div>
+                <?php if (!empty($colVisits)): ?>
+                <div class="flex gap-1 mt-1.5 flex-wrap">
+                    <?php foreach (['pending'=>'bg-slate-300','en_route'=>'bg-blue-400','completed'=>'bg-emerald-400','missed'=>'bg-red-400'] as $sk=>$sc): if ($colCounts[$sk]): ?>
+                    <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold
+                                 <?= $isColToday ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600' ?>">
+                        <span class="w-1.5 h-1.5 rounded-full <?= $sc ?>"></span><?= $colCounts[$sk] ?>
+                    </span>
+                    <?php endif; endforeach; ?>
+                </div>
+                <?php endif; ?>
+            </div>
+            <!-- Visit list -->
+            <div class="flex flex-col gap-1.5 p-2 flex-1 <?= empty($colVisits) ? 'items-center justify-center py-6' : '' ?>">
+                <?php if (empty($colVisits)): ?>
+                <span class="text-xs text-slate-300 font-medium">No visits</span>
+                <?php else: ?>
+                <?php foreach ($colVisits as $cv):
+                    $cvSd = $statusDefs[$cv['status']];
+                ?>
+                <div class="rounded-xl border <?= $cv['status']==='completed' ? 'border-emerald-100 bg-emerald-50' : ($cv['status']==='en_route' ? 'border-blue-100 bg-blue-50' : ($cv['status']==='missed' ? 'border-red-100 bg-red-50' : 'border-slate-100 bg-slate-50')) ?> px-2.5 py-2">
+                    <div class="flex items-start gap-1.5">
+                        <span class="mt-0.5 w-2 h-2 rounded-full <?= $cvSd['dot'] ?> shrink-0"></span>
+                        <div class="min-w-0 flex-1">
+                            <a href="<?= BASE_URL ?>/patient_view.php?id=<?= $cv['patient_id'] ?>"
+                               class="text-xs font-semibold text-slate-700 hover:text-indigo-600 leading-snug block truncate">
+                                <?= h($cv['patient_name']) ?>
+                            </a>
+                            <?php if ($cv['visit_time']): ?>
+                            <span class="text-[10px] text-slate-400"><?= date('g:i A', strtotime($cv['visit_time'])) ?></span>
+                            <?php endif; ?>
+                        </div>
+                        <a href="<?= BASE_URL ?>/patient_view.php?id=<?= $cv['patient_id'] ?>"
+                           class="shrink-0 text-[10px] font-semibold text-slate-400 hover:text-indigo-600 mt-0.5">
+                            <i class="bi bi-person-lines-fill"></i>
+                        </a>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+                <?php endif; ?>
+            </div>
+            <!-- Day footer: link to day view -->
+            <a href="?date=<?= $colDate ?>&ma_id=<?= $viewMaId ?>&view=day"
+               class="block text-center text-[10px] font-semibold py-2 border-t border-slate-100
+                      <?= $isColToday ? 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100' : 'text-slate-400 bg-slate-50 hover:bg-slate-100' ?> transition-colors">
+                View day <i class="bi bi-arrow-right-short"></i>
+            </a>
+        </div>
+        <?php endfor; ?>
+    </div>
+</div>
+
+<?php else: ?>
+<!-- ═══════════════════════ DAILY VIEW ═══════════════════════ -->
 <?php if (empty($visits)): ?>
 <div class="bg-white border border-slate-100 rounded-2xl shadow-sm p-12 text-center">
     <div class="w-16 h-16 bg-indigo-50 rounded-2xl grid place-items-center mx-auto mb-4">
@@ -293,7 +432,8 @@ include __DIR__ . '/includes/header.php';
     </div>
     <?php endforeach; ?>
 </div>
-<?php endif; ?>
+<?php endif; // visit list ?>
+<?php endif; // end daily view ?>
 
 <script>
 const CSRF   = '<?= csrfToken() ?>';
