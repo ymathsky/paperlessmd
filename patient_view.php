@@ -18,7 +18,7 @@ $pageTitle = $patient['first_name'] . ' ' . $patient['last_name'];
 $activeNav = 'patients';
 $activeTab = $_GET['tab'] ?? 'forms';
 // Billing users can only see the forms tab
-if (isBilling() && in_array($activeTab, ['meds', 'photos'], true)) {
+if (isBilling() && in_array($activeTab, ['meds', 'photos', 'wounds'], true)) {
     $activeTab = 'forms';
 }
 $msg = $_GET['msg'] ?? '';
@@ -95,6 +95,21 @@ try {
 } catch (PDOException $e) {
     $activeMedsList = [];
     $discMedsList   = [];
+}
+
+// ── Wound measurements tab data ───────────────────────────────────────────────
+try {
+    $woundsQ = $pdo->prepare("
+        SELECT wm.*, s.full_name AS recorded_by_name
+        FROM wound_measurements wm
+        LEFT JOIN staff s ON s.id = wm.recorded_by
+        WHERE wm.patient_id = ?
+        ORDER BY wm.measured_at ASC, wm.id ASC
+    ");
+    $woundsQ->execute([$id]);
+    $woundMeasurements = $woundsQ->fetchAll();
+} catch (PDOException $e) {
+    $woundMeasurements = [];
 }
 
 $extraJs = '';
@@ -280,6 +295,178 @@ if ($activeTab === 'meds') {
 
     function esc(s) {
         return s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : '';
+    }
+})();
+</script>
+<?php
+    $extraJs = ob_get_clean();
+}
+
+if ($activeTab === 'wounds' && canAccessClinical()) {
+    $woundsCsrf = csrfToken();
+    ob_start(); ?>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+    const PID   = <?= (int)$id ?>;
+    const BASE  = <?= json_encode(BASE_URL) ?>;
+    const CSRF  = <?= json_encode($woundsCsrf) ?>;
+    const ADMIN = <?= isAdmin() ? 'true' : 'false' ?>;
+
+    // ── Submit new measurement ────────────────────────────────────────────────
+    const form    = document.getElementById('woundForm');
+    const errEl   = document.getElementById('woundErr');
+    const submitB = document.getElementById('woundSubmit');
+    if (form) {
+        form.addEventListener('submit', async e => {
+            e.preventDefault();
+            errEl.classList.add('hidden');
+            const fd = new FormData(form);
+            const payload = {
+                action: 'add', csrf: CSRF, patient_id: PID,
+                measured_at: fd.get('measured_at'),
+                wound_site:  fd.get('wound_site'),
+                length_cm:   fd.get('length_cm'),
+                width_cm:    fd.get('width_cm'),
+                depth_cm:    fd.get('depth_cm'),
+                notes:       fd.get('notes'),
+            };
+            submitB.disabled = true;
+            submitB.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving…';
+            try {
+                const r = await fetch(BASE + '/api/wounds.php', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(payload),
+                });
+                const data = await r.json();
+                if (data.ok) {
+                    location.reload();
+                } else {
+                    errEl.textContent = data.error || 'Could not save.';
+                    errEl.classList.remove('hidden');
+                    submitB.disabled = false;
+                    submitB.innerHTML = '<i class="bi bi-plus-lg"></i> Log Measurement';
+                }
+            } catch {
+                errEl.textContent = 'Network error. Please try again.';
+                errEl.classList.remove('hidden');
+                submitB.disabled = false;
+                submitB.innerHTML = '<i class="bi bi-plus-lg"></i> Log Measurement';
+            }
+        });
+    }
+
+    // ── Delete measurement ────────────────────────────────────────────────────
+    document.addEventListener('click', async e => {
+        const del = e.target.closest('.del-wound-btn');
+        if (!del || !ADMIN) return;
+        const mid = parseInt(del.dataset.id);
+        if (!confirm('Delete this measurement? This cannot be undone.')) return;
+        del.disabled = true;
+        const r = await fetch(BASE + '/api/wounds.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({action: 'delete', csrf: CSRF, id: mid}),
+        });
+        const d = await r.json();
+        if (d.ok) {
+            document.querySelector('[data-wound-row="' + mid + '"]')?.remove();
+            rebuildChart();
+        } else {
+            alert(d.error || 'Error deleting.');
+            del.disabled = false;
+        }
+    });
+
+    // ── Trend Chart ──────────────────────────────────────────────────────────
+    const rawData = <?= json_encode(array_map(function($m) {
+        return [
+            'id'         => (int)$m['id'],
+            'date'       => $m['measured_at'],
+            'site'       => $m['wound_site'],
+            'length'     => (float)$m['length_cm'],
+            'width'      => (float)$m['width_cm'],
+            'depth'      => (float)$m['depth_cm'],
+            'area'       => round((float)$m['length_cm'] * (float)$m['width_cm'], 2),
+        ];
+    }, $woundMeasurements)) ?>;
+
+    const COLORS = [
+        '#6366f1','#0ea5e9','#10b981','#f59e0b','#ef4444',
+        '#8b5cf6','#ec4899','#14b8a6','#f97316','#84cc16',
+    ];
+
+    let chartInstance = null;
+
+    function buildDatasets(data) {
+        const sites = [...new Set(data.map(d => d.site))];
+        return sites.map((site, i) => {
+            const pts = data.filter(d => d.site === site);
+            return {
+                label: site,
+                data: pts.map(p => ({x: p.date, y: p.area})),
+                borderColor: COLORS[i % COLORS.length],
+                backgroundColor: COLORS[i % COLORS.length] + '22',
+                tension: 0.35,
+                pointRadius: 5,
+                pointHoverRadius: 7,
+                fill: false,
+            };
+        });
+    }
+
+    function rebuildChart() {
+        // Gather remaining rows from DOM
+        const remaining = [];
+        document.querySelectorAll('[data-wound-row]').forEach(row => {
+            remaining.push({
+                id:     parseInt(row.dataset.woundRow),
+                date:   row.dataset.date,
+                site:   row.dataset.site,
+                area:   parseFloat(row.dataset.area),
+            });
+        });
+        remaining.sort((a,b) => a.date.localeCompare(b.date));
+
+        if (chartInstance) {
+            chartInstance.data.datasets = buildDatasets(remaining.map(r => ({...r, length:0, width:0})));
+            chartInstance.update();
+        }
+    }
+
+    const ctx = document.getElementById('woundChart');
+    if (ctx && rawData.length > 0) {
+        const datasets = buildDatasets(rawData);
+        chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: { datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { position: 'bottom', labels: { usePointStyle: true, padding: 16, font: { size: 12 } } },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y} cm²`,
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        type: 'category',
+                        title: { display: true, text: 'Date', font: { size: 11 } },
+                        grid: { color: '#f1f5f9' },
+                    },
+                    y: {
+                        title: { display: true, text: 'Area (L × W cm²)', font: { size: 11 } },
+                        beginAtZero: true,
+                        grid: { color: '#f1f5f9' },
+                    }
+                }
+            }
+        });
     }
 })();
 </script>
@@ -485,6 +672,13 @@ function completeVisit(visitId) {
         <i class="bi bi-camera mr-1.5"></i>Photos
         <?php if (count($photos)): ?>
         <span class="ml-1 bg-violet-100 text-violet-700 text-xs px-1.5 py-0.5 rounded-full"><?= count($photos) ?></span>
+        <?php endif; ?>
+    </a>
+    <a href="?id=<?= $id ?>&tab=wounds"
+       class="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all <?= $activeTab === 'wounds' ? 'bg-white text-rose-700 shadow' : 'text-slate-500 hover:text-slate-700' ?>">
+        <i class="bi bi-rulers mr-1.5"></i>Wounds
+        <?php if (!empty($woundMeasurements)): ?>
+        <span class="ml-1 bg-rose-100 text-rose-700 text-xs px-1.5 py-0.5 rounded-full"><?= count($woundMeasurements) ?></span>
         <?php endif; ?>
     </a>
     <?php endif; // canAccessClinical tabs ?>
@@ -767,7 +961,7 @@ document.getElementById('chkAll').addEventListener('change', function () {
 </div><!-- /meds tab -->
 
 <!-- Photos Tab -->
-<?php else: ?>
+<?php elseif ($activeTab === 'photos'): ?>
 <?php if (empty($photos)): ?>
 <div class="bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center py-16 text-slate-400">
     <i class="bi bi-camera-slash text-5xl mb-3 opacity-30"></i>
@@ -797,6 +991,175 @@ document.getElementById('chkAll').addEventListener('change', function () {
     <?php endforeach; ?>
 </div>
 <?php endif; ?>
+
+<!-- Wounds Tab -->
+<?php elseif ($activeTab === 'wounds' && canAccessClinical()): ?>
+<div class="space-y-5">
+
+    <!-- Log new measurement -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+        <h4 class="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
+            <i class="bi bi-plus-circle-fill text-rose-500"></i> Log Wound Measurement
+        </h4>
+        <form id="woundForm" novalidate>
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                <div class="col-span-2 sm:col-span-1 lg:col-span-1">
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">Date <span class="text-red-500">*</span></label>
+                    <input type="date" name="measured_at" required value="<?= date('Y-m-d') ?>"
+                           class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50
+                                  focus:outline-none focus:ring-2 focus:ring-rose-400 focus:bg-white transition">
+                </div>
+                <div class="col-span-2 sm:col-span-2 lg:col-span-2">
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">Wound Site <span class="text-red-500">*</span></label>
+                    <input type="text" name="wound_site" required placeholder="e.g. Left heel, Right ankle"
+                           list="wound-sites-list"
+                           class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50
+                                  focus:outline-none focus:ring-2 focus:ring-rose-400 focus:bg-white transition">
+                    <datalist id="wound-sites-list">
+                        <?php
+                        $uniqueSites = array_unique(array_column($woundMeasurements, 'wound_site'));
+                        foreach ($uniqueSites as $site): ?>
+                        <option value="<?= h($site) ?>">
+                        <?php endforeach; ?>
+                        <option value="Left heel"><option value="Right heel">
+                        <option value="Left ankle"><option value="Right ankle">
+                        <option value="Left lower leg"><option value="Right lower leg">
+                        <option value="Sacrum / coccyx"><option value="Left hip"><option value="Right hip">
+                    </datalist>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">Length (cm) <span class="text-red-500">*</span></label>
+                    <input type="number" name="length_cm" required min="0.1" step="0.1" placeholder="0.0"
+                           class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50
+                                  focus:outline-none focus:ring-2 focus:ring-rose-400 focus:bg-white transition">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">Width (cm) <span class="text-red-500">*</span></label>
+                    <input type="number" name="width_cm" required min="0.1" step="0.1" placeholder="0.0"
+                           class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50
+                                  focus:outline-none focus:ring-2 focus:ring-rose-400 focus:bg-white transition">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">Depth (cm)</label>
+                    <input type="number" name="depth_cm" min="0" step="0.1" placeholder="0.0"
+                           class="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50
+                                  focus:outline-none focus:ring-2 focus:ring-rose-400 focus:bg-white transition">
+                </div>
+            </div>
+            <div class="mt-3 flex flex-col sm:flex-row gap-3">
+                <input type="text" name="notes" placeholder="Notes (optional)"
+                       class="flex-1 px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50
+                              focus:outline-none focus:ring-2 focus:ring-rose-400 focus:bg-white transition">
+                <button id="woundSubmit" type="submit"
+                        class="px-6 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-sm
+                               font-semibold rounded-xl transition-all shadow-sm flex items-center gap-2 whitespace-nowrap">
+                    <i class="bi bi-plus-lg"></i> Log Measurement
+                </button>
+            </div>
+            <p id="woundErr" class="text-xs text-red-600 mt-2 hidden"></p>
+        </form>
+    </div>
+
+    <?php if (!empty($woundMeasurements)): ?>
+
+    <!-- Trend chart -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+        <div class="flex items-center gap-2 mb-4">
+            <i class="bi bi-graph-up-arrow text-rose-500"></i>
+            <h4 class="text-sm font-bold text-slate-700">Healing Trend — Wound Area (L × W)</h4>
+        </div>
+        <div class="relative" style="height:260px">
+            <canvas id="woundChart"></canvas>
+        </div>
+        <p class="text-xs text-slate-400 mt-3 text-center">
+            Smaller area = healing progress &nbsp;|&nbsp; Each line represents a distinct wound site
+        </p>
+    </div>
+
+    <!-- History table -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="flex items-center gap-2 px-5 py-3.5 bg-slate-50/70 border-b border-slate-100">
+            <i class="bi bi-table text-slate-400"></i>
+            <span class="text-sm font-bold text-slate-700">Measurement History</span>
+            <span class="text-xs text-slate-400">(<?= count($woundMeasurements) ?> records)</span>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-left border-b border-slate-100 bg-slate-50/40">
+                        <th class="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Date</th>
+                        <th class="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Wound Site</th>
+                        <th class="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-center">L (cm)</th>
+                        <th class="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-center">W (cm)</th>
+                        <th class="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-center">D (cm)</th>
+                        <th class="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-center">Area cm²</th>
+                        <th class="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide hidden md:table-cell">Notes</th>
+                        <th class="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Recorded By</th>
+                        <?php if (isAdmin()): ?><th class="px-4 py-3 w-12"></th><?php endif; ?>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-50" id="woundTableBody">
+                    <?php
+                    // Sort descending for display
+                    $woundDesc = array_reverse($woundMeasurements);
+                    foreach ($woundDesc as $wm):
+                        $area = round((float)$wm['length_cm'] * (float)$wm['width_cm'], 2);
+                    ?>
+                    <tr class="hover:bg-slate-50/70 transition-colors"
+                        data-wound-row="<?= $wm['id'] ?>"
+                        data-date="<?= h($wm['measured_at']) ?>"
+                        data-site="<?= h($wm['wound_site']) ?>"
+                        data-area="<?= $area ?>">
+                        <td class="px-5 py-3.5 font-medium text-slate-700 whitespace-nowrap">
+                            <?= date('M j, Y', strtotime($wm['measured_at'])) ?>
+                        </td>
+                        <td class="px-4 py-3.5 text-slate-600 max-w-[160px] truncate">
+                            <?= h($wm['wound_site']) ?>
+                        </td>
+                        <td class="px-4 py-3.5 text-center font-mono text-slate-700"><?= number_format($wm['length_cm'], 1) ?></td>
+                        <td class="px-4 py-3.5 text-center font-mono text-slate-700"><?= number_format($wm['width_cm'],  1) ?></td>
+                        <td class="px-4 py-3.5 text-center font-mono text-slate-700">
+                            <?= $wm['depth_cm'] > 0 ? number_format($wm['depth_cm'], 1) : '—' ?>
+                        </td>
+                        <td class="px-4 py-3.5 text-center">
+                            <span class="inline-block px-2.5 py-0.5 rounded-full text-xs font-bold
+                                         bg-rose-50 text-rose-700 font-mono">
+                                <?= number_format($area, 2) ?>
+                            </span>
+                        </td>
+                        <td class="px-4 py-3.5 text-slate-500 text-xs hidden md:table-cell max-w-[180px] truncate">
+                            <?= $wm['notes'] ? h($wm['notes']) : '—' ?>
+                        </td>
+                        <td class="px-4 py-3.5 text-slate-400 text-xs hidden lg:table-cell">
+                            <?= h($wm['recorded_by_name'] ?? '—') ?>
+                        </td>
+                        <?php if (isAdmin()): ?>
+                        <td class="px-4 py-3.5">
+                            <button class="del-wound-btn" data-id="<?= $wm['id'] ?>"
+                                    title="Delete measurement"
+                                    style="background:none;border:none;cursor:pointer;color:#94a3b8;padding:4px 6px;border-radius:8px;"
+                                    onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#94a3b8'">
+                                <i class="bi bi-trash3 text-sm"></i>
+                            </button>
+                        </td>
+                        <?php endif; ?>
+                    </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <?php else: ?>
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center py-16 text-slate-400">
+        <i class="bi bi-rulers text-5xl mb-3 opacity-30"></i>
+        <p class="font-semibold text-slate-500">No measurements yet</p>
+        <p class="text-sm mt-1">Use the form above to log the first wound measurement.</p>
+    </div>
+    <?php endif; ?>
+
+</div><!-- /wounds tab -->
+
 <?php endif; ?>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>

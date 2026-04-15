@@ -76,6 +76,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 INDEX idx_target (target_type, target_id),
                 INDEX idx_created (created_at)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+            $pdo->exec("CREATE TABLE IF NOT EXISTS wound_measurements (
+                id          INT AUTO_INCREMENT PRIMARY KEY,
+                patient_id  INT NOT NULL,
+                visit_id    INT NULL,
+                measured_at DATE NOT NULL,
+                wound_site  VARCHAR(150) NOT NULL DEFAULT 'Unspecified',
+                length_cm   DECIMAL(5,1) NOT NULL DEFAULT 0.0,
+                width_cm    DECIMAL(5,1) NOT NULL DEFAULT 0.0,
+                depth_cm    DECIMAL(5,1) NOT NULL DEFAULT 0.0,
+                notes       TEXT NULL,
+                recorded_by INT NULL,
+                created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (patient_id) REFERENCES patients(id),
+                FOREIGN KEY (recorded_by) REFERENCES staff(id),
+                INDEX idx_patient_date (patient_id, measured_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
             if (!is_dir(UPLOAD_DIR)) mkdir(UPLOAD_DIR, 0755, true);
             $hash = password_hash($adminPass, PASSWORD_DEFAULT);
             $stmt = $pdo->prepare("INSERT INTO staff (username,password_hash,full_name,role) VALUES (?,?,?,'admin')
