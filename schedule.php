@@ -171,71 +171,25 @@ include __DIR__ . '/includes/header.php';
 </div>
 
 <style>
+/* Screen: hide the dedicated print layout */
+#print-layout { display: none; }
+
 @media print {
-    @page { margin: 10mm 8mm; size: A4 landscape; }
-
-    /* Hide all chrome and interactive elements */
-    nav, header, footer, .no-print { display: none !important; }
-
-    /* Reset page wrapper padding/colours */
-    body, html { background: #fff !important; font-size: 9pt; color: #1e293b; }
-    .pt-20, .pb-12 { padding-top: 0 !important; padding-bottom: 0 !important; }
+    @page { size: A4 landscape; margin: 10mm 8mm; }
+    body, html { background: #fff !important; margin: 0; padding: 0; }
+    /* Reset page wrapper */
+    .pt-20  { padding-top: 0 !important; }
+    .pb-12  { padding-bottom: 0 !important; }
     .min-h-screen { min-height: 0 !important; }
     .page-fade { animation: none !important; opacity: 1 !important; }
-
-    /* Remove container max-width so content fills the page */
     .max-w-screen-xl { max-width: 100% !important; padding-left: 0 !important; padding-right: 0 !important; margin-left: 0 !important; margin-right: 0 !important; }
-
-    /* Print-only header */
-    .print-header { display: block !important; margin-bottom: 6pt !important; }
-
-    /* Status summary bar */
-    .print-stat-bar {
-        display: grid !important;
-        grid-template-columns: repeat(4, 1fr) !important;
-        gap: 4pt !important;
-        margin-bottom: 6pt !important;
-    }
-    .print-stat-bar > div {
-        box-shadow: none !important;
-        border-radius: 4pt !important;
-        padding: 4pt 6pt !important;
-        font-size: 8pt !important;
-    }
-
-    /* Day view — visit cards */
-    .print-visit-card {
-        break-inside: avoid !important;
-        border: 1px solid #cbd5e1 !important;
-        border-radius: 4pt !important;
-        margin-bottom: 5pt !important;
-        box-shadow: none !important;
-        background: #fff !important;
-    }
-
-    /* Week grid */
-    .print-week-grid-wrapper { overflow: visible !important; padding: 0 !important; margin: 0 !important; }
-    .print-week-grid {
-        display: grid !important;
-        grid-template-columns: repeat(7, 1fr) !important;
-        width: 100% !important;
-        min-width: 0 !important;
-        gap: 3pt !important;
-    }
-    .print-week-col {
-        break-inside: avoid !important;
-        border: 1px solid #cbd5e1 !important;
-        border-radius: 4pt !important;
-        font-size: 7.5pt !important;
-        box-shadow: none !important;
-        overflow: hidden !important;
-    }
+    /* Hide all screen UI — show only print layout */
+    nav, footer, .no-print, #screen-layout { display: none !important; }
+    #print-layout { display: block !important; font-family: 'Inter', Arial, sans-serif; font-size: 9pt; color: #1e293b; }
 }
-
-/* Screen-only: hide print-only elements */
-.print-header { display: none; }
 </style>
 
+<div id="screen-layout">
 <!-- Print-only header (hidden on screen) -->
 <div class="print-header" style="margin-bottom:10pt; border-bottom:2pt solid #4f46e5; padding-bottom:6pt;">
     <div style="font-size:14pt; font-weight:900; color:#1e293b;">
@@ -517,6 +471,167 @@ include __DIR__ . '/includes/header.php';
 </div>
 <?php endif; // visit list ?>
 <?php endif; // end daily view ?>
+</div><!-- /screen-layout -->
+
+<!-- ═══════════════════════ PRINT LAYOUT ═══════════════════════ -->
+<div id="print-layout">
+
+    <!-- Header -->
+    <div style="border-bottom: 2pt solid #4338ca; padding-bottom: 7pt; margin-bottom: 8pt; display: flex; justify-content: space-between; align-items: flex-start;">
+        <div>
+            <div style="font-size: 15pt; font-weight: 900; color: #1e293b; line-height: 1.1;">
+                <?= $view === 'week'
+                    ? 'Weekly Schedule: ' . date('M j', strtotime($weekStart)) . ' &ndash; ' . date('M j, Y', strtotime($weekEnd))
+                    : 'Daily Schedule: ' . date('l, F j, Y', strtotime($date)) ?>
+            </div>
+            <div style="font-size: 9pt; color: #6366f1; font-weight: 700; margin-top: 2pt;">
+                <?= h($ma['full_name']) ?>
+            </div>
+        </div>
+        <div style="text-align: right; font-size: 7.5pt; color: #64748b;">
+            <div style="font-weight: 700; font-size: 9pt; color: #1e293b;"><?= h(PRACTICE_NAME) ?></div>
+            <div>Printed <?= date('M j, Y') ?> &bull; <?= date('g:i a') ?></div>
+        </div>
+    </div>
+
+    <!-- Stats row -->
+    <?php
+    $pColors = [
+        'pending'   => ['bg'=>'#f1f5f9','border'=>'#cbd5e1','num'=>'#334155','lbl'=>'#64748b'],
+        'en_route'  => ['bg'=>'#eff6ff','border'=>'#bfdbfe','num'=>'#1d4ed8','lbl'=>'#3b82f6'],
+        'completed' => ['bg'=>'#f0fdf4','border'=>'#bbf7d0','num'=>'#15803d','lbl'=>'#22c55e'],
+        'missed'    => ['bg'=>'#fef2f2','border'=>'#fecaca','num'=>'#dc2626','lbl'=>'#ef4444'],
+    ];
+    $pCounts = ($view === 'week') ? $weekCounts : $counts;
+    ?>
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 8pt; table-layout: fixed;">
+        <tr>
+            <?php foreach ($statusDefs as $key => $def):
+                $pc = $pColors[$key]; ?>
+            <td style="padding: 0 <?= $key !== 'missed' ? '5pt' : '0' ?> 0 0;">
+                <div style="background: <?= $pc['bg'] ?>; border: 1pt solid <?= $pc['border'] ?>; border-radius: 4pt; padding: 6pt 10pt;">
+                    <div style="font-size: 18pt; font-weight: 900; color: <?= $pc['num'] ?>; line-height: 1;"><?= $pCounts[$key] ?></div>
+                    <div style="font-size: 6.5pt; font-weight: 700; color: <?= $pc['lbl'] ?>; text-transform: uppercase; letter-spacing: 0.4pt; margin-top: 2pt;"><?= $def['label'] ?></div>
+                </div>
+            </td>
+            <?php endforeach; ?>
+        </tr>
+    </table>
+
+    <?php if ($view === 'week'): ?>
+    <!-- ════ WEEK VIEW ════ -->
+    <table style="width: 100%; border-collapse: collapse; table-layout: fixed;">
+        <tr style="vertical-align: top;">
+            <?php
+            $dotC      = ['pending'=>'#94a3b8','en_route'=>'#3b82f6','completed'=>'#22c55e','missed'=>'#ef4444'];
+            $pVtLabels = ['routine'=>'Routine','new_patient'=>'New Pt','wound_care'=>'Wound Care','awv'=>'AWV','ccm'=>'CCM','il'=>'IL'];
+            for ($d = 0; $d < 7; $d++):
+                $colDate    = date('Y-m-d', strtotime($weekStart . ' +' . $d . ' days'));
+                $colIsToday = $colDate === date('Y-m-d');
+                $colVisits  = $visitsByDate[$colDate] ?? [];
+            ?>
+            <td style="vertical-align: top; <?= $d < 6 ? 'padding-right: 3pt;' : '' ?>">
+                <div style="background: <?= $colIsToday ? '#4338ca' : '#f1f5f9' ?>; border: 1pt solid <?= $colIsToday ? '#4338ca' : '#e2e8f0' ?>; border-bottom: none; border-radius: 3pt 3pt 0 0; padding: 4pt 5pt;">
+                    <div style="font-size: 6.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5pt; color: <?= $colIsToday ? '#c7d2fe' : '#94a3b8' ?>;"><?= date('D', strtotime($colDate)) ?></div>
+                    <div style="font-size: 10pt; font-weight: 900; color: <?= $colIsToday ? '#fff' : '#1e293b' ?>; line-height: 1.1;"><?= date('M j', strtotime($colDate)) ?></div>
+                    <?php if (count($colVisits)): ?>
+                    <div style="font-size: 6.5pt; color: <?= $colIsToday ? '#a5b4fc' : '#94a3b8' ?>; margin-top: 1pt;"><?= count($colVisits) ?> visit<?= count($colVisits) !== 1 ? 's' : '' ?></div>
+                    <?php endif; ?>
+                </div>
+                <div style="border: 1pt solid <?= $colIsToday ? '#c7d2fe' : '#e2e8f0' ?>; border-top: none; border-radius: 0 0 3pt 3pt; padding: 3pt; min-height: 50pt;">
+                    <?php if (empty($colVisits)): ?>
+                    <div style="font-size: 7pt; color: #cbd5e1; text-align: center; padding: 8pt 0;">—</div>
+                    <?php else: foreach ($colVisits as $cv):
+                        $cvBg  = $cv['status']==='completed'?'#f0fdf4':($cv['status']==='en_route'?'#eff6ff':($cv['status']==='missed'?'#fef2f2':'#f8fafc'));
+                        $cvBor = $cv['status']==='completed'?'#bbf7d0':($cv['status']==='en_route'?'#bfdbfe':($cv['status']==='missed'?'#fecaca':'#e2e8f0'));
+                    ?>
+                    <div style="margin-bottom: 2.5pt; padding: 3pt 4pt; background: <?= $cvBg ?>; border: 0.5pt solid <?= $cvBor ?>; border-radius: 2pt; page-break-inside: avoid;">
+                        <div style="display: flex; align-items: flex-start; gap: 3pt;">
+                            <span style="display: inline-block; width: 5.5pt; height: 5.5pt; border-radius: 50%; background: <?= $dotC[$cv['status']] ?>; margin-top: 1.5pt; flex-shrink: 0;"></span>
+                            <div>
+                                <div style="font-size: 7.5pt; font-weight: 700; color: #1e293b; line-height: 1.2; word-break: break-word;"><?= h($cv['patient_name']) ?></div>
+                                <?php if ($cv['visit_time']): ?><div style="font-size: 6.5pt; color: #64748b;"><?= date('g:i A', strtotime($cv['visit_time'])) ?></div><?php endif; ?>
+                                <?php $cvVt = $cv['visit_type'] ?? 'routine'; if ($cvVt !== 'routine'): ?>
+                                <div style="font-size: 6pt; color: #6366f1; font-weight: 600;"><?= $pVtLabels[$cvVt] ?? '' ?></div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+                    <?php endforeach; endif; ?>
+                </div>
+            </td>
+            <?php endfor; ?>
+        </tr>
+    </table>
+
+    <?php else: ?>
+    <!-- ════ DAY VIEW ════ -->
+    <?php if (empty($visits)): ?>
+    <p style="text-align: center; color: #94a3b8; font-size: 9pt; padding: 20pt 0;">No visits scheduled for this day.</p>
+    <?php else:
+        $pVtLabels2 = ['routine'=>'Routine','new_patient'=>'New Patient','wound_care'=>'Wound Care','awv'=>'Annual Wellness Visit','ccm'=>'CCM','il'=>'IL Disclosure'];
+        $pSColors   = [
+            'pending'   => ['bg'=>'#f1f5f9','color'=>'#475569','border'=>'#cbd5e1'],
+            'en_route'  => ['bg'=>'#eff6ff','color'=>'#1d4ed8','border'=>'#bfdbfe'],
+            'completed' => ['bg'=>'#f0fdf4','color'=>'#15803d','border'=>'#bbf7d0'],
+            'missed'    => ['bg'=>'#fef2f2','color'=>'#dc2626','border'=>'#fecaca'],
+        ];
+    ?>
+    <table style="width: 100%; border-collapse: collapse;">
+        <colgroup>
+            <col style="width: 20pt;">
+            <col><!-- patient name + notes -->
+            <col style="width: 56pt;"><!-- status -->
+            <col style="width: 72pt;"><!-- visit type -->
+            <col style="width: 44pt;"><!-- time -->
+            <col style="width: 35%;"><!-- address/phone -->
+        </colgroup>
+        <thead>
+            <tr style="background: #f1f5f9; border-bottom: 1.5pt solid #cbd5e1;">
+                <th style="padding: 5pt; text-align: left; font-size: 6.5pt; text-transform: uppercase; letter-spacing: 0.5pt; color: #64748b;">#</th>
+                <th style="padding: 5pt; text-align: left; font-size: 6.5pt; text-transform: uppercase; letter-spacing: 0.5pt; color: #64748b;">Patient</th>
+                <th style="padding: 5pt; text-align: left; font-size: 6.5pt; text-transform: uppercase; letter-spacing: 0.5pt; color: #64748b;">Status</th>
+                <th style="padding: 5pt; text-align: left; font-size: 6.5pt; text-transform: uppercase; letter-spacing: 0.5pt; color: #64748b;">Visit Type</th>
+                <th style="padding: 5pt; text-align: left; font-size: 6.5pt; text-transform: uppercase; letter-spacing: 0.5pt; color: #64748b;">Time</th>
+                <th style="padding: 5pt; text-align: left; font-size: 6.5pt; text-transform: uppercase; letter-spacing: 0.5pt; color: #64748b;">Address &amp; Phone</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php foreach ($visits as $idx => $v):
+                $psc = $pSColors[$v['status']];
+                $vt2 = $v['visit_type'] ?? 'routine';
+            ?>
+            <tr style="border-bottom: 0.5pt solid #e2e8f0; <?= $idx % 2 === 1 ? 'background:#f8fafc;' : '' ?> page-break-inside: avoid; vertical-align: top;">
+                <td style="padding: 6pt 5pt;">
+                    <div style="width: 15pt; height: 15pt; background: #e0e7ff; border-radius: 3pt; font-weight: 800; color: #4338ca; font-size: 7.5pt; text-align: center; line-height: 15pt;"><?= $idx + 1 ?></div>
+                </td>
+                <td style="padding: 6pt 5pt;">
+                    <div style="font-size: 9.5pt; font-weight: 800; color: #0f172a; margin-bottom: 2pt;"><?= h($v['patient_name']) ?></div>
+                    <?php if (!empty($v['notes'])): ?>
+                    <div style="font-size: 6.5pt; color: #92400e; background: #fffbeb; border: 0.5pt solid #fde68a; border-radius: 2pt; padding: 1.5pt 4pt;"><?= h($v['notes']) ?></div>
+                    <?php endif; ?>
+                    <?php if (!empty($v['visit_notes'])): ?>
+                    <div style="margin-top: 2pt; font-size: 6.5pt; color: #374151; font-style: italic;">Note: <?= h($v['visit_notes']) ?></div>
+                    <?php endif; ?>
+                </td>
+                <td style="padding: 6pt 5pt;">
+                    <span style="display: inline-block; padding: 2pt 5pt; border-radius: 10pt; font-size: 7pt; font-weight: 700; background: <?= $psc['bg'] ?>; color: <?= $psc['color'] ?>; border: 0.5pt solid <?= $psc['border'] ?>; white-space: nowrap;"><?= $statusDefs[$v['status']]['label'] ?></span>
+                </td>
+                <td style="padding: 6pt 5pt; font-size: 8pt; color: #4338ca; font-weight: 600;"><?= h($pVtLabels2[$vt2] ?? 'Routine') ?></td>
+                <td style="padding: 6pt 5pt; font-size: 8.5pt; color: #334155; white-space: nowrap;"><?= $v['visit_time'] ? date('g:i A', strtotime($v['visit_time'])) : '&mdash;' ?></td>
+                <td style="padding: 6pt 5pt; font-size: 8pt; color: #334155;">
+                    <?php if ($v['patient_address']): ?><div><?= h($v['patient_address']) ?></div><?php endif; ?>
+                    <?php if ($v['patient_phone']): ?><div style="color: #64748b;"><?= h($v['patient_phone']) ?></div><?php endif; ?>
+                    <?php if (!$v['patient_address'] && !$v['patient_phone']): ?><span style="color:#cbd5e1;">&mdash;</span><?php endif; ?>
+                </td>
+            </tr>
+            <?php endforeach; ?>
+        </tbody>
+    </table>
+    <?php endif; ?>
+    <?php endif; ?>
+
+</div><!-- /print-layout -->
 
 <script>
 const CSRF   = '<?= csrfToken() ?>';
