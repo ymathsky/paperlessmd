@@ -168,7 +168,6 @@ include __DIR__ . '/includes/header.php';
             <?php continue; endif; ?>
 
                 <?php $label = ucwords(str_replace(['_', 'ack'], [' ', 'Acknowledged: '], $key)); ?>
-            ?>
             <?php if (is_array($value)): ?>
             <div class="border-b border-slate-100 pb-3">
                 <div class="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1"><?= h($label) ?></div>
