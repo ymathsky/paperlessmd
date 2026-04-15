@@ -200,6 +200,19 @@ include __DIR__ . '/includes/header.php';
 
             <!-- Actions -->
             <div class="flex flex-col gap-2 shrink-0">
+                <?php if ($v['status'] === 'pending'): ?>
+                <button onclick="startVisit(<?= $v['id'] ?>, <?= $v['patient_id'] ?>, this)"
+                        class="flex items-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95
+                               text-white rounded-xl text-xs font-bold shadow-sm transition-all">
+                    <i class="bi bi-play-fill text-sm"></i> Start Visit
+                </button>
+                <?php elseif ($v['status'] === 'en_route'): ?>
+                <a href="<?= BASE_URL ?>/patient_view.php?id=<?= $v['patient_id'] ?>&tab=forms&visit=<?= $v['id'] ?>"
+                   class="flex items-center gap-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-700
+                          text-white rounded-xl text-xs font-bold shadow-sm transition-all">
+                    <i class="bi bi-file-earmark-plus-fill text-sm"></i> Open Forms
+                </a>
+                <?php endif; ?>
                 <?php if ($v['patient_address']): ?>
                 <a href="<?= $mapsUrl ?>" target="_blank" rel="noopener"
                    class="flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-xs font-semibold hover:bg-blue-100 transition-colors">
@@ -233,21 +246,47 @@ include __DIR__ . '/includes/header.php';
 <?php endif; ?>
 
 <script>
-function updateStatus(visitId, status) {
-    fetch('<?= BASE_URL ?>/api/schedule_update.php', {
+const CSRF   = '<?= csrfToken() ?>';
+const BASE   = '<?= BASE_URL ?>';
+
+// ── One-tap Start Visit ───────────────────────────────────────────────────────
+function startVisit(visitId, patientId, btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split text-sm animate-spin"></i> Starting…';
+
+    fetch(BASE + '/api/schedule_update.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            csrf: '<?= csrfToken() ?>',
-            id: visitId,
-            action: 'status',
-            status: status
-        })
+        body: JSON.stringify({ csrf: CSRF, id: visitId, action: 'status', status: 'en_route' })
     })
     .then(r => r.json())
     .then(data => {
         if (data.ok) {
-            // Reload to show updated state
+            // Navigate straight to the patient's forms page
+            window.location.href = BASE + '/patient_view.php?id=' + patientId + '&tab=forms&visit=' + visitId;
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-play-fill text-sm"></i> Start Visit';
+            alert('Error: ' + (data.error || 'Could not start visit.'));
+        }
+    })
+    .catch(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-play-fill text-sm"></i> Start Visit';
+        alert('Network error. Please try again.');
+    });
+}
+
+// ── Status update (status bar buttons) ───────────────────────────────────────
+function updateStatus(visitId, status) {
+    fetch(BASE + '/api/schedule_update.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csrf: CSRF, id: visitId, action: 'status', status: status })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
             location.reload();
         } else {
             alert('Error: ' + (data.error || 'Could not update status.'));

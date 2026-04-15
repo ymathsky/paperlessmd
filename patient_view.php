@@ -23,6 +23,15 @@ if (isBilling() && in_array($activeTab, ['meds', 'photos'], true)) {
 }
 $msg = $_GET['msg'] ?? '';
 
+// Active visit context from One-Tap Start Visit
+$visitId    = (int)($_GET['visit'] ?? 0);
+$activeVisit = null;
+if ($visitId) {
+    $vsStmt = $pdo->prepare("SELECT * FROM `schedule` WHERE id = ? AND patient_id = ? AND status = 'en_route'");
+    $vsStmt->execute([$visitId, $id]);
+    $activeVisit = $vsStmt->fetch() ?: null;
+}
+
 // Forms submitted for this patient
 $formsStmt = $pdo->prepare("
     SELECT fs.*, s.full_name AS ma_name
@@ -298,6 +307,72 @@ include __DIR__ . '/includes/header.php';
     <span class="text-slate-700 font-semibold"><?= h($patient['first_name'] . ' ' . $patient['last_name']) ?></span>
 </nav>
 
+<?php if ($activeVisit): ?>
+<!-- ── Visit In Progress Banner ─────────────────────────────────────────────── -->
+<div id="visitBanner" class="bg-gradient-to-r from-emerald-600 to-emerald-500 rounded-2xl px-5 py-4 mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md no-print">
+    <div class="flex items-center gap-3">
+        <div class="w-10 h-10 bg-white/20 rounded-xl grid place-items-center flex-shrink-0">
+            <i class="bi bi-play-circle-fill text-white text-xl"></i>
+        </div>
+        <div>
+            <p class="text-white font-bold text-sm">Visit In Progress</p>
+            <p class="text-emerald-100 text-xs mt-0.5">
+                <?= date('l, F j', strtotime($activeVisit['visit_date'])) ?>
+                <?php if ($activeVisit['visit_time']): ?>
+                &bull; <?= date('g:i A', strtotime($activeVisit['visit_time'])) ?>
+                <?php endif; ?>
+                &bull; Status: <strong class="text-white">En Route</strong>
+            </p>
+        </div>
+    </div>
+    <div class="flex gap-2 flex-wrap">
+        <button onclick="completeVisit(<?= $activeVisit['id'] ?>)"
+                id="completeVisitBtn"
+                class="inline-flex items-center gap-2 bg-white text-emerald-700 font-bold text-sm
+                       px-5 py-2.5 rounded-xl hover:bg-emerald-50 active:scale-95 transition-all shadow-sm">
+            <i class="bi bi-check-circle-fill"></i> Mark Complete
+        </button>
+        <?php if ($activeVisit['patient_address'] ?? $patient['address']): 
+            $addr = htmlspecialchars(urlencode($patient['address'] ?? ''));
+        ?>
+        <a href="https://www.google.com/maps/search/?api=1&query=<?= $addr ?>" target="_blank" rel="noopener"
+           class="inline-flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white font-semibold text-sm
+                  px-4 py-2.5 rounded-xl transition-colors">
+            <i class="bi bi-map-fill"></i> Navigate
+        </a>
+        <?php endif; ?>
+    </div>
+</div>
+<script>
+function completeVisit(visitId) {
+    const btn = document.getElementById('completeVisitBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving…';
+    fetch('<?= BASE_URL ?>/api/schedule_update.php', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({csrf: '<?= csrfToken() ?>', id: visitId, action: 'status', status: 'completed'})
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.ok) {
+            document.getElementById('visitBanner').innerHTML =
+                '<div class="flex items-center gap-3 text-white"><i class="bi bi-check-circle-fill text-xl"></i>' +
+                '<span class="font-bold">Visit marked complete!</span></div>';
+            document.getElementById('visitBanner').className =
+                document.getElementById('visitBanner').className.replace('from-emerald-600 to-emerald-500', 'from-slate-500 to-slate-400');
+            setTimeout(() => document.getElementById('visitBanner').remove(), 3000);
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-check-circle-fill"></i> Mark Complete';
+            alert(d.error || 'Could not update visit.');
+        }
+    })
+    .catch(() => { btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-circle-fill"></i> Mark Complete'; });
+}
+</script>
+<?php endif; ?>
+
 <!-- Patient Header Card -->
 <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 mb-6">
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -324,6 +399,13 @@ include __DIR__ . '/includes/header.php';
             </div>
         </div>
         <div class="flex gap-2 flex-wrap">
+            <?php if ($activeVisit): ?>
+            <a href="<?= BASE_URL ?>/schedule.php"
+               class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-emerald-700
+                      bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-colors">
+                <i class="bi bi-calendar3"></i> Back to Schedule
+            </a>
+            <?php endif; ?>
             <?php if (canAccessClinical()): ?>
             <a href="<?= BASE_URL ?>/patient_timeline.php?id=<?= $id ?>"
                class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-blue-700
