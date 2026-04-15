@@ -81,7 +81,7 @@ include __DIR__ . '/includes/header.php';
     .no-print  { display: none !important; }
     .sign-panel{ display: none !important; }
     body       { background: white !important; }
-    #printDoc  { box-shadow: none !important; border: none !important; max-width: 100% !important; }
+    #printDoc  { box-shadow: none !important; border: none !important; max-width: 100% !important; overflow: visible !important; border-radius: 0 !important; }
     .screen-strip { display: none !important; }
   }
   /* BWC paper form classes */

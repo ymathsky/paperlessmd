@@ -150,7 +150,7 @@ if (!function_exists('awvArr')) { function awvArr(array $d, string $k): array {
     </table>
 
     <!-- SECTION E: GDS (Geriatric Depression Scale) -->
-    <div style="background:#333;color:#fff;font-weight:bold;padding:3pt 6pt;font-size:10pt;margin:6pt 0 4pt;">SECTION E: GERIATRIC DEPRESSION SCALE (GDS)</div>
+    <div style="background:#333;color:#fff;font-weight:bold;padding:3pt 6pt;font-size:10pt;margin:6pt 0 4pt;page-break-before:always;padding-top:14pt;">SECTION E: GERIATRIC DEPRESSION SCALE (GDS)</div>
     <p style="font-size:9pt;font-style:italic;margin:0 0 4pt;">Instructions: For each question, circle the answer that best describes how you have felt over the past week.</p>
     <?php
     $gdsQs = [
