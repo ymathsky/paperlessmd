@@ -9,6 +9,7 @@
 <script src="<?= BASE_URL ?>/assets/js/app.js"></script>
 <script>window._pdBase = '<?= BASE_URL ?>';</script>
 <script src="<?= BASE_URL ?>/assets/js/autosave.js" defer></script>
+<script src="<?= BASE_URL ?>/assets/js/voice.js" defer></script>
 <script src="<?= BASE_URL ?>/assets/js/offline.js" defer></script>
 <script>
 (function () {
