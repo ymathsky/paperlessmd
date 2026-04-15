@@ -112,6 +112,56 @@ try {
     $woundMeasurements = [];
 }
 
+// ── Last Visit Summary data ───────────────────────────────────────────────────
+$lastVisit = null;
+try {
+    $lvStmt = $pdo->prepare("
+        SELECT sc.visit_date, sc.visit_time, sc.status, sc.notes,
+               s.full_name AS ma_name
+        FROM `schedule` sc
+        LEFT JOIN staff s ON s.id = sc.ma_id
+        WHERE sc.patient_id = ? AND sc.status IN ('completed','en_route')
+        ORDER BY sc.visit_date DESC, sc.visit_time DESC
+        LIMIT 1
+    ");
+    $lvStmt->execute([$id]);
+    $lastVisit = $lvStmt->fetch() ?: null;
+} catch (PDOException $e) { $lastVisit = null; }
+
+$lastVitals = null;
+try {
+    $lvfStmt = $pdo->prepare("
+        SELECT form_data, created_at, ma_id
+        FROM form_submissions
+        WHERE patient_id = ? AND form_type = 'vital_cs'
+        ORDER BY created_at DESC
+        LIMIT 1
+    ");
+    $lvfStmt->execute([$id]);
+    $lvfRow = $lvfStmt->fetch();
+    if ($lvfRow) {
+        $lvfData = json_decode($lvfRow['form_data'], true) ?? [];
+        $lastVitals = [
+            'bp'       => trim(($lvfData['bp_systolic'] ?? '') . ($lvfData['bp_systolic'] ? '/' . ($lvfData['bp_diastolic'] ?? '') : '')),
+            'hr'       => trim($lvfData['heart_rate'] ?? ''),
+            'temp'     => trim($lvfData['temperature'] ?? ''),
+            'weight'   => trim($lvfData['weight'] ?? ''),
+            'o2'       => trim($lvfData['o2_sat'] ?? ''),
+            'date'     => $lvfRow['created_at'],
+        ];
+    }
+} catch (PDOException $e) { $lastVitals = null; }
+
+// Count forms completed in the last visit's date
+$lastVisitFormCount = 0;
+if ($lastVisit) {
+    foreach ($forms as $f) {
+        if (substr($f['created_at'], 0, 10) === $lastVisit['visit_date']) {
+            $lastVisitFormCount++;
+        }
+    }
+}
+
 $extraJs = '';
 if ($activeTab === 'meds') {
     $csrfJs = csrfToken();
@@ -623,6 +673,91 @@ function completeVisit(visitId) {
     </div>
     <?php endif; ?>
 </div>
+
+<?php if ($lastVisit && canAccessClinical()): ?>
+<!-- ── Last Visit Summary Strip ──────────────────────────────────────────────── -->
+<div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 mb-6 no-print">
+    <div class="flex items-center gap-2 mb-3">
+        <i class="bi bi-clock-history text-blue-500"></i>
+        <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Last Visit</span>
+        <span class="ml-auto text-xs text-slate-400">
+            <?= date('M j, Y', strtotime($lastVisit['visit_date'])) ?>
+            <?php if ($lastVisit['visit_time']): ?>
+            &bull; <?= date('g:i A', strtotime($lastVisit['visit_time'])) ?>
+            <?php endif; ?>
+        </span>
+    </div>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+
+        <!-- MA who visited -->
+        <div class="flex items-start gap-2.5 bg-slate-50 rounded-xl p-3">
+            <div class="w-8 h-8 rounded-lg bg-blue-100 grid place-items-center flex-shrink-0">
+                <i class="bi bi-person-fill text-blue-600 text-sm"></i>
+            </div>
+            <div class="min-w-0">
+                <p class="text-xs text-slate-400 font-medium">MA</p>
+                <p class="text-sm font-semibold text-slate-700 truncate"><?= h($lastVisit['ma_name'] ?? 'Unknown') ?></p>
+            </div>
+        </div>
+
+        <!-- Status -->
+        <div class="flex items-start gap-2.5 bg-slate-50 rounded-xl p-3">
+            <div class="w-8 h-8 rounded-lg <?= $lastVisit['status'] === 'completed' ? 'bg-emerald-100' : 'bg-amber-100' ?> grid place-items-center flex-shrink-0">
+                <i class="bi <?= $lastVisit['status'] === 'completed' ? 'bi-check-circle-fill text-emerald-600' : 'bi-arrow-right-circle-fill text-amber-600' ?> text-sm"></i>
+            </div>
+            <div class="min-w-0">
+                <p class="text-xs text-slate-400 font-medium">Status</p>
+                <p class="text-sm font-semibold text-slate-700 capitalize"><?= h(str_replace('_', ' ', $lastVisit['status'])) ?></p>
+            </div>
+        </div>
+
+        <!-- Vitals snapshot -->
+        <div class="flex items-start gap-2.5 bg-slate-50 rounded-xl p-3">
+            <div class="w-8 h-8 rounded-lg bg-red-100 grid place-items-center flex-shrink-0">
+                <i class="bi bi-heart-pulse-fill text-red-500 text-sm"></i>
+            </div>
+            <div class="min-w-0">
+                <p class="text-xs text-slate-400 font-medium">Vitals</p>
+                <?php if ($lastVitals): ?>
+                <p class="text-sm font-semibold text-slate-700 leading-snug">
+                    <?php
+                    $vParts = [];
+                    if ($lastVitals['bp'])     $vParts[] = $lastVitals['bp'] . ' mmHg';
+                    if ($lastVitals['hr'])     $vParts[] = $lastVitals['hr'] . ' bpm';
+                    if ($lastVitals['o2'])     $vParts[] = $lastVitals['o2'] . '% O₂';
+                    if ($lastVitals['temp'])   $vParts[] = $lastVitals['temp'] . '°F';
+                    if ($lastVitals['weight']) $vParts[] = $lastVitals['weight'] . ' lbs';
+                    echo $vParts ? h(implode(' · ', array_slice($vParts, 0, 3))) : '<span class="text-slate-400 text-xs italic">—</span>';
+                    ?>
+                </p>
+                <?php else: ?>
+                <p class="text-xs text-slate-400 italic mt-0.5">No vitals recorded</p>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- Forms completed -->
+        <div class="flex items-start gap-2.5 bg-slate-50 rounded-xl p-3">
+            <div class="w-8 h-8 rounded-lg bg-violet-100 grid place-items-center flex-shrink-0">
+                <i class="bi bi-file-earmark-check-fill text-violet-600 text-sm"></i>
+            </div>
+            <div class="min-w-0">
+                <p class="text-xs text-slate-400 font-medium">Forms</p>
+                <p class="text-sm font-semibold text-slate-700">
+                    <?= $lastVisitFormCount ?> completed
+                </p>
+            </div>
+        </div>
+
+    </div>
+    <?php if (!empty($lastVisit['notes'])): ?>
+    <div class="mt-3 pt-3 border-t border-slate-100 flex items-start gap-2 text-xs text-slate-500">
+        <i class="bi bi-chat-left-text-fill text-slate-300 mt-0.5 flex-shrink-0"></i>
+        <span><?= h($lastVisit['notes']) ?></span>
+    </div>
+    <?php endif; ?>
+</div>
+<?php endif; ?>
 
 <!-- Form Tiles -->
 <?php if (canAccessClinical()): ?>
