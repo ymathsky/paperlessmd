@@ -16,29 +16,35 @@ $activeNav = 'patients';
 $extraJs = '<script>
 (function() {
     let count = 0;
-    const container = document.getElementById("photoContainer");
-    const tpl       = document.getElementById("photoRowTemplate");
-    const addBtn    = document.getElementById("addPhotoBtn");
+    const container  = document.getElementById("photoContainer");
+    const tpl        = document.getElementById("photoRowTemplate");
+    const addBtn     = document.getElementById("addPhotoBtn");
+    const submitBtn  = document.getElementById("woundSubmitBtn");
+    const PATIENT_ID = document.getElementById("hiddenPatientId").value;
+    const CSRF       = document.getElementById("hiddenCsrf").value;
+    const BASE       = window._pdBase || "";
+
+    // Map<rowEl, Blob|null>  — blobs captured via camera
+    const capturedBlobs = new Map();
 
     // ── Camera modal state ────────────────────────────────────────────────────
     let stream       = null;
-    let targetRow    = null; // the photo-row that triggered the camera
+    let targetRow    = null;
 
-    const modal      = document.getElementById("cameraModal");
-    const video      = document.getElementById("cameraVideo");
-    const canvas     = document.getElementById("cameraCanvas");
-    const snapBtn    = document.getElementById("cameraSnapBtn");
-    const closeBtn   = document.getElementById("cameraCloseBtn");
-    const switchBtn  = document.getElementById("cameraSwitchBtn");
-    const retakeBtn  = document.getElementById("cameraRetakeBtn");
-    const useBtn     = document.getElementById("cameraUseBtn");
-    const preview    = document.getElementById("cameraPreview");
+    const modal     = document.getElementById("cameraModal");
+    const video     = document.getElementById("cameraVideo");
+    const canvas    = document.getElementById("cameraCanvas");
+    const snapBtn   = document.getElementById("cameraSnapBtn");
+    const closeBtn  = document.getElementById("cameraCloseBtn");
+    const switchBtn = document.getElementById("cameraSwitchBtn");
+    const retakeBtn = document.getElementById("cameraRetakeBtn");
+    const useBtn    = document.getElementById("cameraUseBtn");
 
-    let facingMode   = "environment"; // rear camera default
+    let facingMode   = "environment";
     let capturedBlob = null;
 
     async function openCamera(row) {
-        targetRow  = row;
+        targetRow    = row;
         capturedBlob = null;
         canvas.classList.add("hidden");
         video.classList.remove("hidden");
@@ -51,7 +57,7 @@ $extraJs = '<script>
     }
 
     async function startStream() {
-        if (stream) { stream.getTracks().forEach(t => t.stop()); }
+        if (stream) stream.getTracks().forEach(t => t.stop());
         try {
             stream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode, width: { ideal: 1920 }, height: { ideal: 1080 } },
@@ -81,7 +87,6 @@ $extraJs = '<script>
         snapBtn.classList.add("hidden");
         retakeBtn.classList.remove("hidden");
         useBtn.classList.remove("hidden");
-        // Pause stream (save battery) but keep tracks alive for retake
         if (stream) stream.getTracks().forEach(t => t.enabled = false);
         canvas.toBlob(blob => { capturedBlob = blob; }, "image/jpeg", 0.92);
     }
@@ -98,13 +103,8 @@ $extraJs = '<script>
 
     function usePhoto() {
         if (!capturedBlob || !targetRow) return;
-        const ts   = new Date().toISOString().replace(/[:.]/g,"-");
-        const file = new File([capturedBlob], "wound-" + ts + ".jpg", { type: "image/jpeg" });
-        const dt   = new DataTransfer();
-        dt.items.add(file);
-        const fi   = targetRow.querySelector("input[type=file]");
-        fi.files   = dt.files;
-        // Show thumbnail
+        // Store blob in map — NOT injected into file input (cross-browser safe)
+        capturedBlobs.set(targetRow, capturedBlob);
         showThumb(targetRow, URL.createObjectURL(capturedBlob));
         closeCamera();
     }
@@ -116,7 +116,7 @@ $extraJs = '<script>
                 <img src="${src}" alt="Preview"
                      class="w-24 h-24 object-cover rounded-xl border-2 border-violet-400 shadow-sm">
                 <span class="absolute -top-1.5 -right-1.5 bg-emerald-500 text-white text-[10px] font-bold
-                             px-1.5 py-0.5 rounded-full shadow">✓</span>
+                             px-1.5 py-0.5 rounded-full shadow">✓ Camera</span>
              </div>`;
         wrap.classList.remove("hidden");
     }
@@ -129,7 +129,6 @@ $extraJs = '<script>
         facingMode = facingMode === "environment" ? "user" : "environment";
         await startStream();
     });
-    // Close on backdrop click
     modal.addEventListener("click", e => { if (e.target === modal) closeCamera(); });
 
     // ── Row builder ────────────────────────────────────────────────────────────
@@ -140,24 +139,20 @@ $extraJs = '<script>
             el.setAttribute("name", el.getAttribute("data-idx").replace("N", count));
         });
         clone.querySelector(".row-num").textContent = "Photo " + count;
-
         const row = clone.querySelector(".photo-row");
 
-        // Remove button
         clone.querySelector(".remove-row-btn").addEventListener("click", function() {
-            this.closest(".photo-row").remove();
+            const r = this.closest(".photo-row");
+            capturedBlobs.delete(r);
+            r.remove();
         });
-
-        // Camera button
         clone.querySelector(".camera-capture-btn").addEventListener("click", function() {
             openCamera(this.closest(".photo-row"));
         });
-
-        // File input change → show thumb
         clone.querySelector("input[type=file]").addEventListener("change", function() {
-            if (this.files[0]) {
-                showThumb(this.closest(".photo-row"), URL.createObjectURL(this.files[0]));
-            }
+            const r = this.closest(".photo-row");
+            capturedBlobs.delete(r); // file input takes precedence
+            if (this.files[0]) showThumb(r, URL.createObjectURL(this.files[0]));
         });
 
         container.appendChild(clone);
@@ -166,17 +161,66 @@ $extraJs = '<script>
     addBtn.addEventListener("click", addRow);
     addRow();
 
-    // ── Form validation ────────────────────────────────────────────────────────
-    document.getElementById("woundForm").addEventListener("submit", function(e) {
-        let valid = true;
-        document.querySelectorAll(".photo-row").forEach(row => {
-            const fi = row.querySelector("input[type=file]");
-            if (!fi.files.length) {
-                valid = false;
-                fi.closest(".file-input-wrap").classList.add("ring-2","ring-red-400","rounded-xl");
+    // ── AJAX submit — bypasses fi.files assignment entirely ───────────────────
+    document.getElementById("woundForm").addEventListener("submit", async function(e) {
+        e.preventDefault();
+
+        const rows = Array.from(document.querySelectorAll(".photo-row"));
+        // Validate: each row needs a file input OR a captured blob
+        let allValid = true;
+        rows.forEach(row => {
+            const fi   = row.querySelector("input[type=file]");
+            const blob = capturedBlobs.get(row);
+            if (!blob && (!fi || !fi.files.length)) {
+                allValid = false;
+                row.querySelector(".file-input-wrap").classList.add("ring-2","ring-red-400","rounded-xl");
             }
         });
-        if (!valid) { e.preventDefault(); alert("Please attach or capture a photo for each row, or remove empty rows."); }
+        if (!allValid) {
+            alert("Please attach or capture a photo for each row, or remove empty rows.");
+            return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = \'<i class="bi bi-hourglass-split text-xl"></i> Uploading…\';
+
+        const woundDate = document.querySelector(\'[name="wound_date"]\').value;
+        let uploaded = 0, failed = 0;
+
+        for (const row of rows) {
+            const fi       = row.querySelector("input[type=file]");
+            const blob     = capturedBlobs.get(row);
+            const location = row.querySelector(\'select[name$="[]"]\').value;
+            const desc     = row.querySelector(\'input[type=text][name$="[]"]\').value;
+
+            const fd = new FormData();
+            fd.append("csrf_token",     CSRF);
+            fd.append("patient_id",     PATIENT_ID);
+            fd.append("wound_location", location);
+            fd.append("description",    desc);
+            fd.append("wound_date",     woundDate);
+
+            if (blob) {
+                const ts = new Date().toISOString().replace(/[:.]/g, "-");
+                fd.append("photo", blob, "wound-" + ts + ".jpg");
+            } else {
+                fd.append("photo", fi.files[0]);
+            }
+
+            try {
+                const r = await fetch(BASE + "/api/upload_photo.php", { method: "POST", body: fd });
+                const d = await r.json();
+                if (d.success) uploaded++; else { failed++; console.error(d.error); }
+            } catch { failed++; }
+        }
+
+        if (failed === 0) {
+            window.location.href = BASE + "/patient_view.php?id=" + PATIENT_ID + "&tab=photos&msg=created";
+        } else {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = \'<i class="bi bi-cloud-upload-fill text-xl"></i> Upload Photos\';
+            alert(uploaded + " photo(s) uploaded. " + failed + " failed — please retry.");
+        }
     });
 })();
 </script>';
@@ -206,10 +250,9 @@ include __DIR__ . '/../includes/header.php';
         </div>
     </div>
 
-    <form id="woundForm" method="POST" action="<?= BASE_URL ?>/api/upload_photo.php"
-          enctype="multipart/form-data" novalidate>
-        <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-        <input type="hidden" name="patient_id" value="<?= $patient_id ?>">
+    <form id="woundForm" novalidate>
+        <input type="hidden" id="hiddenCsrf" value="<?= csrfToken() ?>">
+        <input type="hidden" id="hiddenPatientId" value="<?= $patient_id ?>">
 
         <div class="p-6">
             <div class="flex items-center justify-between mb-4">
@@ -241,7 +284,7 @@ include __DIR__ . '/../includes/header.php';
         </div>
 
         <div class="px-6 pb-6 flex flex-col sm:flex-row gap-3">
-            <button type="submit"
+            <button type="submit" id="woundSubmitBtn"
                     class="flex-1 sm:flex-none flex items-center justify-center gap-2
                            bg-violet-600 hover:bg-violet-700 active:scale-95 text-white font-bold
                            px-10 py-3.5 rounded-xl transition-all shadow-md hover:shadow-lg text-base">
@@ -372,7 +415,4 @@ include __DIR__ . '/../includes/header.php';
         </button>
     </div>
 </div>
-<!-- preview element (offscreen, used for object URLs cleanup) -->
-<img id="cameraPreview" class="hidden" alt="">
-
 <?php include __DIR__ . '/../includes/footer.php'; ?>
