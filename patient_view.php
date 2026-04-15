@@ -923,6 +923,39 @@ $allDone  = count(array_diff($required, $completedForms)) === 0;
         </a>
     </div>
 
+    <!-- Filter bar -->
+    <div class="flex flex-wrap items-center gap-3 px-5 py-3 border-b border-slate-100 bg-slate-50/60">
+        <div class="flex items-center gap-2 flex-1 min-w-[160px]">
+            <i class="bi bi-funnel text-slate-400 text-sm flex-shrink-0"></i>
+            <select id="filterType"
+                    class="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white
+                           focus:outline-none focus:ring-2 focus:ring-blue-400 text-slate-700">
+                <option value="">All categories</option>
+                <?php
+                $seenTypes = [];
+                foreach ($forms as $frow):
+                    $ftype = $frow['form_type'];
+                    if (in_array($ftype, $seenTypes, true)) continue;
+                    $seenTypes[] = $ftype;
+                    $flabel2 = $formDefs[$ftype]['label'] ?? $ftype;
+                ?>
+                <option value="<?= h($ftype) ?>"><?= h($flabel2) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <div class="flex items-center gap-2">
+            <i class="bi bi-calendar3 text-slate-400 text-sm flex-shrink-0"></i>
+            <input type="date" id="filterDate"
+                   class="text-sm border border-slate-200 rounded-xl px-3 py-2 bg-white
+                          focus:outline-none focus:ring-2 focus:ring-blue-400 text-slate-700">
+        </div>
+        <button id="filterClear"
+                class="text-xs font-semibold text-slate-400 hover:text-rose-600 transition-colors hidden">
+            <i class="bi bi-x-circle"></i> Clear filters
+        </button>
+        <span id="filterCount" class="text-xs text-slate-400 ml-auto hidden"></span>
+    </div>
+
     <div class="overflow-x-auto">
         <table class="w-full text-sm">
             <thead>
@@ -943,8 +976,11 @@ $allDone  = count(array_diff($required, $completedForms)) === 0;
                 <?php foreach ($forms as $f):
                     $fd = $formDefs[$f['form_type']] ?? ['label'=>$f['form_type'],'icon'=>'bi-file','bg'=>'bg-slate-100','text'=>'text-slate-600'];
                     $sc = $statusCfg[$f['status']] ?? $statusCfg['draft'];
+                    $rowDate = substr($f['created_at'], 0, 10); // YYYY-MM-DD
                 ?>
-                <tr class="hover:bg-slate-50/70 transition-colors">
+                <tr class="hover:bg-slate-50/70 transition-colors form-row"
+                    data-type="<?= h($f['form_type']) ?>"
+                    data-date="<?= h($rowDate) ?>">
                     <td class="pl-5 pr-2 py-4">
                         <input type="checkbox" class="form-chk w-3.5 h-3.5 text-blue-600 border-slate-300 rounded cursor-pointer"
                                value="<?= $f['id'] ?>" onchange="updateBatch()">
@@ -981,6 +1017,51 @@ $allDone  = count(array_diff($required, $completedForms)) === 0;
 </div>
 <script>
 var BASE_URL_PID = '<?= BASE_URL ?>/export_pdf.php?patient_id=<?= $id ?>&ids=';
+
+// ── Filter ───────────────────────────────────────────────────────────────────
+var filterTypeEl  = document.getElementById('filterType');
+var filterDateEl  = document.getElementById('filterDate');
+var filterClearEl = document.getElementById('filterClear');
+var filterCountEl = document.getElementById('filterCount');
+
+function applyFilters() {
+    var typeVal = filterTypeEl ? filterTypeEl.value : '';
+    var dateVal = filterDateEl ? filterDateEl.value : '';
+    var hasFilter = typeVal || dateVal;
+    var rows = document.querySelectorAll('.form-row');
+    var visible = 0;
+    rows.forEach(function (tr) {
+        var matchType = !typeVal || tr.dataset.type === typeVal;
+        var matchDate = !dateVal || tr.dataset.date === dateVal;
+        var show = matchType && matchDate;
+        tr.style.display = show ? '' : 'none';
+        if (show) visible++;
+    });
+    if (filterClearEl) filterClearEl.classList.toggle('hidden', !hasFilter);
+    if (filterCountEl) {
+        if (hasFilter) {
+            filterCountEl.textContent = visible + ' of <?= count($forms) ?> form' + (<?= count($forms) ?> !== 1 ? 's' : '');
+            filterCountEl.classList.remove('hidden');
+        } else {
+            filterCountEl.classList.add('hidden');
+        }
+    }
+    // deselect hidden rows
+    document.querySelectorAll('.form-chk').forEach(function (c) {
+        if (c.closest('tr') && c.closest('tr').style.display === 'none') c.checked = false;
+    });
+    updateBatch();
+}
+
+if (filterTypeEl) filterTypeEl.addEventListener('change', applyFilters);
+if (filterDateEl) filterDateEl.addEventListener('input', applyFilters);
+if (filterClearEl) filterClearEl.addEventListener('click', function () {
+    filterTypeEl.value = '';
+    filterDateEl.value = '';
+    applyFilters();
+});
+
+// ── Batch export ─────────────────────────────────────────────────────────────
 function updateBatch() {
     var checked = Array.from(document.querySelectorAll('.form-chk:checked')).map(c => c.value);
     var bar     = document.getElementById('batchBar');
@@ -998,7 +1079,13 @@ function updateBatch() {
     }
 }
 document.getElementById('chkAll').addEventListener('change', function () {
-    document.querySelectorAll('.form-chk').forEach(c => { c.checked = this.checked; });
+    var isChecked = this.checked;
+    document.querySelectorAll('.form-row').forEach(function (tr) {
+        if (tr.style.display !== 'none') {
+            var chk = tr.querySelector('.form-chk');
+            if (chk) chk.checked = isChecked;
+        }
+    });
     updateBatch();
 });
 </script>
