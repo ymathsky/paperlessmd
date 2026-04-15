@@ -133,7 +133,7 @@ if (!function_exists('yn2')) { function yn2(array $d, string $k): string {
     $informantName = vd($data, 'informant_name');
     $informantRel  = vd($data, 'informant_relationship');
     ?>
-    <p style="font-size:10.5pt;font-style:italic;text-decoration:underline;font-weight:bold;margin:0 0 4pt;page-break-before:always;padding-top:14pt;">Step 2: Informant Interview</p>
+    <p style="font-size:10.5pt;font-style:italic;text-decoration:underline;font-weight:bold;margin:0 0 4pt;page-break-before:avoid;">Step 2: Informant Interview</p>
     <p style="font-size:9pt;font-style:italic;margin:0 0 5pt;">— skip this step if the patient lives alone</p>
     <div style="font-size:9.5pt;margin-bottom:6pt;">
         Informant's Name: <span class="bwc-fill"><?= $informantName ?></span>
