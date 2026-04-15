@@ -143,8 +143,8 @@ include __DIR__ . '/includes/header.php';
 <div class="space-y-3" id="visitList">
     <?php foreach ($visits as $idx => $v):
         $sd   = $statusDefs[$v['status']];
-        $addr = $v['patient_address'] ? htmlspecialchars(urlencode($v['patient_address'])) : '';
-        $mapsUrl = $addr ? "https://www.google.com/maps/search/?api=1&query={$addr}" : '#';
+        $addr    = $v['patient_address'] ? rawurlencode($v['patient_address']) : '';
+        $mapsUrl = $addr ? 'https://www.google.com/maps/dir/?api=1&destination=' . $addr : '#';
     ?>
     <div class="bg-white border border-slate-100 rounded-2xl shadow-sm hover:shadow-md transition-shadow"
          id="visit-<?= $v['id'] ?>">
@@ -179,7 +179,8 @@ include __DIR__ . '/includes/header.php';
                 <?php if ($v['patient_address']): ?>
                 <div class="flex items-start gap-1.5 text-sm text-slate-500 mb-1">
                     <i class="bi bi-geo-alt text-slate-400 mt-0.5 shrink-0"></i>
-                    <span><?= h($v['patient_address']) ?></span>
+                    <a href="https://www.google.com/maps/dir/?api=1&destination=<?= $addr ?>" target="_blank" rel="noopener"
+                       class="hover:text-blue-600 underline decoration-dotted"><?= h($v['patient_address']) ?></a>
                 </div>
                 <?php endif; ?>
 
@@ -214,9 +215,9 @@ include __DIR__ . '/includes/header.php';
                 </a>
                 <?php endif; ?>
                 <?php if ($v['patient_address']): ?>
-                <a href="<?= $mapsUrl ?>" target="_blank" rel="noopener"
+                <a href="<?= h($mapsUrl) ?>" target="_blank" rel="noopener"
                    class="flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-xs font-semibold hover:bg-blue-100 transition-colors">
-                    <i class="bi bi-map-fill"></i> Map
+                    <i class="bi bi-navigation-fill"></i> Navigate
                 </a>
                 <?php endif; ?>
                 <a href="<?= BASE_URL ?>/patient_view.php?id=<?= $v['patient_id'] ?>"
