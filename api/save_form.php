@@ -13,11 +13,12 @@ if (!verifyCsrf($_POST['csrf_token'] ?? '')) {
     die('Invalid request.');
 }
 
-$patientId = (int)($_POST['patient_id'] ?? 0);
-$formType  = $_POST['form_type'] ?? '';
-$signature = $_POST['patient_signature'] ?? '';
-$poaName   = trim($_POST['poa_name'] ?? '');
-$poaRel    = trim($_POST['poa_relationship'] ?? '');
+$patientId  = (int)($_POST['patient_id'] ?? 0);
+$formType   = $_POST['form_type'] ?? '';
+$signature  = $_POST['patient_signature'] ?? '';
+$maSig      = $_POST['ma_signature'] ?? '';
+$poaName    = trim($_POST['poa_name'] ?? '');
+$poaRel     = trim($_POST['poa_relationship'] ?? '');
 
 $allowed = ['vital_cs', 'new_patient', 'abn', 'pf_signup', 'ccm_consent', 'cognitive_wellness', 'medicare_awv', 'il_disclosure'];
 if (!$patientId || !in_array($formType, $allowed, true)) {
@@ -32,12 +33,17 @@ if (!$chk->fetch()) {
 }
 
 // Collect form fields (exclude meta)
-$excludeKeys = ['csrf_token', 'patient_id', 'form_type', 'patient_signature', 'poa_name', 'poa_relationship'];
+$excludeKeys = ['csrf_token', 'patient_id', 'form_type', 'patient_signature', 'ma_signature', 'poa_name', 'poa_relationship'];
 $formData    = [];
 foreach ($_POST as $key => $value) {
     if (!in_array($key, $excludeKeys, true)) {
         $formData[$key] = is_array($value) ? $value : trim((string)$value);
     }
+}
+
+// Validate ma_signature format if provided
+if ($maSig && !preg_match('/^data:image\/png;base64,[A-Za-z0-9+\/=]+$/', $maSig)) {
+    $maSig = '';
 }
 
 $status = $signature ? 'signed' : 'draft';
@@ -59,14 +65,15 @@ if ($signature) {
 
 $stmt   = $pdo->prepare("
     INSERT INTO form_submissions
-        (patient_id, form_type, form_data, patient_signature, poa_name, poa_relationship, ma_id, status, signed_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
+        (patient_id, form_type, form_data, patient_signature, ma_signature, poa_name, poa_relationship, ma_id, status, signed_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
 ");
 $stmt->execute([
     $patientId,
     $formType,
     json_encode($formData, JSON_UNESCAPED_UNICODE),
     $signature ?: null,
+    $maSig     ?: null,
     $poaName   ?: null,
     $poaRel    ?: null,
     $_SESSION['user_id'],

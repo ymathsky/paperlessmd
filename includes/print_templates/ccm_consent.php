@@ -65,7 +65,10 @@ $maName  = h($f['ma_name'] ?? '');
             <td style="width:50%;vertical-align:bottom;">
                 <strong>Date of Birth:</strong> <?= $ptDob ?><br><br>
                 <strong>Witness Signature:</strong>
-                <div style="border-top:1px solid #000;margin-top:42pt;"></div>
+                <?php if (!empty($f['ma_signature'])): ?>
+                <br><img src="<?= h($f['ma_signature']) ?>" class="bwc-sig-img" alt="MA Signature">
+                <?php endif; ?>
+                <div style="border-top:1px solid #000;margin-top:<?= !empty($f['ma_signature']) ? '4pt' : '42pt' ?>;"></div>
             </td>
         </tr>
         <tr>

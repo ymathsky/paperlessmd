@@ -284,73 +284,194 @@ $apiBase   = BASE_URL;
 $extraJs = <<<JS
 <script>
 (function () {
+    // ── Patient signature pad ──────────────────────────────────────
     var canvas      = document.getElementById('sigCanvas');
     var placeholder = document.getElementById('sigPlaceholder');
     var clearBtn    = document.getElementById('sigClearBtn');
     var saveBtn     = document.getElementById('sigSaveBtn');
     var sigMsg      = document.getElementById('sigMsg');
 
-    function resizeCanvas() {
-        var rect = canvas.getBoundingClientRect();
-        canvas.width  = Math.floor(rect.width  * window.devicePixelRatio);
-        canvas.height = Math.floor(rect.height * window.devicePixelRatio);
-        canvas.getContext('2d').scale(window.devicePixelRatio, window.devicePixelRatio);
-    }
-    resizeCanvas();
-
-    var pad = new SignaturePad(canvas, { penColor: '#1e293b', minWidth: 1.5, maxWidth: 3 });
-
-    pad.addEventListener('beginStroke', function () {
-        placeholder.style.display = 'none';
-    });
-
-    clearBtn.addEventListener('click', function () {
-        pad.clear();
-        placeholder.style.display = '';
-        sigMsg.classList.add('hidden');
-    });
-
-    saveBtn.addEventListener('click', async function () {
-        if (pad.isEmpty()) {
-            sigMsg.textContent = 'Please sign before saving.';
-            sigMsg.className   = 'text-sm font-semibold text-rose-600';
-            sigMsg.classList.remove('hidden');
-            return;
+    if (canvas) {
+        function resizeCanvas() {
+            var rect = canvas.getBoundingClientRect();
+            canvas.width  = Math.floor(rect.width  * window.devicePixelRatio);
+            canvas.height = Math.floor(rect.height * window.devicePixelRatio);
+            canvas.getContext('2d').scale(window.devicePixelRatio, window.devicePixelRatio);
         }
-        saveBtn.disabled   = true;
-        saveBtn.innerHTML  = '<i class="bi bi-hourglass-split"></i> Saving\u2026';
-        sigMsg.classList.add('hidden');
-        try {
-            var res  = await fetch('{$apiBase}/api/sign_form.php', {
-                method:  'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify({ csrf: '{$csrfToken}', id: {$docId}, signature: pad.toDataURL('image/png') }),
-            });
-            var json = await res.json();
-            if (json.ok) {
-                saveBtn.innerHTML = '<i class="bi bi-check2-circle"></i> Signed!';
-                saveBtn.classList.replace('bg-rose-600',    'bg-emerald-600');
-                saveBtn.classList.replace('hover:bg-rose-700','hover:bg-emerald-700');
-                document.getElementById('signPanel').classList.replace('border-rose-200','border-emerald-200');
-                sigMsg.textContent = 'Signature saved. Refreshing\u2026';
-                sigMsg.className   = 'text-sm font-semibold text-emerald-600';
+        resizeCanvas();
+
+        var pad = new SignaturePad(canvas, { penColor: '#1e293b', minWidth: 1.5, maxWidth: 3 });
+
+        pad.addEventListener('beginStroke', function () {
+            placeholder.style.display = 'none';
+        });
+
+        clearBtn.addEventListener('click', function () {
+            pad.clear();
+            placeholder.style.display = '';
+            sigMsg.classList.add('hidden');
+        });
+
+        saveBtn.addEventListener('click', async function () {
+            if (pad.isEmpty()) {
+                sigMsg.textContent = 'Please sign before saving.';
+                sigMsg.className   = 'text-sm font-semibold text-rose-600';
                 sigMsg.classList.remove('hidden');
-                setTimeout(function () { location.reload(); }, 1200);
-            } else {
-                throw new Error(json.error || 'Unknown error');
+                return;
             }
-        } catch (err) {
-            saveBtn.disabled  = false;
-            saveBtn.innerHTML = '<i class="bi bi-check-circle-fill"></i> Save Signature';
-            sigMsg.textContent = 'Error: ' + err.message;
-            sigMsg.className   = 'text-sm font-semibold text-rose-600';
-            sigMsg.classList.remove('hidden');
+            saveBtn.disabled   = true;
+            saveBtn.innerHTML  = '<i class="bi bi-hourglass-split"></i> Saving\u2026';
+            sigMsg.classList.add('hidden');
+            try {
+                var res  = await fetch('{$apiBase}/api/sign_form.php', {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({ csrf: '{$csrfToken}', id: {$docId}, signature: pad.toDataURL('image/png') }),
+                });
+                var json = await res.json();
+                if (json.ok) {
+                    saveBtn.innerHTML = '<i class="bi bi-check2-circle"></i> Signed!';
+                    saveBtn.classList.replace('bg-rose-600',    'bg-emerald-600');
+                    saveBtn.classList.replace('hover:bg-rose-700','hover:bg-emerald-700');
+                    document.getElementById('signPanel').classList.replace('border-rose-200','border-emerald-200');
+                    sigMsg.textContent = 'Signature saved. Refreshing\u2026';
+                    sigMsg.className   = 'text-sm font-semibold text-emerald-600';
+                    sigMsg.classList.remove('hidden');
+                    setTimeout(function () { location.reload(); }, 1200);
+                } else {
+                    throw new Error(json.error || 'Unknown error');
+                }
+            } catch (err) {
+                saveBtn.disabled  = false;
+                saveBtn.innerHTML = '<i class="bi bi-check-circle-fill"></i> Save Signature';
+                sigMsg.textContent = 'Error: ' + err.message;
+                sigMsg.className   = 'text-sm font-semibold text-rose-600';
+                sigMsg.classList.remove('hidden');
+            }
+        });
+    }
+
+    // ── Provider signature pad ─────────────────────────────────────
+    var provCanvas = document.getElementById('provCanvas');
+    if (provCanvas) {
+        function resizeProvCanvas() {
+            var rect = provCanvas.getBoundingClientRect();
+            provCanvas.width  = Math.floor(rect.width  * window.devicePixelRatio);
+            provCanvas.height = Math.floor(rect.height * window.devicePixelRatio);
+            provCanvas.getContext('2d').scale(window.devicePixelRatio, window.devicePixelRatio);
         }
-    });
+        resizeProvCanvas();
+
+        var provPad = new SignaturePad(provCanvas, { penColor: '#3b0764', minWidth: 1.5, maxWidth: 3 });
+        var provPlaceholder = document.getElementById('provPlaceholder');
+        provPad.addEventListener('beginStroke', function () { provPlaceholder.style.display = 'none'; });
+
+        document.getElementById('provClearBtn').addEventListener('click', function () {
+            provPad.clear();
+            provPlaceholder.style.display = '';
+            document.getElementById('provMsg').classList.add('hidden');
+        });
+
+        document.getElementById('provSaveBtn').addEventListener('click', async function () {
+            var provSaveBtn = this;
+            var provMsg = document.getElementById('provMsg');
+            if (provPad.isEmpty()) {
+                provMsg.textContent = 'Please sign before saving.';
+                provMsg.className   = 'text-sm font-semibold text-rose-600';
+                provMsg.classList.remove('hidden');
+                return;
+            }
+            provSaveBtn.disabled  = true;
+            provSaveBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving\u2026';
+            provMsg.classList.add('hidden');
+            try {
+                var res  = await fetch('{$apiBase}/api/sign_provider.php', {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({
+                        csrf:          '{$csrfToken}',
+                        id:            {$docId},
+                        signature:     provPad.toDataURL('image/png'),
+                        provider_name: document.getElementById('provName').value.trim(),
+                    }),
+                });
+                var json = await res.json();
+                if (json.ok) {
+                    provSaveBtn.innerHTML = '<i class="bi bi-check2-circle"></i> Saved!';
+                    provSaveBtn.classList.replace('bg-violet-600','bg-emerald-600');
+                    provSaveBtn.classList.replace('hover:bg-violet-700','hover:bg-emerald-700');
+                    document.getElementById('provPanel').classList.replace('border-violet-200','border-emerald-200');
+                    provMsg.textContent = 'Provider signature saved. Refreshing\u2026';
+                    provMsg.className   = 'text-sm font-semibold text-emerald-600';
+                    provMsg.classList.remove('hidden');
+                    setTimeout(function () { location.reload(); }, 1200);
+                } else {
+                    throw new Error(json.error || 'Unknown error');
+                }
+            } catch (err) {
+                provSaveBtn.disabled  = false;
+                provSaveBtn.innerHTML = '<i class="bi bi-check-circle-fill"></i> Save Provider Signature';
+                provMsg.textContent = 'Error: ' + err.message;
+                provMsg.className   = 'text-sm font-semibold text-rose-600';
+                provMsg.classList.remove('hidden');
+            }
+        });
+    }
 })();
 </script>
 JS;
 ?>
+<?php endif; ?>
+
+<?php if (!isBilling() && !empty($doc['provider_signature'])): ?>
+<!-- ─── Provider Signature Already Captured ─────────────────────── -->
+<div class="max-w-3xl mt-4 px-5 py-3 bg-violet-50 border border-violet-200 rounded-2xl flex items-center gap-2 no-print">
+    <i class="bi bi-person-check-fill text-violet-500"></i>
+    <span class="text-xs text-violet-700 font-semibold">
+        Provider countersigned<?= $doc['provider_name'] ? ' — ' . h($doc['provider_name']) : '' ?>
+    </span>
+</div>
+<?php elseif (!isBilling() && $doc['status'] !== 'draft'): ?>
+<!-- ─── Provider Signature Capture Panel ────────────────────────── -->
+<div id="provPanel" class="max-w-3xl mt-4 bg-white rounded-2xl shadow-sm border-2 border-violet-200 overflow-hidden no-print">
+    <div class="flex items-center gap-3 px-6 py-4 bg-gradient-to-r from-violet-50 to-purple-50 border-b border-violet-100">
+        <div class="w-9 h-9 bg-violet-100 rounded-xl grid place-items-center flex-shrink-0">
+            <i class="bi bi-person-badge-fill text-violet-600"></i>
+        </div>
+        <div>
+            <p class="font-bold text-slate-800 text-sm">Provider / Clinician Countersignature</p>
+            <p class="text-xs text-slate-500 mt-0.5">Provider reviews and countersigns to verify clinical accuracy.</p>
+        </div>
+    </div>
+    <div class="p-6">
+        <div class="mb-4">
+            <label class="block text-sm font-semibold text-slate-700 mb-1.5">Provider Name</label>
+            <input type="text" id="provName" placeholder="Dr. Full Name"
+                   class="w-full max-w-sm px-4 py-2.5 border border-slate-200 rounded-xl text-sm
+                          focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent bg-white">
+        </div>
+        <div class="relative border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 overflow-hidden" style="touch-action:none;">
+            <canvas id="provCanvas" class="w-full block" style="height:140px;"></canvas>
+            <div id="provPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center text-slate-300 pointer-events-none select-none">
+                <i class="bi bi-pencil-square text-4xl mb-1"></i>
+                <span class="text-sm font-medium">Provider sign here</span>
+            </div>
+        </div>
+        <div class="flex items-center gap-3 mt-4 flex-wrap">
+            <button id="provClearBtn"
+                    class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-slate-600
+                           bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">
+                <i class="bi bi-eraser-fill"></i> Clear
+            </button>
+            <button id="provSaveBtn"
+                    class="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-bold text-white
+                           bg-violet-600 hover:bg-violet-700 rounded-xl transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                <i class="bi bi-check-circle-fill"></i> Save Provider Signature
+            </button>
+            <span id="provMsg" class="text-sm font-semibold hidden"></span>
+        </div>
+    </div>
+</div>
 <?php endif; ?>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>

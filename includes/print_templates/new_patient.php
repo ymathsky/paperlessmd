@@ -79,7 +79,11 @@ $emergPhone       = vd($data, 'emergency_phone');
         <div class="bwc-sig-label">Patient Signature</div>
 
         <div class="bwc-sig-row" style="margin-top:18pt;">
-            <div class="bwc-sig-line"></div>
+            <div class="bwc-sig-line">
+                <?php if (!empty($f['ma_signature'])): ?>
+                <img src="<?= h($f['ma_signature']) ?>" class="bwc-sig-img" alt="MA Signature">
+                <?php endif; ?>
+            </div>
             <div class="bwc-sig-date">Date: <?= $sigDate ?></div>
         </div>
         <div class="bwc-sig-label">Medical Assistant Signature — <?= $maName ?></div>

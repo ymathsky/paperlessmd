@@ -125,4 +125,20 @@ $option     = vd($data, 'abn_option'); // 'option1', 'option2', 'option3'
         <span>Form CMS-R-131 (Exp.01/31/2026)</span>
         <span>Form Approved OMB No. 0938-0566</span>
     </div>
+
+    <!-- Staff / MA Signature -->
+    <div style="margin-top:10pt;display:flex;gap:40pt;align-items:flex-end;">
+        <div style="flex:1;">
+            <div style="min-height:38pt;">
+                <?php if (!empty($f['ma_signature'])): ?>
+                <img src="<?= h($f['ma_signature']) ?>" class="bwc-sig-img" alt="MA Signature">
+                <?php endif; ?>
+            </div>
+            <div style="border-top:1px solid #000;padding-top:2pt;font-size:8.5pt;">Staff / MA Signature — <?= h($f['ma_name'] ?? '') ?></div>
+        </div>
+        <div style="width:110pt;">
+            <div style="min-height:38pt;"></div>
+            <div style="border-top:1px solid #000;padding-top:2pt;font-size:8.5pt;">Date: <?= $sigDate ?></div>
+        </div>
+    </div>
 </div>

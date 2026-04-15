@@ -38,6 +38,38 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    // ── MA Signature Pad ──────────────────────────────────────────────
+    const maCanvas  = document.getElementById('maSigPad');
+    const maSigData = document.getElementById('maSigData');
+    let maSigPad    = null;
+
+    if (maCanvas && typeof SignaturePad !== 'undefined') {
+        const maWrapper = document.getElementById('maSigWrapper') || maCanvas.parentElement;
+        maSigPad = new SignaturePad(maCanvas, {
+            backgroundColor: 'rgb(255, 255, 255)',
+            penColor:        'rgb(30, 30, 120)',
+            minWidth:        1.5,
+            maxWidth:        3.5,
+        });
+
+        function resizeMaCanvas() {
+            const ratio = Math.max(window.devicePixelRatio || 1, 1);
+            const w     = maWrapper.clientWidth || maWrapper.offsetWidth;
+            const h     = 160;
+            maCanvas.width        = w * ratio;
+            maCanvas.height       = h * ratio;
+            maCanvas.style.width  = w + 'px';
+            maCanvas.style.height = h + 'px';
+            maCanvas.getContext('2d').scale(ratio, ratio);
+            maSigPad.clear();
+        }
+        setTimeout(resizeMaCanvas, 150);
+        window.addEventListener('resize', resizeMaCanvas);
+
+        const clearMaBtn = document.getElementById('clearMaSig');
+        if (clearMaBtn) clearMaBtn.addEventListener('click', () => maSigPad.clear());
+    }
+
     // ── POA Toggle ────────────────────────────────────────────────────
     const poaCheck  = document.getElementById('poaCheck');
     const poaFields = document.getElementById('poaFields');
@@ -58,6 +90,9 @@ document.addEventListener('DOMContentLoaded', function () {
         if (sigPad && sigData && !sigPad.isEmpty()) {
             sigData.value = sigPad.toDataURL('image/png');
         }
+        if (maSigPad && maSigData && !maSigPad.isEmpty()) {
+            maSigData.value = maSigPad.toDataURL('image/png');
+        }
 
         if (submitBtn) {
             submitBtn.disabled = true;
@@ -75,6 +110,9 @@ document.addEventListener('DOMContentLoaded', function () {
         mainForm.addEventListener('submit', function () {
             if (sigPad && sigData && !sigPad.isEmpty()) {
                 sigData.value = sigPad.toDataURL('image/png');
+            }
+            if (maSigPad && maSigData && !maSigPad.isEmpty()) {
+                maSigData.value = maSigPad.toDataURL('image/png');
             }
         });
     }

@@ -54,3 +54,28 @@
         <input type="hidden" name="patient_signature" id="sigData">
     </div>
 </div>
+
+<!-- MA Signature Block -->
+<div class="bg-white border-2 border-indigo-100 rounded-2xl overflow-hidden mt-4">
+    <div class="bg-gradient-to-r from-indigo-600 to-indigo-500 px-5 py-3 flex items-center gap-2">
+        <i class="bi bi-person-badge-fill text-white"></i>
+        <span class="text-white font-semibold text-sm">Medical Assistant Signature</span>
+    </div>
+    <div class="p-5">
+        <label class="block text-sm font-semibold text-slate-700 mb-2">MA sign below
+            <span class="text-slate-400 font-normal text-xs ml-1">(staff member completing this form)</span>
+        </label>
+        <div class="sig-wrapper border-2 border-dashed border-slate-300 rounded-2xl focus-within:border-indigo-400 transition-colors" id="maSigWrapper">
+            <canvas id="maSigPad"></canvas>
+            <div class="sig-placeholder">MA sign here</div>
+        </div>
+        <div class="mt-3 flex items-center gap-2">
+            <button type="button" id="clearMaSig"
+                    class="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-xl transition-colors">
+                <i class="bi bi-eraser"></i> Clear
+            </button>
+            <span class="text-xs text-slate-400">Confirms accuracy of information recorded</span>
+        </div>
+        <input type="hidden" name="ma_signature" id="maSigData">
+    </div>
+</div>

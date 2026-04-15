@@ -224,9 +224,23 @@ if (!function_exists('yn2')) { function yn2(array $d, string $k): string {
         </div>
         <div class="bwc-sig-label">Patient Signature</div>
         <div class="bwc-sig-row" style="margin-top:16pt;">
-            <div class="bwc-sig-line"></div>
+            <div class="bwc-sig-line">
+                <?php if (!empty($f['ma_signature'])): ?>
+                <img src="<?= h($f['ma_signature']) ?>" class="bwc-sig-img" alt="MA Signature">
+                <?php endif; ?>
+            </div>
             <div class="bwc-sig-date">Date: <?= $sigDate ?></div>
         </div>
         <div class="bwc-sig-label">Assessed By: <?= h($assessedBy) ?></div>
+
+        <div class="bwc-sig-row" style="margin-top:16pt;">
+            <div class="bwc-sig-line">
+                <?php if (!empty($f['provider_signature'])): ?>
+                <img src="<?= h($f['provider_signature']) ?>" class="bwc-sig-img" alt="Provider Signature">
+                <?php endif; ?>
+            </div>
+            <div class="bwc-sig-date">Date: <?= $sigDate ?></div>
+        </div>
+        <div class="bwc-sig-label">Provider Signature<?php if (!empty($f['provider_name'])): ?> — <?= h($f['provider_name']) ?><?php endif; ?></div>
     </div>
 </div>
