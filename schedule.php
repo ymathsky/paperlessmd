@@ -28,8 +28,7 @@ $schedStmt = $pdo->prepare("
            CONCAT(p.first_name, ' ', p.last_name) AS patient_name,
            p.address AS patient_address,
            p.phone   AS patient_phone,
-           p.id      AS patient_id,
-           sc.visit_notes
+           p.id      AS patient_id
     FROM `schedule` sc
     JOIN patients p ON p.id = sc.patient_id
     WHERE sc.ma_id = ? AND sc.visit_date = ?
