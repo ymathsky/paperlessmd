@@ -84,7 +84,7 @@ include __DIR__ . '/includes/header.php';
 ?>
 
 <!-- Date nav + Title -->
-<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 no-print">
     <div>
         <h2 class="text-2xl font-extrabold text-slate-800">
             <i class="bi bi-calendar3 text-indigo-500 mr-1"></i> Daily Schedule
@@ -172,35 +172,38 @@ include __DIR__ . '/includes/header.php';
 
 <style>
 @media print {
-    @page { margin: 12mm 10mm; size: A4 landscape; }
+    @page { margin: 10mm 8mm; size: A4 landscape; }
 
-    /* Hide all chrome */
+    /* Hide all chrome and interactive elements */
     nav, header, footer, .no-print { display: none !important; }
-    body, html { background: #fff !important; font-size: 9pt; }
-    .pt-20 { padding-top: 0 !important; }
-    #container, .container, [class*="max-w-"] { max-width: 100% !important; padding: 0 !important; margin: 0 !important; }
 
-    /* Print header */
-    .print-header { display: block !important; margin-bottom: 8pt !important; }
+    /* Reset page wrapper padding/colours */
+    body, html { background: #fff !important; font-size: 9pt; color: #1e293b; }
+    .pt-20, .pb-12 { padding-top: 0 !important; padding-bottom: 0 !important; }
+    .min-h-screen { min-height: 0 !important; }
+    .page-fade { animation: none !important; opacity: 1 !important; }
 
-    /* Status summary */
+    /* Remove container max-width so content fills the page */
+    .max-w-screen-xl { max-width: 100% !important; padding-left: 0 !important; padding-right: 0 !important; margin-left: 0 !important; margin-right: 0 !important; }
+
+    /* Print-only header */
+    .print-header { display: block !important; margin-bottom: 6pt !important; }
+
+    /* Status summary bar */
     .print-stat-bar {
         display: grid !important;
         grid-template-columns: repeat(4, 1fr) !important;
         gap: 4pt !important;
-        margin-bottom: 8pt !important;
+        margin-bottom: 6pt !important;
     }
     .print-stat-bar > div {
-        border: 1px solid #e2e8f0 !important;
+        box-shadow: none !important;
         border-radius: 4pt !important;
         padding: 4pt 6pt !important;
-        box-shadow: none !important;
-        background: #fff !important;
         font-size: 8pt !important;
     }
 
     /* Day view — visit cards */
-    #visitList { display: block !important; }
     .print-visit-card {
         break-inside: avoid !important;
         border: 1px solid #cbd5e1 !important;
@@ -209,16 +212,15 @@ include __DIR__ . '/includes/header.php';
         box-shadow: none !important;
         background: #fff !important;
     }
-    .print-visit-card > div:first-child { padding: 6pt 8pt !important; }
 
     /* Week grid */
-    .print-week-grid-wrapper { overflow: visible !important; margin: 0 !important; padding: 0 !important; }
+    .print-week-grid-wrapper { overflow: visible !important; padding: 0 !important; margin: 0 !important; }
     .print-week-grid {
         display: grid !important;
         grid-template-columns: repeat(7, 1fr) !important;
         width: 100% !important;
+        min-width: 0 !important;
         gap: 3pt !important;
-        min-width: unset !important;
     }
     .print-week-col {
         break-inside: avoid !important;
@@ -226,13 +228,12 @@ include __DIR__ . '/includes/header.php';
         border-radius: 4pt !important;
         font-size: 7.5pt !important;
         box-shadow: none !important;
+        overflow: hidden !important;
     }
-    .print-week-col > div:last-child { padding: 3pt !important; }
 }
 
-/* Hide print-only elements on screen */
+/* Screen-only: hide print-only elements */
 .print-header { display: none; }
-.print-stat-bar { display: grid; }   /* stat bar is always visible, just styled differently */
 </style>
 
 <!-- Print-only header (hidden on screen) -->
