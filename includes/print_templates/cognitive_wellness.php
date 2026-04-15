@@ -118,7 +118,8 @@ if (!function_exists('yn2')) { function yn2(array $d, string $k): string {
     </div>
 
     <!-- Step 1 Score -->
-    <div style="border:2px solid #000;padding:6pt 8pt;margin-top:14pt;margin-bottom:10pt;font-size:10pt;page-break-inside:avoid;">
+    <div style="page-break-inside:avoid;padding-top:28pt;">
+    <div style="border:2px solid #000;padding:6pt 8pt;margin-bottom:10pt;font-size:10pt;">
         <strong>Step 1 Scoring:</strong> <em>To get a total score, add the number of items answered correctly.</em><br>
         Total Correct (score out of 12) = <strong style="font-size:14pt;"><?= $step1Score ?> / 12</strong><br>
         <div style="border:1px solid #ccc;padding:4pt 6pt;margin-top:5pt;font-size:9.5pt;">
@@ -127,6 +128,7 @@ if (!function_exists('yn2')) { function yn2(array $d, string $k): string {
             <?= $step1Score < 7 ? '→' : '' ?> If patient scores 0-6, cognitive impairment is indicated. Conduct standard investigations.
         </div>
     </div>
+    </div><!-- /step1-score wrapper -->
 
     <!-- STEP 2: Informant Interview -->
     <?php
