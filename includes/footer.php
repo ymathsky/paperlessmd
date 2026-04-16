@@ -1,5 +1,5 @@
 </div><!-- /container -->
-</div><!-- /pt-20 -->
+</div><!-- /pt-14 -->
 
 <?php if (!empty($_SESSION['user_id'])): ?>
 <!-- ── Session Timeout Warning Modal ─────────────────────────────────── -->
@@ -50,19 +50,23 @@
 <script src="<?= BASE_URL ?>/assets/js/offline.js" defer></script>
 <script>
 (function () {
-    // User dropdown
-    var btn  = document.getElementById('uBtn');
-    var drop = document.getElementById('uDrop');
-    if (btn && drop) {
-        btn.addEventListener('click', function (e) { e.stopPropagation(); drop.classList.toggle('hidden'); });
-        document.addEventListener('click', function () { drop.classList.add('hidden'); });
+    // Sidebar toggle (mobile)
+    var sidebar  = document.getElementById('sidebar');
+    var backdrop = document.getElementById('sidebarBackdrop');
+    var mBtn     = document.getElementById('mBtn');
+
+    function openSidebar() {
+        if (!sidebar) return;
+        sidebar.classList.remove('-translate-x-full');
+        if (backdrop) backdrop.classList.remove('hidden');
     }
-    // Mobile menu
-    var mBtn  = document.getElementById('mBtn');
-    var mMenu = document.getElementById('mMenu');
-    if (mBtn && mMenu) {
-        mBtn.addEventListener('click', function () { mMenu.classList.toggle('hidden'); });
+    function closeSidebar() {
+        if (!sidebar) return;
+        sidebar.classList.add('-translate-x-full');
+        if (backdrop) backdrop.classList.add('hidden');
     }
+    if (mBtn)     mBtn.addEventListener('click', openSidebar);
+    if (backdrop) backdrop.addEventListener('click', closeSidebar);
 })();
 </script>
 <?php if (isset($extraJs)) echo $extraJs; ?>
