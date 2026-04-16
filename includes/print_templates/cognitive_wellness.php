@@ -216,7 +216,7 @@ if (!function_exists('yn2')) { function yn2(array $d, string $k): string {
     <?php endif; ?>
 
     <!-- Signature -->
-    <div class="bwc-sigs" style="page-break-inside:avoid;">
+    <div class="bwc-sigs" style="margin-top:8pt;">
         <div class="bwc-sig-row">
             <div class="bwc-sig-line">
                 <?php if ($f['patient_signature']): ?>
@@ -226,7 +226,7 @@ if (!function_exists('yn2')) { function yn2(array $d, string $k): string {
             <div class="bwc-sig-date">Date: <?= $sigDate ?></div>
         </div>
         <div class="bwc-sig-label">Patient Signature</div>
-        <div class="bwc-sig-row" style="margin-top:16pt;">
+        <div class="bwc-sig-row" style="margin-top:8pt;">
             <div class="bwc-sig-line">
                 <?php if (!empty($f['ma_signature'])): ?>
                 <img src="<?= h($f['ma_signature']) ?>" class="bwc-sig-img" alt="MA Signature">
@@ -236,7 +236,7 @@ if (!function_exists('yn2')) { function yn2(array $d, string $k): string {
         </div>
         <div class="bwc-sig-label">Assessed By: <?= h($assessedBy) ?></div>
 
-        <div class="bwc-sig-row" style="margin-top:16pt;">
+        <div class="bwc-sig-row" style="margin-top:8pt;">
             <div class="bwc-sig-line">
                 <?php if (!empty($f['provider_signature'])): ?>
                 <img src="<?= h($f['provider_signature']) ?>" class="bwc-sig-img" alt="Provider Signature">
