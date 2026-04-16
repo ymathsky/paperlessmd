@@ -176,16 +176,29 @@ include __DIR__ . '/includes/header.php';
 
 @media print {
     @page { size: A4 landscape; margin: 10mm 8mm; }
-    body, html { background: #fff !important; margin: 0; padding: 0; }
-    /* Reset page wrapper */
-    .pt-20  { padding-top: 0 !important; }
-    .pb-12  { padding-bottom: 0 !important; }
+
+    body, html { background: #fff !important; margin: 0 !important; padding: 0 !important; }
+
+    /* Strip ALL wrapper constraints so #print-layout fills the full page */
+    .pt-20        { padding-top: 0 !important; padding-bottom: 0 !important; }
     .min-h-screen { min-height: 0 !important; }
-    .page-fade { animation: none !important; opacity: 1 !important; }
-    .max-w-screen-xl { max-width: 100% !important; padding-left: 0 !important; padding-right: 0 !important; margin-left: 0 !important; margin-right: 0 !important; }
+    .page-fade    {
+        animation: none !important; opacity: 1 !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
     /* Hide all screen UI — show only print layout */
     nav, footer, .no-print, #screen-layout { display: none !important; }
-    #print-layout { display: block !important; font-family: 'Inter', Arial, sans-serif; font-size: 9pt; color: #1e293b; }
+    #print-layout {
+        display: block !important;
+        font-family: 'Inter', Arial, sans-serif;
+        font-size: 9pt;
+        color: #1e293b;
+        width: 100%;
+    }
 }
 </style>
 
