@@ -361,10 +361,11 @@ include __DIR__ . '/includes/header.php';
         try {
             const res  = await fetch(API + '?action=list');
             const data = await res.json();
-            if (!data.ok) return;
-            allConvs = data.conversations || [];
+            allConvs = data.ok ? (data.conversations || []) : [];
             renderConvList(allConvs);
-        } catch (e) { /* network error */ }
+        } catch (e) {
+            renderConvList([]);
+        }
     }
 
     function renderConvList(convs) {

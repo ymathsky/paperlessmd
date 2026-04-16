@@ -42,6 +42,7 @@ function handleList(): void
 {
     global $pdo, $me;
 
+    // Fetch root messages visible to current user
     $stmt = $pdo->prepare("
         SELECT
             m.id,
@@ -50,43 +51,63 @@ function handleList(): void
             m.to_user_id,
             m.created_at,
             sf.full_name AS from_name,
-            COALESCE(st.full_name, 'All Staff') AS to_name,
-            COALESCE(
-                (SELECT MAX(r.created_at) FROM messages r WHERE r.parent_id = m.id),
-                m.created_at
-            ) AS last_activity,
-            (SELECT COUNT(*) FROM messages r WHERE r.parent_id = m.id) AS reply_count,
-            (
-                SELECT COUNT(*) FROM messages r
-                WHERE  (r.id = m.id OR r.parent_id = m.id)
-                  AND  r.from_user_id != :me1
-                  AND  NOT EXISTS (
-                      SELECT 1 FROM message_reads mr
-                      WHERE mr.message_id = r.id AND mr.user_id = :me2
-                  )
-            ) AS unread_count,
-            (
-                SELECT LEFT(r.body, 120)
-                FROM   messages r
-                WHERE  (r.id = m.id OR r.parent_id = m.id)
-                ORDER  BY r.created_at DESC
-                LIMIT  1
-            ) AS last_body
+            COALESCE(st.full_name, 'All Staff') AS to_name
         FROM  messages m
         JOIN  staff sf ON sf.id = m.from_user_id
         LEFT  JOIN staff st ON st.id = m.to_user_id
         WHERE m.parent_id IS NULL
           AND (
-              m.from_user_id = :me3
-           OR m.to_user_id   = :me4
+              m.from_user_id = ?
+           OR m.to_user_id   = ?
            OR m.to_user_id   IS NULL
           )
-        ORDER BY last_activity DESC
+        ORDER BY m.created_at DESC
         LIMIT 200
     ");
-    $stmt->execute([':me1' => $me, ':me2' => $me, ':me3' => $me, ':me4' => $me]);
+    $stmt->execute([$me, $me]);
+    $rows = $stmt->fetchAll();
 
-    echo json_encode(['ok' => true, 'conversations' => $stmt->fetchAll()]);
+    if (empty($rows)) {
+        echo json_encode(['ok' => true, 'conversations' => []]);
+        return;
+    }
+
+    // Enrich each thread with reply preview + unread count via separate queries
+    $result = [];
+    foreach ($rows as $row) {
+        $rootId = (int)$row['id'];
+
+        // Latest reply body + timestamp
+        $lastStmt = $pdo->prepare("
+            SELECT body, created_at FROM messages
+            WHERE id = ? OR parent_id = ?
+            ORDER BY created_at DESC LIMIT 1
+        ");
+        $lastStmt->execute([$rootId, $rootId]);
+        $last = $lastStmt->fetch();
+
+        // Unread count (messages in thread not sent by me and not yet read by me)
+        $unreadStmt = $pdo->prepare("
+            SELECT COUNT(*) FROM messages m
+            WHERE (m.id = ? OR m.parent_id = ?)
+              AND m.from_user_id != ?
+              AND NOT EXISTS (
+                  SELECT 1 FROM message_reads mr
+                  WHERE mr.message_id = m.id AND mr.user_id = ?
+              )
+        ");
+        $unreadStmt->execute([$rootId, $rootId, $me, $me]);
+
+        $row['last_body']      = $last ? substr($last['body'], 0, 120) : '';
+        $row['last_activity']  = $last ? $last['created_at'] : $row['created_at'];
+        $row['unread_count']   = (int)$unreadStmt->fetchColumn();
+        $result[] = $row;
+    }
+
+    // Sort by last activity desc
+    usort($result, fn($a, $b) => strcmp($b['last_activity'], $a['last_activity']));
+
+    echo json_encode(['ok' => true, 'conversations' => $result]);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
