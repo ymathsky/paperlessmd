@@ -1,12 +1,31 @@
 <?php
-// Suppress PHP warnings/notices so they don't corrupt JSON output
-error_reporting(E_ERROR); // keep fatal errors in server log, suppress all else
-ini_set('display_errors', '0');
-ob_start(); // buffer any stray output so it never corrupts JSON
+// ── Error safety net: catches fatal errors try/catch can't reach ──────────────
+register_shutdown_function(function () {
+    $err = error_get_last();
+    if ($err && ($err['type'] & (E_ERROR | E_PARSE | E_CORE_ERROR | E_COMPILE_ERROR | E_USER_ERROR))) {
+        while (ob_get_level() > 0) ob_end_clean();
+        if (!headers_sent()) {
+            http_response_code(500);
+            header('Content-Type: application/json; charset=utf-8');
+        }
+        echo json_encode([
+            'ok'     => false,
+            'error'  => 'Fatal PHP error',
+            '_debug' => $err['message'] . ' in ' . basename($err['file']) . ':' . $err['line'],
+        ]);
+    }
+});
 
+ini_set('display_errors', '0');
+error_reporting(E_ALL & ~E_NOTICE & ~E_DEPRECATED);
+
+// Buffer includes so any stray die()/warning output is captured
+ob_start();
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/audit.php';
+ob_end_clean(); // discard any buffered output from includes
+
 requireLogin();
 
 $me     = (int)$_SESSION['user_id'];
@@ -18,9 +37,7 @@ if ($action === 'download') {
     exit;
 }
 
-ob_end_clean(); // discard any stray output from includes
 header('Content-Type: application/json; charset=utf-8');
-ob_start(); // fresh buffer so only our JSON goes out
 
 try {
     switch ($action) {
@@ -35,24 +52,21 @@ try {
             echo json_encode(['ok' => false, 'error' => 'Unknown action']);
     }
 } catch (PDOException $e) {
-    ob_end_clean();
     http_response_code(503);
     echo json_encode([
-        'ok'    => false,
-        'error' => 'Messaging tables not set up yet. Please run migrate_messages.php',
+        'ok'     => false,
+        'error'  => 'Database error',
+        '_debug' => $e->getMessage(),
     ]);
-    exit;
 } catch (\Throwable $e) {
-    ob_end_clean();
-    error_log('messages API error: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+    error_log('messages API: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
     http_response_code(500);
     echo json_encode([
-        'ok'    => false,
-        'error' => 'Server error. Check server error log.',
+        'ok'     => false,
+        'error'  => 'Server error',
+        '_debug' => $e->getMessage() . ' line ' . $e->getLine(),
     ]);
-    exit;
 }
-ob_end_flush();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LIST  — conversations visible to current user, most-recently-active first
@@ -125,7 +139,7 @@ function handleList(): void
     }
 
     // Sort by last activity desc
-    usort($result, fn($a, $b) => strcmp($b['last_activity'], $a['last_activity']));
+    usort($result, function ($a, $b) { return strcmp($b['last_activity'], $a['last_activity']); });
 
     echo json_encode(['ok' => true, 'conversations' => $result]);
 }
