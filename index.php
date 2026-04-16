@@ -29,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($user) {
             $nowTs       = time();
-            $lockedUntil = $user['locked_until'] ? strtotime($user['locked_until']) : 0;
+            $lockedUntil = !empty($user['locked_until']) ? strtotime($user['locked_until']) : 0;
 
             if ($lockedUntil > $nowTs) {
                 // ── Account is currently locked ───────────────────────────
@@ -48,8 +48,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             } elseif (password_verify($password, $user['password_hash'])) {
                 // ── Successful login — reset lockout state ────────────────
-                $pdo->prepare("UPDATE staff SET failed_attempts = 0, locked_until = NULL WHERE id = ?")
-                    ->execute([(int)$user['id']]);
+                try {
+                    $pdo->prepare("UPDATE staff SET failed_attempts = 0, locked_until = NULL WHERE id = ?")
+                        ->execute([(int)$user['id']]);
+                } catch (PDOException $e) { /* columns not yet added — run migrate_login_lockout.php */ }
 
                 session_regenerate_id(true);
                 $_SESSION['user_id']     = $user['id'];
@@ -72,8 +74,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $justLocked = true;
                 }
 
-                $pdo->prepare("UPDATE staff SET failed_attempts = ?, locked_until = ? WHERE id = ?")
-                    ->execute([$newAttempts, $lockUntil, (int)$user['id']]);
+                try {
+                    $pdo->prepare("UPDATE staff SET failed_attempts = ?, locked_until = ? WHERE id = ?")
+                        ->execute([$newAttempts, $lockUntil, (int)$user['id']]);
+                } catch (PDOException $e) { /* columns not yet added — run migrate_login_lockout.php */ }
 
                 auditLog($pdo, 'login_fail', 'user', (int)$user['id'],
                          $user['username'],
