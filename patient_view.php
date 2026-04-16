@@ -1255,6 +1255,24 @@ $allDone  = count(array_diff($required, $completedForms)) === 0;
                     <th class="px-4 py-3.5"></th>
                 </tr>
             </thead>
+            <?php
+            // ── Version history map ─────────────────────────────────────────
+            // $forms is DESC by created_at; version 1 = oldest, vN = newest
+            $fvTotal   = [];
+            $fvLatest  = [];
+            foreach (array_reverse($forms) as $fv) {
+                $fvTotal[$fv['form_type']] = ($fvTotal[$fv['form_type']] ?? 0) + 1;
+            }
+            foreach ($forms as $fv) { // DESC: first encountered per type = latest
+                if (!isset($fvLatest[$fv['form_type']])) $fvLatest[$fv['form_type']] = $fv['id'];
+            }
+            $fvNum = array_fill_keys(array_keys($fvTotal), 0);
+            $fvMap = [];
+            foreach (array_reverse($forms) as $fv) {
+                $fvNum[$fv['form_type']]++;
+                $fvMap[$fv['id']] = $fvNum[$fv['form_type']];
+            }
+            ?>
             <tbody class="divide-y divide-slate-50">
                 <?php foreach ($forms as $f):
                     $fd = $formDefs[$f['form_type']] ?? ['label'=>$f['form_type'],'icon'=>'bi-file','bg'=>'bg-slate-100','text'=>'text-slate-600'];
@@ -1273,7 +1291,19 @@ $allDone  = count(array_diff($required, $completedForms)) === 0;
                             <span class="<?= $fd['bg'] ?> <?= $fd['text'] ?> p-2 rounded-xl">
                                 <i class="bi <?= $fd['icon'] ?> text-base"></i>
                             </span>
-                            <span class="font-medium text-slate-700"><?= $fd['label'] ?></span>
+                            <div>
+                                <span class="font-medium text-slate-700"><?= $fd['label'] ?></span>
+                                <?php
+                                $fvVer      = $fvMap[$f['id']] ?? 1;
+                                $fvTot      = $fvTotal[$f['form_type']] ?? 1;
+                                $fvIsLatest = ($fvLatest[$f['form_type']] ?? null) === $f['id'];
+                                if ($fvTot > 1): ?>
+                                <span class="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full
+                                             <?= $fvIsLatest ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400' ?>">
+                                    <?= $fvIsLatest ? 'Latest' : 'v' . $fvVer . ' of ' . $fvTot ?>
+                                </span>
+                                <?php endif; ?>
+                            </div>
                         </div>
                     </td>
                     <td class="px-4 py-4 text-slate-500 hidden md:table-cell"><?= h($f['ma_name'] ?? '—') ?></td>
