@@ -86,11 +86,22 @@ include __DIR__ . '/includes/header.php';
 
 <div class="max-w-2xl">
     <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        <div class="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4">
-            <h2 class="text-white font-bold text-lg flex items-center gap-2">
-                <i class="bi bi-pencil-fill"></i> Edit Patient
-            </h2>
-            <p class="text-blue-200 text-sm mt-0.5"><?= h($patient['first_name'] . ' ' . $patient['last_name']) ?></p>
+        <div class="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 flex items-center gap-4">
+            <?php if (!empty($patient['photo_url'])): ?>
+            <img src="<?= h($patient['photo_url']) ?>"
+                 alt="<?= h($patient['first_name']) ?>"
+                 class="w-12 h-12 rounded-xl object-cover border-2 border-white/40 flex-shrink-0">
+            <?php else: ?>
+            <div class="w-12 h-12 rounded-xl bg-white/20 grid place-items-center text-white font-extrabold text-lg flex-shrink-0">
+                <?= strtoupper(substr($patient['first_name'],0,1) . substr($patient['last_name'],0,1)) ?>
+            </div>
+            <?php endif; ?>
+            <div>
+                <h2 class="text-white font-bold text-lg flex items-center gap-2">
+                    <i class="bi bi-pencil-fill"></i> Edit Patient
+                </h2>
+                <p class="text-blue-200 text-sm mt-0.5"><?= h($patient['first_name'] . ' ' . $patient['last_name']) ?></p>
+            </div>
         </div>
 
         <div class="p-6">

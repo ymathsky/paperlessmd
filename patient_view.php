@@ -27,6 +27,8 @@ if ($activeTab === 'audit' && !isAdmin()) {
 }
 $msg = $_GET['msg'] ?? '';
 
+$photoCsrf = csrfToken();
+
 // Active visit context from One-Tap Start Visit
 $visitId    = (int)($_GET['visit'] ?? 0);
 $activeVisit = null;
@@ -1098,9 +1100,31 @@ function completeVisit(visitId) {
 <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 mb-6">
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div class="flex items-center gap-4">
-            <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 grid place-items-center
-                        text-white font-extrabold text-xl shadow-lg flex-shrink-0">
-                <?= strtoupper(substr($patient['first_name'],0,1) . substr($patient['last_name'],0,1)) ?>
+            <!-- Patient avatar: photo if set, else initials gradient -->
+            <div class="relative flex-shrink-0 group" id="ptAvatarWrap">
+                <?php if (!empty($patient['photo_url'])): ?>
+                <img id="ptAvatarImg"
+                     src="<?= h($patient['photo_url']) ?>"
+                     alt="<?= h($patient['first_name']) ?>"
+                     class="w-14 h-14 rounded-2xl object-cover shadow-lg border-2 border-white ring-2 ring-blue-100">
+                <?php else: ?>
+                <div id="ptAvatarImg"
+                     class="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 grid place-items-center
+                            text-white font-extrabold text-xl shadow-lg">
+                    <?= strtoupper(substr($patient['first_name'],0,1) . substr($patient['last_name'],0,1)) ?>
+                </div>
+                <?php endif; ?>
+                <?php if (canAccessClinical()): ?>
+                <!-- Upload overlay (hover) -->
+                <label for="ptPhotoInput"
+                       class="absolute inset-0 rounded-2xl bg-black/50 grid place-items-center cursor-pointer
+                              opacity-0 group-hover:opacity-100 transition-opacity"
+                       title="Change photo">
+                    <i class="bi bi-camera-fill text-white text-lg"></i>
+                </label>
+                <input type="file" id="ptPhotoInput" accept="image/jpeg,image/png,image/webp,image/gif"
+                       class="hidden">
+                <?php endif; ?>
             </div>
             <div>
                 <h2 class="text-xl font-extrabold text-slate-800 flex items-center gap-2 flex-wrap">
@@ -3028,6 +3052,92 @@ $cnCsrf    = csrfToken();
     <?php endif; ?>
 </div><!-- /audit tab -->
 
+<?php endif; ?>
+
+<?php if (canAccessClinical()): ?>
+<script>
+/* ── Patient profile photo upload ───────────────────────────────────── */
+(function () {
+    var input  = document.getElementById('ptPhotoInput');
+    var wrap   = document.getElementById('ptAvatarWrap');
+    var CSRF   = <?= json_encode($photoCsrf) ?>;
+    var BASE   = <?= json_encode(BASE_URL) ?>;
+    var PID    = <?= (int)$id ?>;
+    var HAS_PHOTO = <?= !empty($patient['photo_url']) ? 'true' : 'false' ?>;
+
+    if (!input) return;
+
+    input.addEventListener('change', function () {
+        var file = input.files[0];
+        if (!file) return;
+
+        // Client-side size guard (5 MB)
+        if (file.size > 5 * 1024 * 1024) {
+            alert('File too large — max 5 MB.');
+            input.value = '';
+            return;
+        }
+
+        var fd = new FormData();
+        fd.append('action',     'upload');
+        fd.append('csrf',       CSRF);
+        fd.append('patient_id', PID);
+        fd.append('photo',      file);
+
+        // Show spinner in avatar
+        var imgEl = document.getElementById('ptAvatarImg');
+        var origContent = imgEl ? imgEl.outerHTML : '';
+
+        var spinner = document.createElement('div');
+        spinner.className = 'w-14 h-14 rounded-2xl bg-slate-200 grid place-items-center flex-shrink-0';
+        spinner.innerHTML = '<span class="inline-block w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></span>';
+        if (imgEl) imgEl.replaceWith(spinner);
+
+        fetch(BASE + '/api/patient_photo.php', { method: 'POST', body: fd })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (!data.ok) { alert(data.error || 'Upload failed'); spinner.outerHTML = origContent; return; }
+                // Replace with new image
+                var newImg = document.createElement('img');
+                newImg.id        = 'ptAvatarImg';
+                newImg.src       = data.url + '?v=' + Date.now();
+                newImg.alt       = '';
+                newImg.className = 'w-14 h-14 rounded-2xl object-cover shadow-lg border-2 border-white ring-2 ring-blue-100';
+                spinner.replaceWith(newImg);
+                HAS_PHOTO = true;
+            })
+            .catch(function () { alert('Network error during upload.'); spinner.replaceWith(document.createElement('div')); });
+
+        input.value = '';
+    });
+
+    // Right-click avatar → remove photo
+    if (wrap) {
+        wrap.addEventListener('contextmenu', function (e) {
+            if (!HAS_PHOTO) return;
+            e.preventDefault();
+            if (!confirm('Remove profile photo?')) return;
+            fetch(BASE + '/api/patient_photo.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({action: 'remove', csrf: CSRF, patient_id: PID}),
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (!data.ok) { alert(data.error || 'Error'); return; }
+                // Replace image with initials div
+                var imgEl = document.getElementById('ptAvatarImg');
+                var ini = document.createElement('div');
+                ini.id        = 'ptAvatarImg';
+                ini.className = 'w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 grid place-items-center text-white font-extrabold text-xl shadow-lg';
+                ini.textContent = <?= json_encode(strtoupper(substr($patient['first_name'],0,1) . substr($patient['last_name'],0,1))) ?>;
+                if (imgEl) imgEl.replaceWith(ini);
+                HAS_PHOTO = false;
+            });
+        });
+    }
+})();
+</script>
 <?php endif; ?>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>

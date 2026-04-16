@@ -138,9 +138,15 @@ include __DIR__ . '/includes/header.php';
                     <td class="px-6 py-4">
                         <a href="<?= BASE_URL ?>/patient_view.php?id=<?= $p['id'] ?>"
                            class="flex items-center gap-3 group">
+                            <?php if (!empty($p['photo_url'])): ?>
+                            <img src="<?= h($p['photo_url']) ?>"
+                                 alt=""
+                                 class="w-9 h-9 rounded-xl object-cover flex-shrink-0 shadow-sm border border-slate-100">
+                            <?php else: ?>
                             <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 grid place-items-center text-white text-xs font-bold flex-shrink-0 shadow-sm">
                                 <?= strtoupper(substr($p['first_name'], 0, 1) . substr($p['last_name'], 0, 1)) ?>
                             </div>
+                            <?php endif; ?>
                             <div>
                                 <div class="font-semibold text-slate-800 group-hover:text-blue-600 transition-colors">
                                     <?= h($p['last_name'] . ', ' . $p['first_name']) ?>
