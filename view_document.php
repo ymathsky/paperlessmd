@@ -83,7 +83,8 @@ include __DIR__ . '/includes/header.php';
     body       { background: white !important; }
     #printDoc  { box-shadow: none !important; border: none !important; max-width: 100% !important; overflow: visible !important; border-radius: 0 !important; }
     .screen-strip { display: none !important; }
-    .bwc-sigs  { padding-top: 4pt; }
+    .bwc-sigs  { padding-top: 4pt; margin-top: 6pt; }
+    .bwc-sig-label:last-child { margin-bottom: 0 !important; }
   }
   /* BWC paper form classes */
   .bwc-form            { max-width: 100%; font-family: Arial, sans-serif; font-size: 10pt; color: #000; }
