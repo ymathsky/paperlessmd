@@ -19,7 +19,7 @@ $pageTitle = $patient['first_name'] . ' ' . $patient['last_name'];
 $activeNav = 'patients';
 $activeTab = $_GET['tab'] ?? 'forms';
 // Billing users can only see the forms tab; non-admins cannot see the audit tab
-if (isBilling() && in_array($activeTab, ['meds', 'photos', 'wounds', 'diagnoses', 'notes', 'audit'], true)) {
+if (isBilling() && in_array($activeTab, ['meds', 'photos', 'wounds', 'diagnoses', 'vitals', 'notes', 'audit'], true)) {
     $activeTab = 'forms';
 }
 if ($activeTab === 'audit' && !isAdmin()) {
@@ -712,6 +712,140 @@ if ($activeTab === 'notes' && canAccessClinical()) {
     $soapNotes = $snStmt->fetchAll();
 }
 
+// ── Vitals trend data ───────────────────────────────────────────
+$vitalsRows      = [];
+$vitalsLatest    = [];
+$vitalsChartJson = 'null';
+$vSysArr = [];
+if ($activeTab === 'vitals' && canAccessClinical()) {
+    $vStmt = $pdo->prepare("
+        SELECT form_data, created_at
+        FROM form_submissions
+        WHERE patient_id = ? AND form_type = 'vital_cs'
+        ORDER BY created_at ASC
+        LIMIT 60
+    ");
+    $vStmt->execute([$id]);
+    $vitalForms = $vStmt->fetchAll();
+
+    $vLabels = $vSysArr = $vDiasArr = $vWeightArr = $vO2Arr = $vPulseArr = $vTempArr = $vGlucoseArr = $vRespArr = [];
+    foreach ($vitalForms as $vf) {
+        $fd  = json_decode($vf['form_data'], true) ?? [];
+        $vLabels[] = date('M j, Y', strtotime($vf['created_at']));
+
+        $bp = trim($fd['bp'] ?? '');
+        if (preg_match('/([0-9]+)\s*\/\s*([0-9]+)/', $bp, $m)) {
+            $vSysArr[]  = (int)$m[1];
+            $vDiasArr[] = (int)$m[2];
+        } else { $vSysArr[] = null; $vDiasArr[] = null; }
+
+        preg_match('/([0-9]+\.?[0-9]*)/', $fd['weight']  ?? '', $wM);  $vWeightArr[]  = isset($wM[1])  ? (float)$wM[1]  : null;
+        preg_match('/([0-9]+\.?[0-9]*)/', $fd['o2sat']   ?? '', $oM);  $vO2Arr[]      = isset($oM[1])  ? (float)$oM[1]  : null;
+        preg_match('/([0-9]+)/',           $fd['pulse']   ?? '', $pM);  $vPulseArr[]   = isset($pM[1])  ? (int)$pM[1]   : null;
+        preg_match('/([0-9]+\.?[0-9]*)/', $fd['temp']    ?? '', $tM);  $vTempArr[]    = isset($tM[1])  ? (float)$tM[1]  : null;
+        preg_match('/([0-9]+\.?[0-9]*)/', $fd['glucose'] ?? '', $gM);  $vGlucoseArr[] = isset($gM[1])  ? (float)$gM[1]  : null;
+        preg_match('/([0-9]+)/',           $fd['resp']    ?? '', $rM);  $vRespArr[]    = isset($rM[1])  ? (int)$rM[1]   : null;
+
+        $vitalsRows[] = [
+            'date'    => $vf['created_at'],
+            'bp'      => $fd['bp']      ?? '',
+            'pulse'   => $fd['pulse']   ?? '',
+            'temp'    => $fd['temp']    ?? '',
+            'o2sat'   => $fd['o2sat']   ?? '',
+            'glucose' => $fd['glucose'] ?? '',
+            'weight'  => $fd['weight']  ?? '',
+            'resp'    => $fd['resp']    ?? '',
+        ];
+    }
+    foreach (['systolic'=>$vSysArr,'diastolic'=>$vDiasArr,'weight'=>$vWeightArr,'o2sat'=>$vO2Arr,'pulse'=>$vPulseArr,'temp'=>$vTempArr,'glucose'=>$vGlucoseArr,'resp'=>$vRespArr] as $k => $arr) {
+        foreach (array_reverse($arr) as $v) { if ($v !== null) { $vitalsLatest[$k] = $v; break; } }
+    }
+    $vitalsChartJson = json_encode(['labels'=>$vLabels,'systolic'=>$vSysArr,'diastolic'=>$vDiasArr,'weight'=>$vWeightArr,'o2sat'=>$vO2Arr,'pulse'=>$vPulseArr,'temp'=>$vTempArr,'glucose'=>$vGlucoseArr,'resp'=>$vRespArr]);
+    ob_start(); ?>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+(function () {
+    const cd = <?= $vitalsChartJson ?>;
+    if (!cd || !cd.labels.length) return;
+
+    function mkOpts(yLabel, yMin, yMax) {
+        return {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 400 },
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 12, padding: 12 } },
+                tooltip: { backgroundColor: '#0f172a', titleFont: { size: 11 }, bodyFont: { size: 12, weight: '600' }, padding: 10, cornerRadius: 10 },
+            },
+            scales: {
+                x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#94a3b8', maxTicksLimit: 8 } },
+                y: { min: yMin, max: yMax, grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 }, color: '#94a3b8' }, title: { display: !!yLabel, text: yLabel, font: { size: 10 }, color: '#94a3b8' } },
+            },
+        };
+    }
+    function mkDs(label, data, color, dash) {
+        return { label, data, borderColor: color, backgroundColor: color + '22', borderWidth: 2.5, pointRadius: 4, pointHoverRadius: 6, fill: false, tension: 0.35, spanGaps: true, borderDash: dash || [] };
+    }
+
+    /* BP chart */
+    const bpCtx = document.getElementById('vChartBP');
+    if (bpCtx && (cd.systolic.some(v=>v!==null) || cd.diastolic.some(v=>v!==null))) {
+        new Chart(bpCtx, {
+            type: 'line',
+            data: { labels: cd.labels, datasets: [
+                mkDs('Systolic',  cd.systolic,  '#ef4444'),
+                mkDs('Diastolic', cd.diastolic, '#f97316', [5,3]),
+            ]},
+            options: mkOpts('mmHg'),
+        });
+    }
+
+    /* Other vitals chart */
+    const metricCfg = {
+        o2sat:   { label: 'O2 Sat (%)',      data: cd.o2sat,    color: '#06b6d4', yLabel: '%',     yMin: 80,  yMax: 100 },
+        pulse:   { label: 'Pulse (bpm)',     data: cd.pulse,    color: '#8b5cf6', yLabel: 'bpm' },
+        weight:  { label: 'Weight (lbs)',    data: cd.weight,   color: '#0ea5e9', yLabel: 'lbs' },
+        temp:    { label: 'Temp (°F)',       data: cd.temp,     color: '#f59e0b', yLabel: '°F',    yMin: 94,  yMax: 106 },
+        glucose: { label: 'Glucose (mg/dL)',data: cd.glucose,  color: '#10b981', yLabel: 'mg/dL' },
+        resp:    { label: 'Resp Rate (/min)',data: cd.resp,     color: '#64748b', yLabel: '/min' },
+    };
+    let curChart = null;
+    const otherCtx = document.getElementById('vChartOther');
+    function showMetric(key) {
+        if (curChart) { curChart.destroy(); curChart = null; }
+        const cfg = metricCfg[key];
+        if (!otherCtx || !cfg) return;
+        curChart = new Chart(otherCtx, {
+            type: 'line',
+            data: { labels: cd.labels, datasets: [mkDs(cfg.label, cfg.data, cfg.color)] },
+            options: mkOpts(cfg.yLabel, cfg.yMin, cfg.yMax),
+        });
+    }
+    const metricOrder = ['o2sat','pulse','weight','temp','glucose','resp'];
+    let defMetric = metricOrder.find(m => (cd[m] || []).some(v=>v!==null)) || 'o2sat';
+    showMetric(defMetric);
+    document.querySelectorAll('.vt-btn').forEach(btn => {
+        if (btn.dataset.metric === defMetric) {
+            btn.classList.add('bg-indigo-600','text-white','shadow-sm');
+            btn.classList.remove('bg-white','text-slate-600');
+        }
+        btn.addEventListener('click', function () {
+            document.querySelectorAll('.vt-btn').forEach(b => {
+                b.classList.remove('bg-indigo-600','text-white','shadow-sm');
+                b.classList.add('bg-white','text-slate-600');
+            });
+            this.classList.add('bg-indigo-600','text-white','shadow-sm');
+            this.classList.remove('bg-white','text-slate-600');
+            showMetric(this.dataset.metric);
+        });
+    });
+})();
+</script>
+<?php
+    $extraJs = ob_get_clean();
+}
+
 // ── Per-patient audit trail (admin only) ─────────────────────
 $patientAudit = [];
 if ($activeTab === 'audit' && isAdmin()) {
@@ -1195,6 +1329,14 @@ $allDone  = count(array_diff($required, $completedForms)) === 0;
         <i class="bi bi-clipboard2-pulse mr-1.5"></i>Diagnoses
         <?php if (!empty($diagList)): ?>
         <span class="ml-1 bg-orange-100 text-orange-700 text-xs px-1.5 py-0.5 rounded-full"><?= count($diagList) ?></span>
+        <?php endif; ?>
+    </a>
+    <!-- Vitals Trends tab -->
+    <a href="?id=<?= $id ?>&tab=vitals"
+       class="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all <?= $activeTab === 'vitals' ? 'bg-white text-rose-700 shadow' : 'text-slate-500 hover:text-slate-700' ?>">
+        <i class="bi bi-activity mr-1.5"></i>Vitals
+        <?php if (!empty($vitalsRows)): ?>
+        <span class="ml-1 bg-rose-100 text-rose-700 text-xs px-1.5 py-0.5 rounded-full"><?= count($vitalsRows) ?></span>
         <?php endif; ?>
     </a>
     <!-- SOAP Notes tab -->
@@ -2153,6 +2295,152 @@ $photosJson = json_encode(array_map(fn($p) => [
         </div>
     </div>
 </div><!-- /diagnoses tab -->
+
+<?php elseif ($activeTab === 'vitals' && canAccessClinical()): ?>
+<!-- ── Vitals Trend Tab ─────────────────────────────────────────────────────── -->
+<?php if (empty($vitalsRows)): ?>
+<div class="bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center py-16 text-slate-400">
+    <i class="bi bi-activity text-5xl mb-3 opacity-30"></i>
+    <p class="font-semibold text-slate-500">No vitals recorded yet</p>
+    <p class="text-sm mt-1">Vitals are collected automatically from Visit Consent (Vital CS) forms.</p>
+</div>
+<?php else: ?>
+<?php
+$vitKpis = [
+    ['label'=>'Blood Pressure', 'icon'=>'bi-heart-pulse-fill',  'color'=>'red',    'unit'=>'',      'val'=> isset($vitalsLatest['systolic']) ? ($vitalsLatest['systolic'] . '/' . ($vitalsLatest['diastolic'] ?? '?')) : null],
+    ['label'=>'O2 Saturation',  'icon'=>'bi-lungs-fill',         'color'=>'cyan',   'unit'=>'%',     'val'=> $vitalsLatest['o2sat']    ?? null],
+    ['label'=>'Pulse',          'icon'=>'bi-activity',           'color'=>'violet', 'unit'=>' bpm',  'val'=> $vitalsLatest['pulse']    ?? null],
+    ['label'=>'Weight',         'icon'=>'bi-speedometer2',       'color'=>'sky',    'unit'=>' lbs',  'val'=> $vitalsLatest['weight']   ?? null],
+    ['label'=>'Temperature',    'icon'=>'bi-thermometer-half',   'color'=>'amber',  'unit'=>'°F',    'val'=> $vitalsLatest['temp']     ?? null],
+    ['label'=>'Glucose',        'icon'=>'bi-droplet-fill',       'color'=>'emerald','unit'=>' mg/dL','val'=> $vitalsLatest['glucose']  ?? null],
+];
+$kpiColors = [
+    'red'    => ['bg'=>'bg-red-50',    'icon'=>'text-red-500',    'border'=>'border-red-100'],
+    'cyan'   => ['bg'=>'bg-cyan-50',   'icon'=>'text-cyan-500',   'border'=>'border-cyan-100'],
+    'violet' => ['bg'=>'bg-violet-50', 'icon'=>'text-violet-500', 'border'=>'border-violet-100'],
+    'sky'    => ['bg'=>'bg-sky-50',    'icon'=>'text-sky-500',    'border'=>'border-sky-100'],
+    'amber'  => ['bg'=>'bg-amber-50',  'icon'=>'text-amber-500',  'border'=>'border-amber-100'],
+    'emerald'=> ['bg'=>'bg-emerald-50','icon'=>'text-emerald-500','border'=>'border-emerald-100'],
+];
+?>
+<!-- KPI Summary Cards -->
+<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
+    <?php foreach ($vitKpis as $kpi):
+        $kc = $kpiColors[$kpi['color']]; ?>
+    <div class="bg-white border <?= $kc['border'] ?> rounded-2xl p-4 hover:shadow-sm transition-shadow">
+        <div class="flex items-center gap-2 mb-2">
+            <span class="w-7 h-7 <?= $kc['bg'] ?> rounded-lg grid place-items-center flex-shrink-0">
+                <i class="bi <?= $kpi['icon'] ?> <?= $kc['icon'] ?> text-sm"></i>
+            </span>
+        </div>
+        <p class="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5"><?= $kpi['label'] ?></p>
+        <?php if ($kpi['val'] !== null): ?>
+        <p class="text-xl font-extrabold text-slate-800 leading-none">
+            <?= h($kpi['val']) ?><span class="text-xs font-semibold text-slate-400 ml-0.5"><?= $kpi['unit'] ?></span>
+        </p>
+        <p class="text-xs text-slate-400 mt-1.5">Most recent</p>
+        <?php else: ?>
+        <p class="text-lg font-bold text-slate-300">—</p>
+        <p class="text-xs text-slate-300 mt-1.5">No data</p>
+        <?php endif; ?>
+    </div>
+    <?php endforeach; ?>
+</div>
+
+<!-- Charts Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+    <!-- BP Chart -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="w-9 h-9 bg-red-50 rounded-xl grid place-items-center flex-shrink-0">
+                <i class="bi bi-heart-pulse-fill text-red-500"></i>
+            </div>
+            <div>
+                <h3 class="font-bold text-slate-700 text-sm">Blood Pressure</h3>
+                <p class="text-xs text-slate-400">Systolic &amp; Diastolic (mmHg)</p>
+            </div>
+        </div>
+        <?php if (!empty(array_filter($vSysArr))): ?>
+        <div class="relative h-52"><canvas id="vChartBP"></canvas></div>
+        <?php else: ?>
+        <div class="h-52 flex items-center justify-center">
+            <div class="text-center text-slate-300">
+                <i class="bi bi-heart-pulse text-3xl"></i>
+                <p class="text-sm mt-2">No BP data recorded</p>
+            </div>
+        </div>
+        <?php endif; ?>
+    </div>
+
+    <!-- Other Vitals Chart -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+        <div class="flex items-center gap-3 mb-3">
+            <div class="w-9 h-9 bg-indigo-50 rounded-xl grid place-items-center flex-shrink-0">
+                <i class="bi bi-graph-up-arrow text-indigo-500"></i>
+            </div>
+            <div>
+                <h3 class="font-bold text-slate-700 text-sm">Vital Trends</h3>
+                <p class="text-xs text-slate-400">Select a metric to view over time</p>
+            </div>
+        </div>
+        <div class="flex flex-wrap gap-1.5 mb-3">
+            <?php foreach ([['o2sat','O2 Sat'],['pulse','Pulse'],['weight','Weight'],['temp','Temp'],['glucose','Glucose'],['resp','Resp']] as [$m,$lbl]): ?>
+            <button class="vt-btn text-xs font-bold px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-600 transition-all hover:border-indigo-300"
+                    data-metric="<?= $m ?>"><?= $lbl ?></button>
+            <?php endforeach; ?>
+        </div>
+        <div class="relative h-44"><canvas id="vChartOther"></canvas></div>
+    </div>
+</div>
+
+<!-- History Table -->
+<div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+    <div class="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+        <h3 class="font-semibold text-slate-700 text-sm flex items-center gap-2">
+            <i class="bi bi-table text-slate-400"></i> Vitals History
+        </h3>
+        <span class="text-xs text-slate-400"><?= count($vitalsRows) ?> visit<?= count($vitalsRows) !== 1 ? 's' : '' ?> — showing last <?= min(count($vitalsRows), 20) ?></span>
+    </div>
+    <div class="overflow-x-auto">
+    <table class="w-full text-xs">
+        <thead>
+            <tr class="bg-slate-50 border-b border-slate-100 text-slate-500 font-semibold uppercase tracking-wide">
+                <th class="px-4 py-3 text-left">Date</th>
+                <th class="px-4 py-3 text-left">BP</th>
+                <th class="px-4 py-3 text-left">O2 Sat</th>
+                <th class="px-4 py-3 text-left">Pulse</th>
+                <th class="px-4 py-3 text-left">Weight</th>
+                <th class="px-4 py-3 text-left hidden sm:table-cell">Temp</th>
+                <th class="px-4 py-3 text-left hidden sm:table-cell">Glucose</th>
+                <th class="px-4 py-3 text-left hidden md:table-cell">Resp</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-50">
+        <?php foreach (array_slice(array_reverse($vitalsRows), 0, 20) as $vr):
+            $vrBpColor = '';
+            if (!empty($vr['bp']) && preg_match('/([0-9]+)\s*\/\s*([0-9]+)/', $vr['bp'], $bpM)) {
+                $vrSys = (int)$bpM[1]; $vrDia = (int)$bpM[2];
+                if ($vrSys >= 140 || $vrDia >= 90) $vrBpColor = 'text-red-600 font-bold';
+                elseif ($vrSys >= 130 || $vrDia >= 80) $vrBpColor = 'text-amber-600 font-semibold';
+                else $vrBpColor = 'text-emerald-600 font-semibold';
+            }
+        ?>
+        <tr class="hover:bg-slate-50/70 transition-colors">
+            <td class="px-4 py-3 font-semibold text-slate-700 whitespace-nowrap"><?= date('M j, Y', strtotime($vr['date'])) ?></td>
+            <td class="px-4 py-3 whitespace-nowrap <?= $vrBpColor ?>"><?= h($vr['bp']) ?: '<span class="text-slate-300">—</span>' ?></td>
+            <td class="px-4 py-3 text-slate-700"><?= h($vr['o2sat']) ?: '<span class="text-slate-300">—</span>' ?></td>
+            <td class="px-4 py-3 text-slate-700"><?= h($vr['pulse']) ?: '<span class="text-slate-300">—</span>' ?></td>
+            <td class="px-4 py-3 text-slate-700"><?= h($vr['weight']) ?: '<span class="text-slate-300">—</span>' ?></td>
+            <td class="px-4 py-3 text-slate-700 hidden sm:table-cell"><?= h($vr['temp']) ?: '<span class="text-slate-300">—</span>' ?></td>
+            <td class="px-4 py-3 text-slate-700 hidden sm:table-cell"><?= h($vr['glucose']) ?: '<span class="text-slate-300">—</span>' ?></td>
+            <td class="px-4 py-3 text-slate-700 hidden md:table-cell"><?= h($vr['resp']) ?: '<span class="text-slate-300">—</span>' ?></td>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+    </div>
+</div>
+<?php endif; // vitalsRows ?>
 
 <?php elseif ($activeTab === 'notes' && canAccessClinical()): ?>
 <!-- ── SOAP Notes Tab ──────────────────────────────────────────────────────── -->
