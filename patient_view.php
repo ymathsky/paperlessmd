@@ -19,7 +19,7 @@ $pageTitle = $patient['first_name'] . ' ' . $patient['last_name'];
 $activeNav = 'patients';
 $activeTab = $_GET['tab'] ?? 'forms';
 // Billing users can only see the forms tab; non-admins cannot see the audit tab
-if (isBilling() && in_array($activeTab, ['meds', 'photos', 'wounds', 'diagnoses', 'audit'], true)) {
+if (isBilling() && in_array($activeTab, ['meds', 'photos', 'wounds', 'diagnoses', 'notes', 'audit'], true)) {
     $activeTab = 'forms';
 }
 if ($activeTab === 'audit' && !isAdmin()) {
@@ -697,6 +697,21 @@ if ($activeTab === 'diagnoses' && canAccessClinical()) {
     $extraJs = ob_get_clean();
 }
 
+// ── SOAP notes ─────────────────────────────────────────────────
+$soapNotes = [];
+if ($activeTab === 'notes' && canAccessClinical()) {
+    $snStmt = $pdo->prepare("
+        SELECT sn.id, sn.note_date, sn.status, sn.assessment, sn.finalized_at,
+               s.full_name AS author_name
+        FROM soap_notes sn
+        JOIN staff s ON s.id = sn.author_id
+        WHERE sn.patient_id = ?
+        ORDER BY sn.note_date DESC, sn.id DESC
+    ");
+    $snStmt->execute([$id]);
+    $soapNotes = $snStmt->fetchAll();
+}
+
 // ── Per-patient audit trail (admin only) ─────────────────────
 $patientAudit = [];
 if ($activeTab === 'audit' && isAdmin()) {
@@ -1180,6 +1195,14 @@ $allDone  = count(array_diff($required, $completedForms)) === 0;
         <i class="bi bi-clipboard2-pulse mr-1.5"></i>Diagnoses
         <?php if (!empty($diagList)): ?>
         <span class="ml-1 bg-orange-100 text-orange-700 text-xs px-1.5 py-0.5 rounded-full"><?= count($diagList) ?></span>
+        <?php endif; ?>
+    </a>
+    <!-- SOAP Notes tab -->
+    <a href="?id=<?= $id ?>&tab=notes"
+       class="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all <?= $activeTab === 'notes' ? 'bg-white text-blue-700 shadow' : 'text-slate-500 hover:text-slate-700' ?>">
+        <i class="bi bi-journal-medical mr-1.5"></i>Notes
+        <?php if (!empty($soapNotes)): ?>
+        <span class="ml-1 bg-blue-100 text-blue-700 text-xs px-1.5 py-0.5 rounded-full"><?= count($soapNotes) ?></span>
         <?php endif; ?>
     </a>
     <?php endif; // canAccessClinical tabs ?>
@@ -2130,6 +2153,77 @@ $photosJson = json_encode(array_map(fn($p) => [
         </div>
     </div>
 </div><!-- /diagnoses tab -->
+
+<?php elseif ($activeTab === 'notes' && canAccessClinical()): ?>
+<!-- ── SOAP Notes Tab ──────────────────────────────────────────────────────── -->
+<div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+    <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
+        <h3 class="font-semibold text-slate-700 flex items-center gap-2">
+            <i class="bi bi-journal-medical text-blue-500"></i> SOAP Notes
+        </h3>
+        <a href="<?= BASE_URL ?>/soap_note.php?patient_id=<?= $id ?><?= $visitId ? '&visit_id=' . $visitId : '' ?>"
+           class="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700
+                  text-white font-semibold text-sm rounded-xl transition-colors shadow-sm">
+            <i class="bi bi-plus-lg"></i> New Note
+        </a>
+    </div>
+    <?php if (empty($soapNotes)): ?>
+    <div class="flex flex-col items-center justify-center py-14 text-slate-400">
+        <i class="bi bi-journal text-5xl mb-3 opacity-30"></i>
+        <p class="font-semibold text-slate-500">No SOAP notes yet</p>
+        <p class="text-sm mt-1">Click <strong>New Note</strong> to document the first visit note.</p>
+    </div>
+    <?php else: ?>
+    <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+        <thead>
+            <tr class="bg-slate-50 border-b border-slate-100 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                <th class="px-5 py-3 text-left">Date</th>
+                <th class="px-5 py-3 text-left hidden sm:table-cell">Author</th>
+                <th class="px-5 py-3 text-left">Assessment (preview)</th>
+                <th class="px-5 py-3 text-left">Status</th>
+                <th class="px-5 py-3 text-left"></th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-50">
+        <?php foreach ($soapNotes as $sn):
+            $snFinal = $sn['status'] === 'final';
+        ?>
+        <tr class="hover:bg-slate-50/70 transition-colors">
+            <td class="px-5 py-4 whitespace-nowrap">
+                <div class="font-semibold text-slate-800"><?= date('M j, Y', strtotime($sn['note_date'])) ?></div>
+                <div class="text-xs text-slate-400"><?= date('D', strtotime($sn['note_date'])) ?></div>
+            </td>
+            <td class="px-5 py-4 text-slate-600 hidden sm:table-cell"><?= h($sn['author_name']) ?></td>
+            <td class="px-5 py-4 max-w-xs">
+                <?php if ($sn['assessment']): ?>
+                <p class="text-slate-700 truncate"><?= h(mb_strimwidth($sn['assessment'], 0, 100, '…')) ?></p>
+                <?php else: ?>
+                <span class="text-slate-400 italic text-xs">No assessment recorded</span>
+                <?php endif; ?>
+            </td>
+            <td class="px-5 py-4 whitespace-nowrap">
+                <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold
+                            <?= $snFinal ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700' ?>">
+                    <i class="bi <?= $snFinal ? 'bi-lock-fill' : 'bi-pencil' ?> text-[10px]"></i>
+                    <?= $snFinal ? 'Final' : 'Draft' ?>
+                </span>
+            </td>
+            <td class="px-5 py-4">
+                <a href="<?= BASE_URL ?>/soap_note.php?id=<?= (int)$sn['id'] ?>"
+                   class="inline-flex items-center gap-1.5 text-xs font-semibold px-3.5 py-2 rounded-xl transition-colors
+                          <?= $snFinal ? 'bg-slate-50 text-slate-600 hover:bg-slate-100' : 'bg-blue-50 text-blue-600 hover:bg-blue-100' ?>">
+                    <?= $snFinal ? 'View' : 'Edit' ?>
+                    <i class="bi bi-arrow-right text-[10px]"></i>
+                </a>
+            </td>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+    </div>
+    <?php endif; ?>
+</div><!-- /notes tab -->
 
 <?php elseif ($activeTab === 'audit' && isAdmin()): ?>
 <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
