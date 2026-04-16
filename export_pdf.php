@@ -119,7 +119,7 @@ if (!function_exists('vdArr')) {
     .page-break { page-break-after: always; break-after: page; }
     body        { background: white !important; }
     .paper-card { box-shadow: none !important; border: none !important; max-width: 100% !important; overflow: visible !important; border-radius: 0 !important; }
-    .bwc-sigs   { padding-top: 24pt; }
+    .bwc-sigs   { padding-top: 4pt; }
   }
   @media screen {
     .page-break { border-bottom: 3px dashed #e2e8f0; margin-bottom: 2.5rem; padding-bottom: 2.5rem; }

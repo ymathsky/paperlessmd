@@ -121,8 +121,8 @@ if (!function_exists('yn2')) { function yn2(array $d, string $k): string {
     </div>
 
     <!-- Step 1 Score -->
-    <div style="page-break-inside:avoid;padding-top:28pt;">
-    <div style="border:2px solid #000;padding:6pt 8pt;margin-bottom:10pt;font-size:10pt;">
+    <div style="page-break-inside:avoid;">
+    <div style="border:2px solid #000;padding:6pt 8pt;margin-bottom:6pt;font-size:10pt;">
         <strong>Step 1 Scoring:</strong> <em>To get a total score, add the number of items answered correctly.</em><br>
         Total Correct (score out of 12) = <strong style="font-size:14pt;"><?= $step1Score ?> / 12</strong><br>
         <div style="border:1px solid #ccc;padding:4pt 6pt;margin-top:5pt;font-size:9.5pt;">
@@ -138,13 +138,13 @@ if (!function_exists('yn2')) { function yn2(array $d, string $k): string {
     $informantName = vd($data, 'informant_name');
     $informantRel  = vd($data, 'informant_relationship');
     ?>
-    <p style="font-size:10.5pt;font-style:italic;text-decoration:underline;font-weight:bold;margin:0 0 4pt;page-break-before:avoid;">Step 2: Informant Interview</p>
-    <p style="font-size:9pt;font-style:italic;margin:0 0 5pt;">— skip this step if the patient lives alone</p>
-    <div style="font-size:9.5pt;margin-bottom:6pt;">
+    <p style="font-size:10.5pt;font-style:italic;text-decoration:underline;font-weight:bold;margin:4pt 0 2pt;page-break-before:avoid;">Step 2: Informant Interview</p>
+    <p style="font-size:9pt;font-style:italic;margin:0 0 3pt;">— skip this step if the patient lives alone</p>
+    <div style="font-size:9.5pt;margin-bottom:4pt;">
         Informant's Name: <span class="bwc-fill"><?= $informantName ?></span>
         &nbsp;&nbsp;&nbsp; Relationship to Patient: <span class="bwc-fill"><?= $informantRel ?></span>
     </div>
-    <p style="font-size:9pt;font-style:italic;margin:0 0 5pt;">~These 6 questions ask how the patient is compared to when he/she was 5-10 years ago~ Compared to then…</p>
+    <p style="font-size:9pt;font-style:italic;margin:0 0 3pt;">~These 6 questions ask how the patient is compared to when he/she was 5-10 years ago~ Compared to then…</p>
 
     <?php
     $step2Qs = [
@@ -156,7 +156,7 @@ if (!function_exists('yn2')) { function yn2(array $d, string $k): string {
         'sq6' => 'Does the patient need more assistance with transport?',
     ];
     ?>
-    <table class="bwc-cog-table" style="margin-bottom:8pt;page-break-inside:avoid;">
+    <table class="bwc-cog-table" style="margin-bottom:4pt;page-break-inside:avoid;">
         <?php foreach ($step2Qs as $k => $q): ?>
         <tr>
             <td style="width:70%;font-size:9.5pt;"><?= htmlspecialchars($q, ENT_QUOTES, 'UTF-8') ?></td>
@@ -165,14 +165,14 @@ if (!function_exists('yn2')) { function yn2(array $d, string $k): string {
         <?php endforeach; ?>
     </table>
 
-    <div style="border:1px solid #000;padding:5pt 8pt;margin-bottom:10pt;font-size:9.5pt;page-break-inside:avoid;">
+    <div style="border:1px solid #000;padding:4pt 8pt;margin-bottom:6pt;font-size:9.5pt;page-break-inside:avoid;">
         <strong>Step 2 Scoring:</strong> <em>Add the number of items answered "NO", "UNSURE", or "N/A".</em><br>
         Total (score out of 6) = <strong style="font-size:13pt;"><?= $step2Score ?> / 6</strong><br>
         <?php if ($step2Score <= 3): ?><strong>→ If a patient scores 0-3, cognitive impairment is indicated.</strong><?php else: ?>If a patient scores 0-3, cognitive impairment is indicated.<?php endif; ?>
     </div>
 
     <!-- STEP 3: MIS -->
-    <p style="font-size:10.5pt;font-style:italic;text-decoration:underline;font-weight:bold;margin:0 0 4pt;">Step 3: Memory Impairment Screen (MIS)</p>
+    <p style="font-size:10.5pt;font-style:italic;text-decoration:underline;font-weight:bold;margin:4pt 0 2pt;">Step 3: Memory Impairment Screen (MIS)</p>
 
     <!-- MIS Word Recall Table -->
     <table style="width:100%;border-collapse:collapse;border:1px solid #000;margin-bottom:6pt;font-size:9.5pt;page-break-inside:avoid;">
@@ -202,7 +202,7 @@ if (!function_exists('yn2')) { function yn2(array $d, string $k): string {
             <?php endforeach; ?>
         </tbody>
     </table>
-    <div style="border:1px solid #000;padding:5pt 8pt;margin-bottom:10pt;font-size:9.5pt;page-break-inside:avoid;">
+    <div style="border:1px solid #000;padding:4pt 8pt;margin-bottom:6pt;font-size:9.5pt;page-break-inside:avoid;">
         <strong>Step 3 Scoring:</strong> Maximum score is 8. Total = <strong style="font-size:13pt;"><?= $step3Score ?> / 8</strong><br>
         <?= $step3Score >= 5 ? '→ ' : '' ?>5-8 = No cognitive impairment. &nbsp;&nbsp;
         <?= $step3Score <= 4 ? '→ ' : '' ?>≤ 4 = Possible cognitive impairment.
@@ -210,7 +210,7 @@ if (!function_exists('yn2')) { function yn2(array $d, string $k): string {
 
     <!-- Clinical Notes -->
     <?php $notes = vd($data, 'clinical_notes'); if ($notes): ?>
-    <div style="border:1px solid #ccc;padding:6pt 8pt;margin-bottom:10pt;font-size:9.5pt;">
+    <div style="border:1px solid #ccc;padding:4pt 8pt;margin-bottom:6pt;font-size:9.5pt;">
         <strong>Clinical Notes:</strong><br><?= nl2br(h($notes)) ?>
     </div>
     <?php endif; ?>
