@@ -322,6 +322,7 @@ function attIcon(mime) {
 function showView(name) {
     const isThread  = name==='thread';
     const isEmpty   = name==='empty';
+    if (isEmpty) sessionStorage.removeItem('msg_conv');
     emptyState.classList.toggle('hidden', !isEmpty);
     emptyState.classList.toggle('flex',    isEmpty);
     threadView.classList.toggle('hidden',  !isThread);
@@ -360,7 +361,7 @@ async function loadConvs() {
         const d   = await res.json();
         allConvs  = d.ok ? (d.conversations||[]) : [];
         renderConvList(allConvs);
-    } catch(e) { renderConvList([]); }
+    } catch(e) { console.error('loadConvs error:', e); renderConvList([]); }
 }
 
 function renderConvList(convs) {
@@ -412,6 +413,7 @@ function convItemHtml(c) {
 // ── Thread ────────────────────────────────────────────────────────────────────
 async function openThread(rootId) {
     currentRootId = rootId;
+    sessionStorage.setItem('msg_conv', rootId);
     showView('thread');
     threadMessages.innerHTML = '<div class="flex items-center justify-center py-10"><div class="w-5 h-5 rounded-full border-2 border-slate-200 border-t-blue-500 animate-spin"></div></div>';
 
@@ -639,8 +641,11 @@ setInterval(async () => {
 
 // ── Init ───────────────────────────────────────────────────────────────────────
 showView('empty');
-loadConvs();
 loadUsers();
+loadConvs().then(() => {
+    const saved = sessionStorage.getItem('msg_conv');
+    if (saved) openThread(parseInt(saved, 10));
+});
 
 })();
 </script>

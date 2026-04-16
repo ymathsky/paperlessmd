@@ -1,4 +1,8 @@
 <?php
+// Suppress PHP warnings/notices so they don't corrupt JSON output
+error_reporting(0);
+ini_set('display_errors', '0');
+
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/audit.php';
@@ -51,6 +55,7 @@ function handleList(): void
             m.to_user_id,
             m.created_at,
             sf.full_name AS from_name,
+            sf.role      AS from_role,
             COALESCE(st.full_name, 'All Staff') AS to_name
         FROM  messages m
         JOIN  staff sf ON sf.id = m.from_user_id
