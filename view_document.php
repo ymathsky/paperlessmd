@@ -76,8 +76,7 @@ if (!function_exists('vdArr')) {
 include __DIR__ . '/includes/header.php';
 ?>
 <style>
-  @page { size: letter; margin: 0.5in 0.5in 0.5in 0.5in; }
-  @page :first { margin-top: 0.2in; }
+  @page { size: letter; margin: 0.25in 0.5in 0.5in 0.5in; }
   @media print {
     .no-print  { display: none !important; }
     .sign-panel{ display: none !important; }

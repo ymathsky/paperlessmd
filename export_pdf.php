@@ -127,8 +127,7 @@ if (!function_exists('vdArr')) {
   }
 
   /* ── Page setup ────────────────────────────────────────── */
-  @page { size: letter; margin: 0.5in 0.5in 0.5in 0.5in; }
-  @page :first { margin-top: 0.2in; }
+  @page { size: letter; margin: 0.25in 0.5in 0.5in 0.5in; }
 
   /* ── BWC Paper Form Classes (.bwc-*) ───────────────────── */
   .bwc-form            { max-width: 6.5in; margin: 0 auto; font-family: Arial, sans-serif; font-size: 10pt; color: #000; }
