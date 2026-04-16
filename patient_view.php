@@ -900,13 +900,27 @@ $statusCsrfInline = csrfToken();
     let currentStatus = <?= json_encode($patient['status'] ?? 'active') ?>;
     let pendingStatus = null;
 
-    /* ---- Modal helpers ---- */
-    const modal    = document.getElementById('statusPwModal');
-    const pwInput  = document.getElementById('statusPwInput');
-    const pwErr    = document.getElementById('statusPwErr');
-    const pwErrMsg = document.getElementById('statusPwErrMsg');
-    const pwBtn    = document.getElementById('statusPwConfirmBtn');
-    const pwLabel  = document.getElementById('statusPwLabel');
+    /* ---- Modal element refs (lazily resolved after DOM ready) ---- */
+    let modal, pwInput, pwErr, pwErrMsg, pwBtn, pwLabel;
+
+    document.addEventListener('DOMContentLoaded', function () {
+        modal    = document.getElementById('statusPwModal');
+        pwInput  = document.getElementById('statusPwInput');
+        pwErr    = document.getElementById('statusPwErr');
+        pwErrMsg = document.getElementById('statusPwErrMsg');
+        pwBtn    = document.getElementById('statusPwConfirmBtn');
+        pwLabel  = document.getElementById('statusPwLabel');
+
+        modal   && modal.addEventListener('click', e => { if (e.target === modal) window.closeStatusModal(); });
+        pwInput && pwInput.addEventListener('keydown', e => { if (e.key === 'Enter') window.confirmStatusChange(); });
+
+        const ddInput = document.getElementById('discharge-date');
+        if (ddInput) {
+            ddInput.addEventListener('change', () => {
+                if (currentStatus === 'discharged') openModal('discharged');
+            });
+        }
+    });
 
     function openModal(status) {
         pendingStatus = status;
@@ -920,10 +934,6 @@ $statusCsrfInline = csrfToken();
         modal.classList.add('hidden');
         pendingStatus = null;
     };
-    // Close on backdrop click
-    modal && modal.addEventListener('click', e => { if (e.target === modal) window.closeStatusModal(); });
-    // Enter key submits
-    pwInput && pwInput.addEventListener('keydown', e => { if (e.key === 'Enter') confirmStatusChange(); });
 
     window.confirmStatusChange = async function() {
         const pw = pwInput.value;
