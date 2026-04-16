@@ -30,7 +30,7 @@ $fStmt->execute([$id]);
 
 // Photos
 $phStmt = $pdo->prepare("
-    SELECT id, file_path, note, created_at FROM wound_photos WHERE patient_id = ? ORDER BY created_at DESC
+    SELECT id, filename AS file_path, description AS note, wound_location, created_at FROM wound_photos WHERE patient_id = ? ORDER BY created_at DESC
 ");
 $phStmt->execute([$id]);
 
