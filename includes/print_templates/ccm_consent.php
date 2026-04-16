@@ -51,41 +51,39 @@ $maName  = h($f['ma_name'] ?? '');
         </ul>
     </div>
 
-    <!-- Signatures Table -->
-    <table style="width:100%;border-collapse:collapse;margin-top:10pt;font-size:10pt;">
-        <tr>
-            <td style="width:50%;padding-right:20pt;vertical-align:bottom;">
-                <strong>Patient Name:</strong> <?= $ptName ?><br><br>
-                <strong>Patient Signature:</strong>
-                <?php if ($f['patient_signature']): ?>
-                <br><img src="<?= h($f['patient_signature']) ?>" class="bwc-sig-img" alt="Patient Signature">
-                <?php endif; ?>
-                <div style="border-top:1px solid #000;margin-top:20pt;"></div>
-            </td>
-            <td style="width:50%;vertical-align:bottom;">
-                <strong>Date of Birth:</strong> <?= $ptDob ?><br><br>
-                <strong>Witness Signature:</strong>
-                <?php if (!empty($f['ma_signature'])): ?>
-                <br><img src="<?= h($f['ma_signature']) ?>" class="bwc-sig-img" alt="MA Signature">
-                <?php endif; ?>
-                <div style="border-top:1px solid #000;margin-top:<?= !empty($f['ma_signature']) ? '4pt' : '42pt' ?>;"></div>
-            </td>
-        </tr>
-        <tr>
-            <td style="padding-top:12pt;vertical-align:top;">
-                Print Name: <?= $ptName ?>
-            </td>
-            <td style="padding-top:12pt;vertical-align:top;">
-                Print Name: <?= $maName ?>
-            </td>
-        </tr>
-        <tr>
-            <td style="padding-top:10pt;vertical-align:top;">
-                Date: <?= $sigDate ?>
-            </td>
-            <td style="padding-top:10pt;vertical-align:top;">
-                Date: <?= $sigDate ?>
-            </td>
-        </tr>
-    </table>
+    <!-- Signatures -->
+    <div class="bwc-sigs" style="page-break-inside:avoid;">
+        <table style="width:100%;border-collapse:collapse;font-size:10pt;">
+            <tr>
+                <td style="width:50%;padding-right:20pt;vertical-align:top;">
+                    <strong>Patient Name:</strong> <?= $ptName ?><br>
+                    <div style="margin-top:8pt;font-size:9.5pt;font-weight:bold;">Patient Signature:</div>
+                    <div class="bwc-sig-row" style="margin-top:4pt;">
+                        <div class="bwc-sig-line">
+                            <?php if ($f['patient_signature']): ?>
+                            <img src="<?= h($f['patient_signature']) ?>" class="bwc-sig-img" alt="Patient Signature">
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <div class="bwc-sig-label">Patient / Authorized Representative Signature</div>
+                    <div style="margin-top:8pt;font-size:9.5pt;">Print Name: <?= $ptName ?></div>
+                    <div style="margin-top:4pt;font-size:9.5pt;">Date: <?= $sigDate ?></div>
+                </td>
+                <td style="width:50%;vertical-align:top;">
+                    <strong>Date of Birth:</strong> <?= $ptDob ?><br>
+                    <div style="margin-top:8pt;font-size:9.5pt;font-weight:bold;">Witness Signature:</div>
+                    <div class="bwc-sig-row" style="margin-top:4pt;">
+                        <div class="bwc-sig-line">
+                            <?php if (!empty($f['ma_signature'])): ?>
+                            <img src="<?= h($f['ma_signature']) ?>" class="bwc-sig-img" alt="MA Signature">
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <div class="bwc-sig-label">Witness / MA Signature</div>
+                    <div style="margin-top:8pt;font-size:9.5pt;">Print Name: <?= $maName ?></div>
+                    <div style="margin-top:4pt;font-size:9.5pt;">Date: <?= $sigDate ?></div>
+                </td>
+            </tr>
+        </table>
+    </div>
 </div>
