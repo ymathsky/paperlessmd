@@ -1,7 +1,8 @@
 <?php
 // Suppress PHP warnings/notices so they don't corrupt JSON output
-error_reporting(0);
+error_reporting(E_ERROR); // keep fatal errors in server log, suppress all else
 ini_set('display_errors', '0');
+ob_start(); // buffer any stray output so it never corrupts JSON
 
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/db.php';
@@ -17,7 +18,9 @@ if ($action === 'download') {
     exit;
 }
 
+ob_end_clean(); // discard any stray output from includes
 header('Content-Type: application/json; charset=utf-8');
+ob_start(); // fresh buffer so only our JSON goes out
 
 try {
     switch ($action) {
@@ -32,12 +35,24 @@ try {
             echo json_encode(['ok' => false, 'error' => 'Unknown action']);
     }
 } catch (PDOException $e) {
+    ob_end_clean();
     http_response_code(503);
     echo json_encode([
         'ok'    => false,
         'error' => 'Messaging tables not set up yet. Please run migrate_messages.php',
     ]);
+    exit;
+} catch (\Throwable $e) {
+    ob_end_clean();
+    error_log('messages API error: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+    http_response_code(500);
+    echo json_encode([
+        'ok'    => false,
+        'error' => 'Server error. Check server error log.',
+    ]);
+    exit;
 }
+ob_end_flush();
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LIST  — conversations visible to current user, most-recently-active first
