@@ -7,34 +7,114 @@ if (!empty($_SESSION['user_id'])) {
 }
 
 $error   = '';
+$locked  = false;
 $timeout = ($_GET['msg'] ?? '') === 'timeout';
+
+// ── Lockout constants ────────────────────────────────────────────────────────
+const LOCKOUT_MAX_ATTEMPTS = 5;
+const LOCKOUT_MINUTES      = 15;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_once __DIR__ . '/includes/db.php';
+    require_once __DIR__ . '/includes/audit.php';
+
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
 
-    if ($username && $password) {
-        $stmt = $pdo->prepare("SELECT * FROM staff WHERE username = ? AND active = 1 LIMIT 1");
+    if ($username !== '' && $password !== '') {
+        // Fetch regardless of active flag so we can report lockout state
+        $stmt = $pdo->prepare("SELECT * FROM staff WHERE username = ? LIMIT 1");
         $stmt->execute([$username]);
         $user = $stmt->fetch();
 
-        if ($user && password_verify($password, $user['password_hash'])) {
-            session_regenerate_id(true);
-            $_SESSION['user_id']     = $user['id'];
-            $_SESSION['username']    = $user['username'];
-            $_SESSION['full_name']   = $user['full_name'];
-            $_SESSION['role']        = $user['role'];
-            $_SESSION['last_active'] = time();
-            require_once __DIR__ . '/includes/audit.php';
-            auditLog($pdo, 'login', 'user', (int)$user['id'], $user['username']);
-            header('Location: ' . BASE_URL . '/dashboard.php');
-            exit;
+        if ($user) {
+            $nowTs       = time();
+            $lockedUntil = $user['locked_until'] ? strtotime($user['locked_until']) : 0;
+
+            if ($lockedUntil > $nowTs) {
+                // ── Account is currently locked ───────────────────────────
+                $minsLeft = (int)ceil(($lockedUntil - $nowTs) / 60);
+                $error    = 'Account locked — too many failed attempts. '
+                          . 'Try again in ' . $minsLeft . ' minute' . ($minsLeft !== 1 ? 's' : '') . '.';
+                $locked   = true;
+                auditLog($pdo, 'login_fail', 'user', (int)$user['id'],
+                         $user['username'], 'account_locked');
+
+            } elseif (!$user['active']) {
+                // ── Inactive account — generic message to avoid disclosure ─
+                $error = 'Invalid username or password.';
+                auditLog($pdo, 'login_fail', null, null, null,
+                         'attempted_username=' . $username . ' reason=inactive');
+
+            } elseif (password_verify($password, $user['password_hash'])) {
+                // ── Successful login — reset lockout state ────────────────
+                $pdo->prepare("UPDATE staff SET failed_attempts = 0, locked_until = NULL WHERE id = ?")
+                    ->execute([(int)$user['id']]);
+
+                session_regenerate_id(true);
+                $_SESSION['user_id']     = $user['id'];
+                $_SESSION['username']    = $user['username'];
+                $_SESSION['full_name']   = $user['full_name'];
+                $_SESSION['role']        = $user['role'];
+                $_SESSION['last_active'] = time();
+                auditLog($pdo, 'login', 'user', (int)$user['id'], $user['username']);
+                header('Location: ' . BASE_URL . '/dashboard.php');
+                exit;
+
+            } else {
+                // ── Wrong password — increment counter ────────────────────
+                $newAttempts = (int)($user['failed_attempts'] ?? 0) + 1;
+                $lockUntil   = null;
+                $justLocked  = false;
+
+                if ($newAttempts >= LOCKOUT_MAX_ATTEMPTS) {
+                    $lockUntil  = date('Y-m-d H:i:s', $nowTs + LOCKOUT_MINUTES * 60);
+                    $justLocked = true;
+                }
+
+                $pdo->prepare("UPDATE staff SET failed_attempts = ?, locked_until = ? WHERE id = ?")
+                    ->execute([$newAttempts, $lockUntil, (int)$user['id']]);
+
+                auditLog($pdo, 'login_fail', 'user', (int)$user['id'],
+                         $user['username'],
+                         'attempt=' . $newAttempts . ($justLocked ? ' locked=1' : ''));
+
+                if ($justLocked) {
+                    // Notify admin by email
+                    $adminEmail = PRACTICE_EMAIL;
+                    $subject    = '[' . APP_NAME . '] Account locked — ' . $user['full_name'];
+                    $body       = "A staff account has been automatically locked after "
+                                . LOCKOUT_MAX_ATTEMPTS . " consecutive failed login attempts.\n\n"
+                                . "Account  : " . $user['full_name'] . " (" . $user['username'] . ")\n"
+                                . "Role     : " . $user['role'] . "\n"
+                                . "Locked   : " . date('Y-m-d H:i:s T') . "\n"
+                                . "Unlocks  : " . $lockUntil . "\n"
+                                . "IP addr  : " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown') . "\n"
+                                . "User-agent: " . ($_SERVER['HTTP_USER_AGENT'] ?? 'unknown') . "\n\n"
+                                . "— " . APP_NAME . " security system";
+                    $headers    = "From: noreply@md-officesupport.com\r\n"
+                                . "X-Mailer: " . APP_NAME;
+                    @mail($adminEmail, $subject, $body, $headers);
+
+                    $error  = 'Account locked for ' . LOCKOUT_MINUTES . ' minutes due to too many failed attempts. '
+                            . 'The administrator has been notified.';
+                    $locked = true;
+                } else {
+                    $remaining = LOCKOUT_MAX_ATTEMPTS - $newAttempts;
+                    $error     = 'Invalid username or password. '
+                               . $remaining . ' attempt' . ($remaining !== 1 ? 's' : '')
+                               . ' remaining before lockout.';
+                }
+            }
+        } else {
+            // Username not found — generic message
+            $error = 'Invalid username or password.';
+            auditLog($pdo, 'login_fail', null, null, null,
+                     'attempted_username=' . $username . ' reason=not_found');
         }
+    } else {
+        $error = 'Please enter your username and password.';
     }
-    $error = 'Invalid username or password.';
-    require_once __DIR__ . '/includes/audit.php';
-    auditLog($pdo, 'login_fail', null, null, null, 'attempted_username=' . ($username ?: '(empty)'));
 }
 ?>
 <!DOCTYPE html>
@@ -78,10 +158,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php endif; ?>
 
             <?php if ($error): ?>
+            <?php if ($locked): ?>
+            <div class="flex items-start gap-3 bg-amber-50 border border-amber-300 text-amber-800 px-4 py-3.5 rounded-2xl text-sm mb-6">
+                <i class="bi bi-shield-lock-fill text-lg shrink-0 mt-0.5 text-amber-500"></i>
+                <span><?= h($error) ?></span>
+            </div>
+            <?php else: ?>
             <div class="flex items-start gap-3 bg-red-50 border border-red-200 text-red-700 px-4 py-3.5 rounded-2xl text-sm mb-6">
                 <i class="bi bi-exclamation-circle text-lg shrink-0 mt-0.5"></i>
                 <span><?= h($error) ?></span>
             </div>
+            <?php endif; ?>
             <?php endif; ?>
 
             <form method="POST" novalidate>
