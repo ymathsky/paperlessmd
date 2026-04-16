@@ -28,10 +28,14 @@ if (!$user || !password_verify($password, $user['password_hash'])) {
 }
 
 // Generate a secure API token and store it
-$token = bin2hex(random_bytes(32));
-$expires = date('Y-m-d H:i:s', strtotime('+30 days'));
-$pdo->prepare("INSERT INTO mobile_tokens (staff_id, token, expires_at) VALUES (?, ?, ?)")
-    ->execute([$user['id'], $token, $expires]);
+try {
+    $token = bin2hex(random_bytes(32));
+    $expires = date('Y-m-d H:i:s', strtotime('+30 days'));
+    $pdo->prepare("INSERT INTO mobile_tokens (staff_id, token, expires_at) VALUES (?, ?, ?)")
+        ->execute([$user['id'], $token, $expires]);
+} catch (Throwable $e) {
+    jsonError('Token storage failed: ' . $e->getMessage(), 500);
+}
 
 jsonOk([
     'token' => $token,
