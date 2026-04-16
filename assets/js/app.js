@@ -19,8 +19,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
         function resizeCanvas() {
             const ratio = Math.max(window.devicePixelRatio || 1, 1);
-            const w     = wrapper.clientWidth  || wrapper.offsetWidth;
-            const h     = 200;
+            const w     = wrapper.getBoundingClientRect().width || wrapper.offsetWidth;
+            if (!w) return;
+            const h = 200;
             canvas.width        = w * ratio;
             canvas.height       = h * ratio;
             canvas.style.width  = w + 'px';
@@ -29,7 +30,14 @@ document.addEventListener('DOMContentLoaded', function () {
             sigPad.clear();
         }
 
-        setTimeout(resizeCanvas, 150);
+        if (typeof ResizeObserver !== 'undefined') {
+            const ro = new ResizeObserver(function(entries) {
+                if (entries[0].contentRect.width > 0) resizeCanvas();
+            });
+            ro.observe(wrapper);
+        } else {
+            setTimeout(resizeCanvas, 150);
+        }
         window.addEventListener('resize', resizeCanvas);
 
         const clearBtn = document.getElementById('clearSig');
@@ -54,8 +62,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
         function resizeMaCanvas() {
             const ratio = Math.max(window.devicePixelRatio || 1, 1);
-            const w     = maWrapper.clientWidth || maWrapper.offsetWidth;
-            const h     = 160;
+            const w     = maWrapper.getBoundingClientRect().width || maWrapper.offsetWidth;
+            if (!w) return; // not laid out yet — ResizeObserver will retry
+            const h = 160;
             maCanvas.width        = w * ratio;
             maCanvas.height       = h * ratio;
             maCanvas.style.width  = w + 'px';
@@ -63,7 +72,19 @@ document.addEventListener('DOMContentLoaded', function () {
             maCanvas.getContext('2d').scale(ratio, ratio);
             maSigPad.clear();
         }
-        setTimeout(resizeMaCanvas, 150);
+
+        // Use ResizeObserver for reliable sizing (fires when element has real layout)
+        if (typeof ResizeObserver !== 'undefined') {
+            const ro = new ResizeObserver(function(entries) {
+                if (entries[0].contentRect.width > 0) {
+                    resizeMaCanvas();
+                }
+            });
+            ro.observe(maWrapper);
+        } else {
+            // Fallback for older browsers
+            setTimeout(resizeMaCanvas, 300);
+        }
         window.addEventListener('resize', resizeMaCanvas);
 
         const clearMaBtn = document.getElementById('clearMaSig');
