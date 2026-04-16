@@ -11,10 +11,13 @@ $maName  = h($f['ma_name'] ?? '');
 <div class="bwc-form">
     <!-- Practice Header -->
     <div class="bwc-header">
-        <p class="bwc-practice-name">Beyond Wound Care Inc.</p>
-        <p>1340 Remington RD, STE P &nbsp; Schaumburg, IL 60173</p>
-        <p>Phone: 847-873-8693 &nbsp;&nbsp; Fax: 847-873-8486</p>
-        <p>Email: Support@beyondwoundcare.com</p>
+        <img src="<?= BASE_URL ?>/assets/img/logo.png" class="bwc-header-logo" alt="Beyond Wound Care Inc.">
+        <div class="bwc-header-text">
+            <p class="bwc-practice-name">Beyond Wound Care Inc.</p>
+            <p>1340 Remington RD, STE P &nbsp; Schaumburg, IL 60173</p>
+            <p>Phone: 847-873-8693 &nbsp;&nbsp; Fax: 847-873-8486</p>
+            <p>Email: Support@beyondwoundcare.com</p>
+        </div>
     </div>
 
     <!-- Form Title -->
