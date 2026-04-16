@@ -68,6 +68,21 @@
                     <i class="bi <?= $n['icon'] ?>"></i><?= $n['label'] ?>
                 </a>
                 <?php endforeach; ?>
+                <?php if (!isBilling()):
+                    $_esignCount = (int)$pdo->query("SELECT COUNT(*) FROM form_submissions WHERE status IN ('signed','uploaded') AND (provider_signature IS NULL OR provider_signature = '')")->fetchColumn();
+                    $_esignActive = ($activeNav ?? '') === 'esign';
+                ?>
+                <a href="<?= BASE_URL ?>/esign_queue.php"
+                   class="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-150
+                          <?= $_esignActive ? 'bg-white/20 text-white shadow-inner' : 'text-blue-200 hover:bg-white/10 hover:text-white' ?>">
+                    <i class="bi bi-pen-fill"></i>Sign Queue
+                    <?php if ($_esignCount > 0): ?>
+                    <span class="bg-violet-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none min-w-[18px] text-center">
+                        <?= $_esignCount ?>
+                    </span>
+                    <?php endif; ?>
+                </a>
+                <?php endif; ?>
             </div>
 
             <!-- Right side -->
@@ -142,6 +157,17 @@
                class="flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium
                       <?= ($activeNav??'') === 'schedule' ? 'bg-white/20 text-white' : 'text-blue-200' ?>">
                 <i class="bi bi-calendar3"></i> Schedule
+            </a>
+            <?php
+                $_mEsignCount = (int)$pdo->query("SELECT COUNT(*) FROM form_submissions WHERE status IN ('signed','uploaded') AND (provider_signature IS NULL OR provider_signature = '')")->fetchColumn();
+            ?>
+            <a href="<?= BASE_URL ?>/esign_queue.php"
+               class="flex items-center gap-3 px-3 py-3 rounded-xl text-sm font-medium
+                      <?= ($activeNav??'') === 'esign' ? 'bg-white/20 text-white' : 'text-blue-200' ?>">
+                <i class="bi bi-pen-fill"></i> Sign Queue
+                <?php if ($_mEsignCount > 0): ?>
+                <span class="bg-violet-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none"><?= $_mEsignCount ?></span>
+                <?php endif; ?>
             </a>
             <?php endif; ?>
         </div>
