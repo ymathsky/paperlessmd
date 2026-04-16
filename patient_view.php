@@ -898,15 +898,55 @@ $statusCsrfInline = csrfToken();
     const CSRF = <?= json_encode($statusCsrfInline) ?>;
     const PID  = <?= (int)$id ?>;
     let currentStatus = <?= json_encode($patient['status'] ?? 'active') ?>;
+    let pendingStatus = null;
 
-    window.setPatientStatus = async function(status) {
+    /* ---- Modal helpers ---- */
+    const modal    = document.getElementById('statusPwModal');
+    const pwInput  = document.getElementById('statusPwInput');
+    const pwErr    = document.getElementById('statusPwErr');
+    const pwErrMsg = document.getElementById('statusPwErrMsg');
+    const pwBtn    = document.getElementById('statusPwConfirmBtn');
+    const pwLabel  = document.getElementById('statusPwLabel');
+
+    function openModal(status) {
+        pendingStatus = status;
+        pwInput.value = '';
+        pwErr.classList.add('hidden');
+        pwLabel.textContent = 'Mark as ' + status.charAt(0).toUpperCase() + status.slice(1);
+        modal.classList.remove('hidden');
+        requestAnimationFrame(() => pwInput.focus());
+    }
+    window.closeStatusModal = function() {
+        modal.classList.add('hidden');
+        pendingStatus = null;
+    };
+    // Close on backdrop click
+    modal && modal.addEventListener('click', e => { if (e.target === modal) window.closeStatusModal(); });
+    // Enter key submits
+    pwInput && pwInput.addEventListener('keydown', e => { if (e.key === 'Enter') confirmStatusChange(); });
+
+    window.confirmStatusChange = async function() {
+        const pw = pwInput.value;
+        if (!pw) { pwErrMsg.textContent = 'Please enter your password.'; pwErr.classList.remove('hidden'); return; }
+        pwErr.classList.add('hidden');
+        pwBtn.disabled = true;
+        pwBtn.innerHTML = '<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>';
+        await doSetStatus(pendingStatus, pw);
+        pwBtn.disabled = false;
+        pwBtn.innerHTML = 'Confirm';
+    };
+
+    window.setPatientStatus = function(status) {
         const ddWrap = document.getElementById('discharge-date-wrap');
         if (status === 'discharged') {
             ddWrap && ddWrap.classList.remove('hidden');
         } else {
             ddWrap && ddWrap.classList.add('hidden');
         }
+        openModal(status);
+    };
 
+    async function doSetStatus(status, password) {
         const dischargedAt = status === 'discharged'
             ? (document.getElementById('discharge-date')?.value || '')
             : '';
@@ -915,12 +955,18 @@ $statusCsrfInline = csrfToken();
             const r = await fetch(BASE + '/api/patient_status.php', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({csrf: CSRF, patient_id: PID, status, discharged_at: dischargedAt}),
+                body: JSON.stringify({csrf: CSRF, patient_id: PID, status, discharged_at: dischargedAt, password}),
             });
             const data = await r.json();
-            if (!data.ok) { alert(data.error || 'Could not update status.'); return; }
+            if (!data.ok) {
+                pwErrMsg.textContent = data.error || 'Could not update status.';
+                pwErr.classList.remove('hidden');
+                return;
+            }
 
+            window.closeStatusModal();
             currentStatus = status;
+
             // Update button styles
             const colorMap = {active:'emerald', inactive:'amber', discharged:'red'};
             document.querySelectorAll('#status-widget button').forEach(btn => {
@@ -942,14 +988,14 @@ $statusCsrfInline = csrfToken();
             }
             const msg = document.getElementById('status-msg');
             if (msg) { msg.classList.remove('hidden'); setTimeout(()=>msg.classList.add('hidden'), 2000); }
-        } catch { alert('Network error.'); }
-    };
+        } catch { pwErrMsg.textContent = 'Network error.'; pwErr.classList.remove('hidden'); }
+    }
 
     // Live discharge date: re-save when user changes date
     const ddInput = document.getElementById('discharge-date');
     if (ddInput) {
         ddInput.addEventListener('change', () => {
-            if (currentStatus === 'discharged') setPatientStatus('discharged');
+            if (currentStatus === 'discharged') openModal('discharged');
         });
     }
 })();
@@ -1143,6 +1189,52 @@ function completeVisit(visitId) {
         </div>
     </div>
     <?php endif; ?>
+</div>
+
+<!-- ── Password Confirmation Modal ────────────────────────────────────────── -->
+<div id="statusPwModal"
+     class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
+        <!-- Header -->
+        <div class="px-6 py-5 border-b border-slate-100 flex items-center gap-3">
+            <div class="w-10 h-10 bg-amber-50 rounded-2xl grid place-items-center flex-shrink-0">
+                <i class="bi bi-shield-lock-fill text-amber-500 text-lg"></i>
+            </div>
+            <div>
+                <h3 class="font-extrabold text-slate-800 text-base">Confirm Status Change</h3>
+                <p id="statusPwLabel" class="text-xs text-slate-500 mt-0.5"></p>
+            </div>
+            <button onclick="closeStatusModal()" class="ml-auto text-slate-300 hover:text-slate-500 transition-colors">
+                <i class="bi bi-x-lg text-lg"></i>
+            </button>
+        </div>
+        <!-- Body -->
+        <div class="px-6 py-5">
+            <p class="text-sm text-slate-500 mb-4">Enter your password to authorize this change.</p>
+            <div id="statusPwErr" class="hidden mb-3 flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-xl text-sm">
+                <i class="bi bi-exclamation-circle-fill flex-shrink-0"></i>
+                <span id="statusPwErrMsg"></span>
+            </div>
+            <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Password</label>
+            <input type="password" id="statusPwInput" autocomplete="current-password"
+                   placeholder="Enter your password"
+                   class="w-full px-4 py-3 text-sm border border-slate-200 rounded-xl
+                          focus:outline-none focus:ring-2 focus:ring-amber-400 bg-slate-50 hover:bg-white transition-colors">
+        </div>
+        <!-- Footer -->
+        <div class="px-6 pb-5 flex gap-3">
+            <button onclick="closeStatusModal()"
+                    class="flex-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700
+                           font-semibold text-sm rounded-xl transition-colors">
+                Cancel
+            </button>
+            <button id="statusPwConfirmBtn" onclick="confirmStatusChange()"
+                    class="flex-1 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white
+                           font-bold text-sm rounded-xl transition-colors shadow-sm active:scale-95 flex items-center justify-center gap-2">
+                Confirm
+            </button>
+        </div>
+    </div>
 </div>
 
 <?php if ($lastVisit && canAccessClinical()): ?>

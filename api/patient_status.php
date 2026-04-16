@@ -30,9 +30,25 @@ if (!verifyCsrf($csrf)) {
 $patientId    = (int)($input['patient_id'] ?? 0);
 $status       = $input['status'] ?? '';
 $dischargedAt = trim($input['discharged_at'] ?? '');
+$password     = $input['password'] ?? '';
 
 if (!$patientId) {
     echo json_encode(['ok' => false, 'error' => 'Missing patient_id']);
+    exit;
+}
+
+// Verify the submitting user's password
+if ($password === '') {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'error' => 'Password is required to change status']);
+    exit;
+}
+$userRow = $pdo->prepare("SELECT password_hash FROM staff WHERE id = ?");
+$userRow->execute([(int)($_SESSION['user_id'] ?? 0)]);
+$userRow = $userRow->fetch();
+if (!$userRow || !password_verify($password, $userRow['password_hash'])) {
+    http_response_code(403);
+    echo json_encode(['ok' => false, 'error' => 'Incorrect password']);
     exit;
 }
 
