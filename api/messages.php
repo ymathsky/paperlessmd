@@ -15,16 +15,24 @@ if ($action === 'download') {
 
 header('Content-Type: application/json; charset=utf-8');
 
-switch ($action) {
-    case 'list':          handleList();         break;
-    case 'thread':        handleThread();       break;
-    case 'send':          handleSend();         break;
-    case 'users':         handleUsers();        break;
-    case 'unread_count':  handleUnreadCount();  break;
-    case 'delete':        handleDelete();       break;
-    default:
-        http_response_code(400);
-        echo json_encode(['ok' => false, 'error' => 'Unknown action']);
+try {
+    switch ($action) {
+        case 'list':          handleList();         break;
+        case 'thread':        handleThread();       break;
+        case 'send':          handleSend();         break;
+        case 'users':         handleUsers();        break;
+        case 'unread_count':  handleUnreadCount();  break;
+        case 'delete':        handleDelete();       break;
+        default:
+            http_response_code(400);
+            echo json_encode(['ok' => false, 'error' => 'Unknown action']);
+    }
+} catch (PDOException $e) {
+    http_response_code(503);
+    echo json_encode([
+        'ok'    => false,
+        'error' => 'Messaging tables not set up yet. Please run migrate_messages.php',
+    ]);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

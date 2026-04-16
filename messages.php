@@ -3,17 +3,49 @@ require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/db.php';
 requireLogin();
 
-$pageTitle  = 'Messages';
-$activeNav  = 'messages';
-$fullHeight = true;          // fills viewport — header.php adjusts wrapper
-$msgCsrf    = csrfToken();
-$myId       = (int)$_SESSION['user_id'];
+$pageTitle = 'Messages';
+$activeNav = 'messages';
+$msgCsrf   = csrfToken();
+$myId      = (int)$_SESSION['user_id'];
+
+// Check whether the messages table exists (safe before migration)
+$_msgReady = false;
+try {
+    $pdo->query("SELECT 1 FROM messages LIMIT 1");
+    $_msgReady = true;
+} catch (PDOException $e) { /* migration not run yet */ }
 
 include __DIR__ . '/includes/header.php';
 ?>
-<!-- ═══════════════════════════════════════════════════════════════════════════
+
+<?php if (!$_msgReady): ?>
+<!-- Migration pending banner -->
+<div class="bg-amber-50 border border-amber-200 rounded-2xl p-6 max-w-lg mx-auto mt-10 text-center">
+    <div class="w-12 h-12 bg-amber-100 rounded-xl grid place-items-center mx-auto mb-4">
+        <i class="bi bi-exclamation-triangle-fill text-amber-500 text-xl"></i>
+    </div>
+    <h2 class="font-bold text-slate-800 mb-1">Messaging not set up yet</h2>
+    <p class="text-sm text-slate-600 mb-4">
+        The database tables for messaging haven't been created. 
+        <?php if (isAdmin()): ?>
+        Run the migration to activate this feature.
+        <?php else: ?>
+        Please ask your admin to run <code class="bg-slate-100 px-1 rounded">migrate_messages.php</code>.
+        <?php endif; ?>
+    </p>
+    <?php if (isAdmin()): ?>
+    <a href="<?= BASE_URL ?>/migrate_messages.php"
+       class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white
+              text-sm font-semibold px-5 py-2.5 rounded-xl transition">
+        <i class="bi bi-database-fill-add"></i> Run Migration Now
+    </a>
+    <?php endif; ?>
+</div>
+<?php else: ?>
+<!-- ═════════════════════════════════════════════════════════════════════════
      Two-pane messaging layout
-═══════════════════════════════════════════════════════════════════════════ -->
+═════════════════════════════════════════════════════════════════════════ -->
+
 <div id="msgApp"
      class="flex h-full overflow-hidden"
      data-api="<?= BASE_URL ?>/api/messages.php"
@@ -695,5 +727,7 @@ include __DIR__ . '/includes/header.php';
 
 })();
 </script>
+
+<?php endif; // $_msgReady ?>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>
