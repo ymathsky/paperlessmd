@@ -78,6 +78,36 @@ function draftAge(string $ts): array {
     return [(int)($diff/86400).'d ago',  'text-red-600',    'bg-red-50'];
 }
 
+// ── Weekly stats bar chart (admin only) ─────────────────────────────────────────
+$weeklyStats = [];
+if (isAdmin()) {
+    // Build Mon–Sun labels for this week and last week
+    $weekStart = strtotime('monday this week midnight');
+    $prevStart = $weekStart - 7 * 86400;
+
+    // Query counts per day for the last 14 days
+    $wsStmt = $pdo->query("
+        SELECT DATE(created_at) AS d, COUNT(*) AS cnt
+        FROM form_submissions
+        WHERE created_at >= '" . date('Y-m-d', $prevStart) . "'
+          AND created_at <  '" . date('Y-m-d', $weekStart + 7 * 86400) . "'
+        GROUP BY DATE(created_at)
+    ");
+    $wsRows = [];
+    foreach ($wsStmt->fetchAll() as $r) $wsRows[$r['d']] = (int)$r['cnt'];
+
+    for ($i = 0; $i < 7; $i++) {
+        $tw = date('Y-m-d', $weekStart + $i * 86400);
+        $lw = date('Y-m-d', $prevStart + $i * 86400);
+        $weeklyStats[] = [
+            'label'    => date('D', $weekStart + $i * 86400), // Mon, Tue…
+            'thisWeek' => $wsRows[$tw] ?? 0,
+            'lastWeek' => $wsRows[$lw] ?? 0,
+        ];
+    }
+}
+$weeklyStatsJson = json_encode($weeklyStats);
+
 // ── Right-sidebar data ────────────────────────────────────────────────────────
 
 // Activity feed: last 18 audit entries (admin sees all, others see own)
@@ -434,6 +464,28 @@ include __DIR__ . '/includes/header.php';
 <?php endif; ?>
 <?php endif; // canAccessClinical unsigned forms ?>
 
+<?php if (isAdmin() && !empty($weeklyStats)): ?>
+<!-- Weekly Stats Chart -->
+<div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-7">
+    <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+        <h3 class="font-bold text-slate-700 flex items-center gap-2">
+            <i class="bi bi-bar-chart-fill text-indigo-500"></i> Weekly Form Activity
+        </h3>
+        <div class="flex items-center gap-4 text-xs text-slate-500">
+            <span class="flex items-center gap-1.5">
+                <span class="inline-block w-3 h-3 rounded-sm bg-indigo-500"></span> This week
+            </span>
+            <span class="flex items-center gap-1.5">
+                <span class="inline-block w-3 h-3 rounded-sm bg-slate-200"></span> Last week
+            </span>
+        </div>
+    </div>
+    <div class="px-6 py-5">
+        <canvas id="weeklyChart" height="110"></canvas>
+    </div>
+</div>
+<?php endif; ?>
+
 <!-- Recent Forms -->
 <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
     <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
@@ -777,6 +829,77 @@ $extraJs = <<<'JS'
 })();
 </script>
 JS;
+
+// Weekly stats chart JS (admin only)
+if (isAdmin() && !empty($weeklyStats)):
+$extraJs .= '<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>';
+$weeklyJson = $weeklyStatsJson;
+$extraJs .= <<<WEEKJS
+<script>
+(function () {
+    var data = {$weeklyJson};
+    var labels   = data.map(function(d){ return d.label; });
+    var thisWeek = data.map(function(d){ return d.thisWeek; });
+    var lastWeek = data.map(function(d){ return d.lastWeek; });
+
+    var ctx = document.getElementById('weeklyChart');
+    if (!ctx) return;
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'This week',
+                    data: thisWeek,
+                    backgroundColor: 'rgba(99,102,241,0.85)',
+                    borderRadius: 6,
+                    borderSkipped: false,
+                },
+                {
+                    label: 'Last week',
+                    data: lastWeek,
+                    backgroundColor: 'rgba(203,213,225,0.7)',
+                    borderRadius: 6,
+                    borderSkipped: false,
+                },
+            ],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) {
+                            return ' ' + ctx.dataset.label + ': ' + ctx.raw + ' form' + (ctx.raw !== 1 ? 's' : '');
+                        }
+                    }
+                },
+            },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    ticks: { font: { size: 11 }, color: '#94a3b8' },
+                },
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        precision: 0,
+                        font: { size: 11 },
+                        color: '#94a3b8',
+                    },
+                    grid: { color: 'rgba(148,163,184,0.12)' },
+                },
+            },
+        },
+    });
+})();
+</script>
+WEEKJS;
+endif;
 
 // Admin Notes JS (only for admins — note: PHP is evaluated before heredoc content, so we append inline)
 if (isAdmin()):
