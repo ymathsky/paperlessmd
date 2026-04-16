@@ -155,15 +155,15 @@ $formMeta = [
 include __DIR__ . '/includes/header.php';
 ?>
 
-<div class="flex gap-6 items-start">
-<!-- ═══════════════ LEFT / MAIN COLUMN ═══════════════════════════════════ -->
-<div class="flex-1 min-w-0">
-
 <!-- Page Header -->
 <div class="mb-7">
     <h2 class="text-2xl font-extrabold text-slate-800"><?= $greeting ?>, <?= h($firstName) ?> 👋</h2>
     <p class="text-slate-500 text-sm mt-1"><?= date('l, F j, Y') ?></p>
 </div>
+
+<div class="flex gap-6 items-start">
+<!-- ═══════════════ LEFT / MAIN COLUMN ═══════════════════════════════════ -->
+<div class="flex-1 min-w-0">
 
 <!-- Stats -->
 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-7">
