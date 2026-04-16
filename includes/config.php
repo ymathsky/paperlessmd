@@ -23,6 +23,7 @@ define('PRACTICE_FAX',      '847-873-8486');
 define('PRACTICE_EMAIL',    'Support@beyondwoundcare.com');
 define('UPLOAD_DIR', dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'photos' . DIRECTORY_SEPARATOR);
 define('SESSION_TIMEOUT', 7200); // 2 hours
+define('GEMINI_API_KEY', ''); // set via cPanel environment or config.local.php
 
 if (session_status() === PHP_SESSION_NONE) {
     session_set_cookie_params([
