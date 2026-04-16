@@ -62,6 +62,10 @@
         <span class="text-white font-semibold text-sm">Medical Assistant Signature</span>
     </div>
     <div class="p-5">
+        <div id="maSigAlert" class="hidden flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm mb-4">
+            <i class="bi bi-exclamation-circle text-lg flex-shrink-0"></i>
+            MA signature is required before submitting.
+        </div>
         <label class="block text-sm font-semibold text-slate-700 mb-2">MA sign below
             <span class="text-slate-400 font-normal text-xs ml-1">(staff member completing this form)</span>
         </label>

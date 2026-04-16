@@ -87,12 +87,33 @@ document.addEventListener('DOMContentLoaded', function () {
     function captureAndSubmit() {
         if (!mainForm) return;
 
-        if (sigPad && sigData && !sigPad.isEmpty()) {
-            sigData.value = sigPad.toDataURL('image/png');
+        // Validate patient signature
+        const sigAlert   = document.getElementById('sigAlert');
+        const maSigAlert = document.getElementById('maSigAlert');
+        let valid = true;
+
+        if (sigPad) {
+            if (sigPad.isEmpty()) {
+                if (sigAlert) { sigAlert.classList.remove('hidden'); sigAlert.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+                valid = false;
+            } else {
+                if (sigAlert) sigAlert.classList.add('hidden');
+                sigData.value = sigPad.toDataURL('image/png');
+            }
         }
-        if (maSigPad && maSigData && !maSigPad.isEmpty()) {
-            maSigData.value = maSigPad.toDataURL('image/png');
+
+        // Validate MA signature
+        if (maSigPad) {
+            if (maSigPad.isEmpty()) {
+                if (maSigAlert) { maSigAlert.classList.remove('hidden'); if (valid) maSigAlert.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+                valid = false;
+            } else {
+                if (maSigAlert) maSigAlert.classList.add('hidden');
+                maSigData.value = maSigPad.toDataURL('image/png');
+            }
         }
+
+        if (!valid) return;
 
         if (submitBtn) {
             submitBtn.disabled = true;

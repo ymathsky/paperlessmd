@@ -46,7 +46,17 @@ if ($maSig && !preg_match('/^data:image\/png;base64,[A-Za-z0-9+\/=]+$/', $maSig)
     $maSig = '';
 }
 
-$status = $signature ? 'signed' : 'draft';
+// Require both signatures
+if (!$signature) {
+    http_response_code(400);
+    die('Patient signature is required.');
+}
+if (!$maSig) {
+    http_response_code(400);
+    die('MA signature is required.');
+}
+
+$status = 'signed';
 
 // One-signature rule: if submitting with a signature and one already exists today, redirect
 if ($signature) {
