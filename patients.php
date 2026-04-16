@@ -8,6 +8,7 @@ $activeNav = 'patients';
 
 $q       = trim($_GET['q'] ?? '');
 $filter  = $_GET['filter'] ?? '';
+$status  = $_GET['status'] ?? '';
 $page    = max(1, (int)($_GET['page'] ?? 1));
 $perPage = 20;
 $offset  = ($page - 1) * $perPage;
@@ -21,6 +22,12 @@ if ($q !== '') {
 }
 if ($filter === 'pending') {
     $where[] = "EXISTS (SELECT 1 FROM form_submissions fs WHERE fs.patient_id = p.id AND fs.status = 'signed')";
+}
+// Status filter — default to 'active'
+$statusFilter = in_array($status, ['active','inactive','discharged','all'], true) ? $status : 'active';
+if ($statusFilter !== 'all') {
+    $where[]  = 'p.status = ?';
+    $params[] = $statusFilter;
 }
 
 $sql = "
@@ -37,11 +44,13 @@ $sql = "
 ";
 $stmt = $pdo->prepare($sql);
 $stmt->execute($params);
+// clone params for count query before we reference $params again
+$countParams = $params;
 $patients = $stmt->fetchAll();
 
 $countSql = "SELECT COUNT(DISTINCT p.id) FROM patients p WHERE " . implode(' AND ', $where);
 $cs = $pdo->prepare($countSql);
-$cs->execute($params);
+$cs->execute($countParams);
 $total = (int)$cs->fetchColumn();
 $pages = (int)ceil($total / $perPage);
 
@@ -73,12 +82,22 @@ include __DIR__ . '/includes/header.php';
                    placeholder="Search by name, phone, or DOB...">
         </div>
         <div class="flex gap-2 flex-wrap">
-            <a href="<?= BASE_URL ?>/patients.php<?= $q ? '?q=' . urlencode($q) : '' ?>"
-               class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all
-                      <?= $filter === '' ? 'bg-blue-600 text-white shadow' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' ?>">
-                All
+            <?php
+            $statusBtns = [
+                'active'     => ['label'=>'Active',     'color'=>'bg-emerald-600 text-white shadow', 'inactive'=>'bg-slate-100 text-slate-700 hover:bg-slate-200'],
+                'inactive'   => ['label'=>'Inactive',   'color'=>'bg-amber-500 text-white shadow',   'inactive'=>'bg-slate-100 text-slate-700 hover:bg-slate-200'],
+                'discharged' => ['label'=>'Discharged', 'color'=>'bg-red-600 text-white shadow',     'inactive'=>'bg-slate-100 text-slate-700 hover:bg-slate-200'],
+                'all'        => ['label'=>'All',        'color'=>'bg-blue-600 text-white shadow',    'inactive'=>'bg-slate-100 text-slate-700 hover:bg-slate-200'],
+            ];
+            foreach ($statusBtns as $sv => $cfg):
+                $cls = ($statusFilter === $sv) ? $cfg['color'] : $cfg['inactive'];
+                $href = BASE_URL . '/patients.php?status=' . $sv . ($q ? '&q='.urlencode($q) : '') . ($filter ? '&filter='.$filter : '');
+            ?>
+            <a href="<?= $href ?>" class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all <?= $cls ?>">
+                <?= $cfg['label'] ?>
             </a>
-            <a href="<?= BASE_URL ?>/patients.php?filter=pending<?= $q ? '&q=' . urlencode($q) : '' ?>"
+            <?php endforeach; ?>
+            <a href="<?= BASE_URL ?>/patients.php?status=<?= $statusFilter ?>&filter=pending<?= $q ? '&q=' . urlencode($q) : '' ?>"
                class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all
                       <?= $filter === 'pending' ? 'bg-amber-500 text-white shadow' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' ?>">
                 <i class="bi bi-cloud-arrow-up"></i> Pending Upload
@@ -107,6 +126,7 @@ include __DIR__ . '/includes/header.php';
                     <th class="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wide">Patient</th>
                     <th class="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wide hidden sm:table-cell">DOB</th>
                     <th class="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wide hidden md:table-cell">Phone</th>
+                    <th class="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wide">Status</th>
                     <th class="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wide text-center">Forms</th>
                     <th class="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wide text-center hidden sm:table-cell">Photos</th>
                     <th class="px-4 py-3.5"></th>
@@ -135,6 +155,22 @@ include __DIR__ . '/includes/header.php';
                         <?= $p['dob'] ? date('M j, Y', strtotime($p['dob'])) : '—' ?>
                     </td>
                     <td class="px-4 py-4 text-slate-600 hidden md:table-cell"><?= h($p['phone'] ?: '—') ?></td>
+                    <td class="px-4 py-4">
+                        <?php
+                        $stMap = [
+                            'active'     => ['bg-emerald-100 text-emerald-700', 'Active'],
+                            'inactive'   => ['bg-amber-100 text-amber-700',     'Inactive'],
+                            'discharged' => ['bg-red-100 text-red-700',         'Discharged'],
+                        ];
+                        [$stCls, $stLabel] = $stMap[$p['status'] ?? 'active'] ?? $stMap['active'];
+                        ?>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold <?= $stCls ?>">
+                            <?= $stLabel ?>
+                        </span>
+                        <?php if (!empty($p['discharged_at']) && $p['status'] === 'discharged'): ?>
+                        <div class="text-xs text-slate-400 mt-0.5"><?= date('M j, Y', strtotime($p['discharged_at'])) ?></div>
+                        <?php endif; ?>
+                    </td>
                     <td class="px-4 py-4 text-center">
                         <?php if ($p['form_count'] > 0): ?>
                         <span class="inline-flex items-center justify-center min-w-[28px] h-7 px-2

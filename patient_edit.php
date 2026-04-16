@@ -28,23 +28,41 @@ $vals  = $patient;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrf();
+    $allowedStatuses = ['active', 'inactive', 'discharged'];
+    $newStatus = trim($_POST['status'] ?? 'active');
+    if (!in_array($newStatus, $allowedStatuses, true)) $newStatus = 'active';
+    $newDischargedAt = ($newStatus === 'discharged' && !empty($_POST['discharged_at']))
+        ? trim($_POST['discharged_at']) : null;
+    if ($newDischargedAt && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $newDischargedAt)) {
+        $newDischargedAt = null;
+    }
+
     $vals = [
-        'first_name' => trim($_POST['first_name'] ?? ''),
-        'last_name'  => trim($_POST['last_name']  ?? ''),
-        'dob'        => trim($_POST['dob']         ?? ''),
-        'phone'      => trim($_POST['phone']       ?? ''),
-        'email'      => trim($_POST['email']       ?? ''),
-        'address'    => trim($_POST['address']     ?? ''),
-        'insurance'  => trim($_POST['insurance']   ?? ''),
-        'pcp'        => trim($_POST['pcp']         ?? ''),
+        'first_name'    => trim($_POST['first_name'] ?? ''),
+        'last_name'     => trim($_POST['last_name']  ?? ''),
+        'dob'           => trim($_POST['dob']         ?? ''),
+        'phone'         => trim($_POST['phone']       ?? ''),
+        'email'         => trim($_POST['email']       ?? ''),
+        'address'       => trim($_POST['address']     ?? ''),
+        'insurance'     => trim($_POST['insurance']   ?? ''),
+        'pcp'           => trim($_POST['pcp']         ?? ''),
+        'status'        => $newStatus,
+        'discharged_at' => $newDischargedAt,
     ];
     if (!$vals['first_name'] || !$vals['last_name']) {
         $error = 'First and last name are required.';
     } else {
         $stmt = $pdo->prepare("UPDATE patients
-            SET first_name=?, last_name=?, dob=?, phone=?, email=?, address=?, insurance=?, pcp=?
+            SET first_name=?, last_name=?, dob=?, phone=?, email=?, address=?, insurance=?, pcp=?,
+                status=?, discharged_at=?
             WHERE id=?");
-        $stmt->execute([...array_values($vals), $id]);
+        $stmt->execute([
+            $vals['first_name'], $vals['last_name'], $vals['dob'] ?: null,
+            $vals['phone'], $vals['email'], $vals['address'],
+            $vals['insurance'], $vals['pcp'],
+            $vals['status'], $vals['discharged_at'],
+            $id
+        ]);
         header('Location: ' . BASE_URL . '/patient_view.php?id=' . $id . '&msg=updated');
         exit;
     }
@@ -145,6 +163,26 @@ include __DIR__ . '/includes/header.php';
                         <input type="text" name="pcp" value="<?= h($vals['pcp']) ?>"
                                class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
                                       focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Patient Status</label>
+                        <select name="status" id="edit-status"
+                                onchange="document.getElementById('edit-discharge-wrap').classList.toggle('hidden', this.value !== 'discharged')"
+                                class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
+                                       focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition">
+                            <option value="active"     <?= ($vals['status'] ?? 'active') === 'active'     ? 'selected' : '' ?>>Active</option>
+                            <option value="inactive"   <?= ($vals['status'] ?? 'active') === 'inactive'   ? 'selected' : '' ?>>Inactive</option>
+                            <option value="discharged" <?= ($vals['status'] ?? 'active') === 'discharged' ? 'selected' : '' ?>>Discharged</option>
+                        </select>
+                    </div>
+                    <div id="edit-discharge-wrap" class="<?= ($vals['status'] ?? 'active') !== 'discharged' ? 'hidden' : '' ?>">
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Discharge Date</label>
+                        <input type="date" name="discharged_at" value="<?= h($vals['discharged_at'] ?? '') ?>"
+                               class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
+                                      focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent focus:bg-white transition">
                     </div>
                 </div>
 

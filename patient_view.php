@@ -695,7 +695,71 @@ if ($activeTab === 'diagnoses' && canAccessClinical()) {
 }
 
 include __DIR__ . '/includes/header.php';
+// Inline script for status widget (always needed on this page)
+$statusCsrfInline = csrfToken();
 ?>
+<script>
+(function(){
+    const BASE = <?= json_encode(BASE_URL) ?>;
+    const CSRF = <?= json_encode($statusCsrfInline) ?>;
+    const PID  = <?= (int)$id ?>;
+    let currentStatus = <?= json_encode($patient['status'] ?? 'active') ?>;
+
+    window.setPatientStatus = async function(status) {
+        const ddWrap = document.getElementById('discharge-date-wrap');
+        if (status === 'discharged') {
+            ddWrap && ddWrap.classList.remove('hidden');
+        } else {
+            ddWrap && ddWrap.classList.add('hidden');
+        }
+
+        const dischargedAt = status === 'discharged'
+            ? (document.getElementById('discharge-date')?.value || '')
+            : '';
+
+        try {
+            const r = await fetch(BASE + '/api/patient_status.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({csrf: CSRF, patient_id: PID, status, discharged_at: dischargedAt}),
+            });
+            const data = await r.json();
+            if (!data.ok) { alert(data.error || 'Could not update status.'); return; }
+
+            currentStatus = status;
+            // Update button styles
+            const colorMap = {active:'emerald', inactive:'amber', discharged:'red'};
+            document.querySelectorAll('#status-widget button').forEach(btn => {
+                const sv = btn.getAttribute('onclick').match(/'(\w+)'/)?.[1];
+                if (!sv) return;
+                const c = colorMap[sv];
+                const active = sv === status;
+                btn.className = `px-3.5 py-1.5 rounded-xl text-xs font-semibold border transition ` +
+                    (active
+                        ? `bg-${c}-100 text-${c}-700 border-${c}-300 ring-2 ring-${c}-300`
+                        : `bg-white text-slate-600 border-slate-200 hover:border-${c}-300 hover:text-${c}-700`);
+            });
+            // Update header badge
+            const badge = document.querySelector('.pt-status-badge');
+            if (badge) {
+                const badgeMap = {active:'bg-emerald-100 text-emerald-700', inactive:'bg-amber-100 text-amber-700', discharged:'bg-red-100 text-red-700'};
+                badge.className = 'pt-status-badge text-xs font-semibold px-2.5 py-0.5 rounded-full ' + (badgeMap[status] || badgeMap.active);
+                badge.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+            }
+            const msg = document.getElementById('status-msg');
+            if (msg) { msg.classList.remove('hidden'); setTimeout(()=>msg.classList.add('hidden'), 2000); }
+        } catch { alert('Network error.'); }
+    };
+
+    // Live discharge date: re-save when user changes date
+    const ddInput = document.getElementById('discharge-date');
+    if (ddInput) {
+        ddInput.addEventListener('change', () => {
+            if (currentStatus === 'discharged') setPatientStatus('discharged');
+        });
+    }
+})();
+</script>
 
 <!-- Success Toast -->
 <?php if ($msg === 'created' || $msg === 'updated'): ?>
@@ -789,8 +853,20 @@ function completeVisit(visitId) {
                 <?= strtoupper(substr($patient['first_name'],0,1) . substr($patient['last_name'],0,1)) ?>
             </div>
             <div>
-                <h2 class="text-xl font-extrabold text-slate-800">
+                <h2 class="text-xl font-extrabold text-slate-800 flex items-center gap-2 flex-wrap">
                     <?= h($patient['first_name'] . ' ' . $patient['last_name']) ?>
+                    <?php
+                    $ptStMap = [
+                        'active'     => 'bg-emerald-100 text-emerald-700',
+                        'inactive'   => 'bg-amber-100 text-amber-700',
+                        'discharged' => 'bg-red-100 text-red-700',
+                    ];
+                    $ptStatus = $patient['status'] ?? 'active';
+                    $ptStCls  = $ptStMap[$ptStatus] ?? $ptStMap['active'];
+                    ?>
+                    <span class="pt-status-badge text-xs font-semibold px-2.5 py-0.5 rounded-full <?= $ptStCls ?>">
+                        <?= ucfirst($ptStatus) ?>
+                    </span>
                 </h2>
                 <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-sm text-slate-500">
                     <?php if ($patient['dob']): ?>
@@ -840,6 +916,37 @@ function completeVisit(visitId) {
         <?php if ($patient['email']): ?><span><i class="bi bi-envelope mr-1"></i><?= h($patient['email']) ?></span><?php endif; ?>
         <?php if ($patient['address']): ?><span><i class="bi bi-geo-alt mr-1"></i><?= h($patient['address']) ?></span><?php endif; ?>
         <?php if ($patient['pcp']): ?><span><i class="bi bi-person-badge mr-1"></i>PCP: <?= h($patient['pcp']) ?></span><?php endif; ?>
+        <?php if (!empty($patient['discharged_at']) && ($patient['status'] ?? '') === 'discharged'): ?>
+        <span class="text-red-500"><i class="bi bi-calendar-x mr-1"></i>Discharged: <?= date('M j, Y', strtotime($patient['discharged_at'])) ?></span>
+        <?php endif; ?>
+    </div>
+    <?php endif; ?>
+
+    <?php if (canAccessClinical()): ?>
+    <!-- Inline Status Change -->
+    <div class="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center gap-3 no-print" id="status-widget">
+        <span class="text-xs font-bold text-slate-500 uppercase tracking-wide">Change Status:</span>
+        <?php
+        $statusOpts = ['active'=>['emerald','Active'], 'inactive'=>['amber','Inactive'], 'discharged'=>['red','Discharged']];
+        foreach ($statusOpts as $sv => [$color, $label]):
+            $isActive = ($patient['status'] ?? 'active') === $sv;
+        ?>
+        <button onclick="setPatientStatus('<?= $sv ?>')"
+                class="px-3.5 py-1.5 rounded-xl text-xs font-semibold border transition
+                       <?= $isActive
+                           ? "bg-{$color}-100 text-{$color}-700 border-{$color}-300 ring-2 ring-{$color}-300"
+                           : "bg-white text-slate-600 border-slate-200 hover:border-{$color}-300 hover:text-{$color}-700" ?>">
+            <?= $label ?>
+        </button>
+        <?php endforeach; ?>
+        <span id="status-msg" class="text-xs text-slate-400 hidden">Saved</span>
+        <!-- Discharge date picker (shown only when discharged is active) -->
+        <div id="discharge-date-wrap" class="<?= ($patient['status'] ?? 'active') !== 'discharged' ? 'hidden' : '' ?> flex items-center gap-2">
+            <label class="text-xs text-slate-500">Discharge date:</label>
+            <input type="date" id="discharge-date"
+                   value="<?= h($patient['discharged_at'] ?? '') ?>"
+                   class="text-xs border border-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-red-300">
+        </div>
     </div>
     <?php endif; ?>
 </div>
