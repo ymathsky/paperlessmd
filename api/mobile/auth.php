@@ -23,7 +23,7 @@ $stmt = $pdo->prepare("SELECT * FROM staff WHERE username = ? AND active = 1 LIM
 $stmt->execute([$username]);
 $user = $stmt->fetch();
 
-if (!$user || !password_verify($password, $user['password'])) {
+if (!$user || !password_verify($password, $user['password_hash'])) {
     jsonError('Invalid credentials', 401);
 }
 
