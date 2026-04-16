@@ -14,6 +14,15 @@ if (!$patient) { header('Location: ' . BASE_URL . '/patients.php'); exit; }
 $pageTitle = 'Edit ' . $patient['first_name'] . ' ' . $patient['last_name'];
 $activeNav = 'patients';
 
+// Load current diagnoses for display
+try {
+    $dxStmt = $pdo->prepare("SELECT icd_code, icd_desc FROM patient_diagnoses WHERE patient_id = ? ORDER BY added_at DESC");
+    $dxStmt->execute([$id]);
+    $patientDxList = $dxStmt->fetchAll();
+} catch (PDOException $e) {
+    $patientDxList = [];
+}
+
 $error = '';
 $vals  = $patient;
 
@@ -138,6 +147,23 @@ include __DIR__ . '/includes/header.php';
                                       focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition">
                     </div>
                 </div>
+
+                <?php if (!empty($patientDxList)): ?>
+                <div class="mb-5">
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">
+                        <i class="bi bi-clipboard2-pulse text-orange-500 mr-1"></i>Active Diagnoses
+                    </label>
+                    <div class="flex flex-wrap gap-2">
+                        <?php foreach ($patientDxList as $dx): ?>
+                        <span class="inline-flex items-center gap-1.5 bg-orange-50 border border-orange-200 text-orange-700 text-xs font-medium px-2.5 py-1 rounded-full">
+                            <span class="font-mono font-bold"><?= h($dx['icd_code']) ?></span>
+                            <span class="text-orange-600"><?= h($dx['icd_desc']) ?></span>
+                        </span>
+                        <?php endforeach; ?>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-1">Manage diagnoses from the <a href="<?= BASE_URL ?>/patient_view.php?id=<?= $id ?>&tab=diagnoses" class="text-orange-600 hover:underline">Diagnoses tab</a>.</p>
+                </div>
+                <?php endif; ?>
 
                 <div class="flex flex-col sm:flex-row gap-3">
                     <button type="submit"

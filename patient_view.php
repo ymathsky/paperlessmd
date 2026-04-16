@@ -19,7 +19,7 @@ $pageTitle = $patient['first_name'] . ' ' . $patient['last_name'];
 $activeNav = 'patients';
 $activeTab = $_GET['tab'] ?? 'forms';
 // Billing users can only see the forms tab
-if (isBilling() && in_array($activeTab, ['meds', 'photos', 'wounds'], true)) {
+if (isBilling() && in_array($activeTab, ['meds', 'photos', 'wounds', 'diagnoses'], true)) {
     $activeTab = 'forms';
 }
 $msg = $_GET['msg'] ?? '';
@@ -161,6 +161,21 @@ if ($lastVisit) {
             $lastVisitFormCount++;
         }
     }
+}
+
+// ── Diagnoses tab data ───────────────────────────────────────────────────────
+try {
+    $diagStmt = $pdo->prepare("
+        SELECT pd.*, s.full_name AS added_by_name
+        FROM patient_diagnoses pd
+        LEFT JOIN staff s ON s.id = pd.added_by
+        WHERE pd.patient_id = ?
+        ORDER BY pd.added_at DESC
+    ");
+    $diagStmt->execute([$id]);
+    $diagList = $diagStmt->fetchAll();
+} catch (PDOException $e) {
+    $diagList = [];
 }
 
 $extraJs = '';
@@ -525,6 +540,160 @@ if ($activeTab === 'wounds' && canAccessClinical()) {
     $extraJs = ob_get_clean();
 }
 
+if ($activeTab === 'diagnoses' && canAccessClinical()) {
+    $diagCsrf = csrfToken();
+    ob_start(); ?>
+<script>
+(function () {
+    const PID  = <?= (int)$id ?>;
+    const BASE = <?= json_encode(BASE_URL) ?>;
+    const CSRF = <?= json_encode($diagCsrf) ?>;
+
+    let selectedCode = '', selectedDesc = '';
+    let searchTimer  = null;
+
+    const searchEl   = document.getElementById('diag-search');
+    const dropdown   = document.getElementById('diag-dropdown');
+    const selBox     = document.getElementById('diag-selected');
+    const selCode    = document.getElementById('diag-sel-code');
+    const selDesc    = document.getElementById('diag-sel-desc');
+    const notesEl    = document.getElementById('diag-notes');
+    const errEl      = document.getElementById('diag-error');
+    const listEl     = document.getElementById('diag-list');
+    const emptyEl    = document.getElementById('diag-empty');
+
+    if (searchEl) {
+        searchEl.addEventListener('input', () => {
+            clearTimeout(searchTimer);
+            const q = searchEl.value.trim();
+            if (q.length < 2) { dropdown.classList.add('hidden'); return; }
+            searchTimer = setTimeout(() => fetchSuggestions(q), 250);
+        });
+
+        document.addEventListener('click', e => {
+            if (!e.target.closest('#diag-search') && !e.target.closest('#diag-dropdown')) {
+                dropdown.classList.add('hidden');
+            }
+        });
+    }
+
+    async function fetchSuggestions(q) {
+        try {
+            const r = await fetch(BASE + '/api/icd10_search.php?q=' + encodeURIComponent(q));
+            const data = await r.json();
+            renderDropdown(data);
+        } catch { dropdown.classList.add('hidden'); }
+    }
+
+    function renderDropdown(items) {
+        if (!items.length) { dropdown.classList.add('hidden'); return; }
+        dropdown.innerHTML = items.map(item =>
+            `<li class="flex items-center gap-2 px-3 py-2 hover:bg-orange-50 cursor-pointer"
+                 data-code="${esc(item.code)}" data-desc="${esc(item.desc)}">
+                <span class="font-mono text-orange-600 font-bold text-xs w-20 flex-shrink-0">${esc(item.code)}</span>
+                <span class="text-slate-700 text-xs truncate">${esc(item.desc)}</span>
+             </li>`
+        ).join('');
+        dropdown.querySelectorAll('li').forEach(li => {
+            li.addEventListener('click', () => {
+                selectedCode = li.dataset.code;
+                selectedDesc = li.dataset.desc;
+                searchEl.value = '';
+                dropdown.classList.add('hidden');
+                selCode.textContent = selectedCode;
+                selDesc.textContent = selectedDesc;
+                selBox.classList.remove('hidden');
+                if (errEl) { errEl.classList.add('hidden'); }
+            });
+        });
+        dropdown.classList.remove('hidden');
+    }
+
+    window.diagClear = function() {
+        selectedCode = ''; selectedDesc = '';
+        selBox.classList.add('hidden');
+        if (searchEl) { searchEl.value = ''; searchEl.focus(); }
+    };
+
+    window.diagAdd = async function() {
+        if (!selectedCode) {
+            showErr('Please search and select an ICD-10 code first.'); return;
+        }
+        const btn = document.getElementById('diag-add-btn');
+        btn.disabled = true;
+        try {
+            const r = await fetch(BASE + '/api/diagnoses.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    action: 'add', csrf: CSRF, patient_id: PID,
+                    icd_code: selectedCode, icd_desc: selectedDesc,
+                    notes: notesEl ? notesEl.value.trim() : '',
+                }),
+            });
+            const data = await r.json();
+            if (data.ok) {
+                prependDiag(data.diagnosis);
+                diagClear();
+                if (notesEl) notesEl.value = '';
+                if (emptyEl) emptyEl.remove();
+            } else {
+                showErr(data.error || 'Could not add diagnosis.');
+            }
+        } catch { showErr('Network error. Please try again.'); }
+        btn.disabled = false;
+    };
+
+    function prependDiag(dx) {
+        const date = new Date(dx.added_at).toLocaleDateString('en-US');
+        const row = document.createElement('div');
+        row.className = 'diag-row flex items-start gap-3 px-5 py-3 border-b border-slate-50 hover:bg-slate-50 transition';
+        row.dataset.id = dx.id;
+        row.innerHTML = `
+            <span class="font-mono font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded text-sm whitespace-nowrap mt-0.5">${esc(dx.icd_code)}</span>
+            <div class="flex-1 min-w-0">
+                <p class="text-sm font-semibold text-slate-700">${esc(dx.icd_desc)}</p>
+                ${dx.notes ? `<p class="text-xs text-slate-500 mt-0.5">${esc(dx.notes)}</p>` : ''}
+                <p class="text-xs text-slate-400 mt-0.5">Added by ${esc(dx.added_by_name || 'You')} &bull; ${date}</p>
+            </div>
+            <button onclick="diagRemove(${dx.id}, this)" class="text-slate-300 hover:text-red-500 transition flex-shrink-0 mt-0.5">
+                <i class="bi bi-trash3"></i>
+            </button>`;
+        listEl.prepend(row);
+    }
+
+    window.diagRemove = async function(diagId, btn) {
+        if (!confirm('Remove this diagnosis?')) return;
+        btn.disabled = true;
+        try {
+            const r = await fetch(BASE + '/api/diagnoses.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({action:'remove', csrf:CSRF, patient_id:PID, id:diagId}),
+            });
+            const data = await r.json();
+            if (data.ok) {
+                btn.closest('.diag-row').remove();
+            } else {
+                alert(data.error || 'Could not remove.');
+                btn.disabled = false;
+            }
+        } catch { alert('Network error.'); btn.disabled = false; }
+    };
+
+    function showErr(msg) {
+        if (errEl) { errEl.textContent = msg; errEl.classList.remove('hidden'); }
+    }
+
+    function esc(s) {
+        return s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : '';
+    }
+})();
+</script>
+<?php
+    $extraJs = ob_get_clean();
+}
+
 include __DIR__ . '/includes/header.php';
 ?>
 
@@ -878,6 +1047,13 @@ $allDone  = count(array_diff($required, $completedForms)) === 0;
         <i class="bi bi-rulers mr-1.5"></i>Wounds
         <?php if (!empty($woundMeasurements)): ?>
         <span class="ml-1 bg-rose-100 text-rose-700 text-xs px-1.5 py-0.5 rounded-full"><?= count($woundMeasurements) ?></span>
+        <?php endif; ?>
+    </a>
+    <a href="?id=<?= $id ?>&tab=diagnoses"
+       class="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all <?= $activeTab === 'diagnoses' ? 'bg-white text-orange-700 shadow' : 'text-slate-500 hover:text-slate-700' ?>">
+        <i class="bi bi-clipboard2-pulse mr-1.5"></i>Diagnoses
+        <?php if (!empty($diagList)): ?>
+        <span class="ml-1 bg-orange-100 text-orange-700 text-xs px-1.5 py-0.5 rounded-full"><?= count($diagList) ?></span>
         <?php endif; ?>
     </a>
     <?php endif; // canAccessClinical tabs ?>
@@ -1713,6 +1889,82 @@ $photosJson = json_encode(array_map(fn($p) => [
     <?php endif; ?>
 
 </div><!-- /wounds tab -->
+
+<?php elseif ($activeTab === 'diagnoses' && canAccessClinical()): ?>
+<!-- Diagnoses Tab -->
+<div id="diag-tab" class="space-y-4">
+
+    <!-- Add Diagnosis Card -->
+    <?php if (!isBilling()): ?>
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+        <h3 class="font-bold text-slate-700 mb-3 flex items-center gap-2">
+            <i class="bi bi-plus-circle-fill text-orange-500"></i> Add Diagnosis
+        </h3>
+        <div class="flex gap-2 mb-2">
+            <div class="relative flex-1">
+                <input id="diag-search" type="text" placeholder="Search ICD-10 code or description..."
+                       class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50
+                              focus:outline-none focus:ring-2 focus:ring-orange-400 focus:bg-white transition"
+                       autocomplete="off">
+                <ul id="diag-dropdown"
+                    class="absolute z-50 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-lg mt-1
+                           max-h-60 overflow-y-auto hidden text-sm"></ul>
+            </div>
+        </div>
+        <!-- Selected code preview -->
+        <div id="diag-selected" class="hidden flex items-center gap-3 bg-orange-50 border border-orange-200 rounded-xl px-4 py-2.5 mb-3">
+            <span class="font-mono font-bold text-orange-700" id="diag-sel-code"></span>
+            <span class="text-slate-700 text-sm" id="diag-sel-desc"></span>
+            <button type="button" onclick="diagClear()" class="ml-auto text-slate-400 hover:text-red-500"><i class="bi bi-x-lg"></i></button>
+        </div>
+        <div class="flex gap-2">
+            <input id="diag-notes" type="text" maxlength="500" placeholder="Notes (optional)"
+                   class="flex-1 px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50
+                          focus:outline-none focus:ring-2 focus:ring-orange-400 focus:bg-white transition">
+            <button id="diag-add-btn" onclick="diagAdd()"
+                    class="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl text-sm transition disabled:opacity-50">
+                <i class="bi bi-plus-lg mr-1"></i>Add
+            </button>
+        </div>
+        <p id="diag-error" class="text-red-600 text-xs mt-2 hidden"></p>
+    </div>
+    <?php endif; ?>
+
+    <!-- Diagnoses List -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+            <h3 class="font-bold text-slate-700 flex items-center gap-2">
+                <i class="bi bi-clipboard2-pulse text-orange-500"></i>
+                Active Diagnoses
+            </h3>
+        </div>
+        <div id="diag-list">
+        <?php if (empty($diagList)): ?>
+        <div id="diag-empty" class="flex flex-col items-center justify-center py-12 text-slate-400">
+            <i class="bi bi-clipboard2 text-4xl mb-2"></i>
+            <p class="font-semibold">No diagnoses on file</p>
+            <p class="text-sm mt-1">Search and add an ICD-10 code above.</p>
+        </div>
+        <?php else: ?>
+        <?php foreach ($diagList as $dx): ?>
+        <div class="diag-row flex items-start gap-3 px-5 py-3 border-b border-slate-50 hover:bg-slate-50 transition" data-id="<?= (int)$dx['id'] ?>">
+            <span class="font-mono font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded text-sm whitespace-nowrap mt-0.5"><?= h($dx['icd_code']) ?></span>
+            <div class="flex-1 min-w-0">
+                <p class="text-sm font-semibold text-slate-700"><?= h($dx['icd_desc']) ?></p>
+                <?php if ($dx['notes']): ?><p class="text-xs text-slate-500 mt-0.5"><?= h($dx['notes']) ?></p><?php endif; ?>
+                <p class="text-xs text-slate-400 mt-0.5">Added by <?= h($dx['added_by_name'] ?? 'Unknown') ?> &bull; <?= date('m/d/Y', strtotime($dx['added_at'])) ?></p>
+            </div>
+            <?php if (!isBilling()): ?>
+            <button onclick="diagRemove(<?= (int)$dx['id'] ?>, this)" class="text-slate-300 hover:text-red-500 transition flex-shrink-0 mt-0.5">
+                <i class="bi bi-trash3"></i>
+            </button>
+            <?php endif; ?>
+        </div>
+        <?php endforeach; ?>
+        <?php endif; ?>
+        </div>
+    </div>
+</div><!-- /diagnoses tab -->
 
 <?php endif; ?>
 
