@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/db.php';
+require_once __DIR__ . '/includes/audit.php';
 requireNotBilling();
 
 $pageTitle = 'Add Patient';
@@ -29,6 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             VALUES (?,?,?,?,?,?,?,?,NOW())");
         $stmt->execute(array_values($vals));
         $id = $pdo->lastInsertId();
+        auditLog($pdo, 'patient_add', 'patient', (int)$id, $vals['first_name'] . ' ' . $vals['last_name']);
         header('Location: ' . BASE_URL . '/patient_view.php?id=' . $id . '&msg=created');
         exit;
     }

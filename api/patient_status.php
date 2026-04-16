@@ -6,6 +6,7 @@
  */
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/audit.php';
 requireNotBillingApi();
 
 header('Content-Type: application/json');
@@ -62,5 +63,13 @@ if (!$chk->fetch()) {
 
 $stmt = $pdo->prepare("UPDATE patients SET status = ?, discharged_at = ? WHERE id = ?");
 $stmt->execute([$status, $dischargedAt ?: null, $patientId]);
+
+// Fetch name for audit label
+$nameRow = $pdo->prepare("SELECT first_name, last_name FROM patients WHERE id = ?");
+$nameRow->execute([$patientId]);
+$nameRow = $nameRow->fetch();
+auditLog($pdo, 'patient_status', 'patient', $patientId,
+    $nameRow ? ($nameRow['first_name'] . ' ' . $nameRow['last_name']) : null,
+    'status=' . $status);
 
 echo json_encode(['ok' => true, 'status' => $status, 'discharged_at' => $dischargedAt]);

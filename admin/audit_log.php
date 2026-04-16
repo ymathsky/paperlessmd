@@ -88,14 +88,24 @@ if (isset($_GET['export']) && $_GET['export'] === 'csv') {
 
 /* ── Action badge config ─────────────────────────────────── */
 $actionCfg = [
-    'login'        => ['bg' => 'bg-emerald-100', 'text' => 'text-emerald-700', 'icon' => 'bi-box-arrow-in-right', 'label' => 'Login'],
-    'login_fail'   => ['bg' => 'bg-red-100',     'text' => 'text-red-700',     'icon' => 'bi-x-circle',          'label' => 'Login Failed'],
-    'logout'       => ['bg' => 'bg-slate-100',   'text' => 'text-slate-600',   'icon' => 'bi-box-arrow-right',   'label' => 'Logout'],
-    'patient_view' => ['bg' => 'bg-blue-100',    'text' => 'text-blue-700',    'icon' => 'bi-person-lines-fill', 'label' => 'Patient View'],
-    'form_view'    => ['bg' => 'bg-sky-100',     'text' => 'text-sky-700',     'icon' => 'bi-file-earmark-text', 'label' => 'Form View'],
-    'form_create'  => ['bg' => 'bg-violet-100',  'text' => 'text-violet-700',  'icon' => 'bi-file-earmark-plus', 'label' => 'Form Create'],
-    'form_sign'    => ['bg' => 'bg-indigo-100',  'text' => 'text-indigo-700',  'icon' => 'bi-pen',               'label' => 'Form Sign'],
-    'form_export'  => ['bg' => 'bg-amber-100',   'text' => 'text-amber-700',   'icon' => 'bi-file-earmark-pdf',  'label' => 'Form Export'],
+    // Auth
+    'login'           => ['bg' => 'bg-emerald-100', 'text' => 'text-emerald-700', 'icon' => 'bi-box-arrow-in-right',  'label' => 'Login'],
+    'login_fail'      => ['bg' => 'bg-red-100',     'text' => 'text-red-700',     'icon' => 'bi-x-circle',            'label' => 'Login Failed'],
+    'logout'          => ['bg' => 'bg-slate-100',   'text' => 'text-slate-600',   'icon' => 'bi-box-arrow-right',     'label' => 'Logout'],
+    // Patient record
+    'patient_add'     => ['bg' => 'bg-teal-100',    'text' => 'text-teal-700',    'icon' => 'bi-person-plus-fill',    'label' => 'Patient Add'],
+    'patient_view'    => ['bg' => 'bg-blue-100',    'text' => 'text-blue-700',    'icon' => 'bi-person-lines-fill',   'label' => 'Patient View'],
+    'patient_edit'    => ['bg' => 'bg-cyan-100',    'text' => 'text-cyan-700',    'icon' => 'bi-pencil-fill',         'label' => 'Patient Edit'],
+    'patient_status'  => ['bg' => 'bg-orange-100',  'text' => 'text-orange-700',  'icon' => 'bi-person-check-fill',   'label' => 'Status Change'],
+    // Forms
+    'form_view'       => ['bg' => 'bg-sky-100',     'text' => 'text-sky-700',     'icon' => 'bi-file-earmark-text',   'label' => 'Form View'],
+    'form_create'     => ['bg' => 'bg-violet-100',  'text' => 'text-violet-700',  'icon' => 'bi-file-earmark-plus',   'label' => 'Form Create'],
+    'form_sign'       => ['bg' => 'bg-indigo-100',  'text' => 'text-indigo-700',  'icon' => 'bi-pen',                 'label' => 'Form Sign (Patient)'],
+    'provider_sign'   => ['bg' => 'bg-purple-100',  'text' => 'text-purple-700',  'icon' => 'bi-pen-fill',            'label' => 'Form Sign (Provider)'],
+    'form_amend'      => ['bg' => 'bg-rose-100',    'text' => 'text-rose-700',    'icon' => 'bi-pencil-square',       'label' => 'Form Amended'],
+    'form_export'     => ['bg' => 'bg-amber-100',   'text' => 'text-amber-700',   'icon' => 'bi-file-earmark-pdf',    'label' => 'Form Export'],
+    // Admin
+    'settings_update' => ['bg' => 'bg-slate-100',   'text' => 'text-slate-700',   'icon' => 'bi-gear-fill',           'label' => 'Settings Update'],
 ];
 
 $pageTitle = 'HIPAA Audit Log';

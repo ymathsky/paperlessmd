@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/db.php';
+require_once __DIR__ . '/includes/audit.php';
 requireNotBilling();
 
 $id = (int)($_GET['id'] ?? 0);
@@ -63,6 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $vals['status'], $vals['discharged_at'],
             $id
         ]);
+        auditLog($pdo, 'patient_edit', 'patient', $id, $vals['first_name'] . ' ' . $vals['last_name']);
         header('Location: ' . BASE_URL . '/patient_view.php?id=' . $id . '&msg=updated');
         exit;
     }

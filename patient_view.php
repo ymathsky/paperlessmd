@@ -18,8 +18,11 @@ auditLog($pdo, 'patient_view', 'patient', $id, $patient['first_name'] . ' ' . $p
 $pageTitle = $patient['first_name'] . ' ' . $patient['last_name'];
 $activeNav = 'patients';
 $activeTab = $_GET['tab'] ?? 'forms';
-// Billing users can only see the forms tab
-if (isBilling() && in_array($activeTab, ['meds', 'photos', 'wounds', 'diagnoses'], true)) {
+// Billing users can only see the forms tab; non-admins cannot see the audit tab
+if (isBilling() && in_array($activeTab, ['meds', 'photos', 'wounds', 'diagnoses', 'audit'], true)) {
+    $activeTab = 'forms';
+}
+if ($activeTab === 'audit' && !isAdmin()) {
     $activeTab = 'forms';
 }
 $msg = $_GET['msg'] ?? '';
@@ -694,6 +697,22 @@ if ($activeTab === 'diagnoses' && canAccessClinical()) {
     $extraJs = ob_get_clean();
 }
 
+// ── Per-patient audit trail (admin only) ─────────────────────
+$patientAudit = [];
+if ($activeTab === 'audit' && isAdmin()) {
+    $auditStmt = $pdo->prepare("
+        SELECT al.*
+        FROM audit_log al
+        WHERE (al.target_type = 'patient' AND al.target_id = ?)
+           OR (al.target_type = 'form'
+               AND al.target_id IN (SELECT id FROM form_submissions WHERE patient_id = ?))
+        ORDER BY al.created_at DESC, al.id DESC
+        LIMIT 300
+    ");
+    $auditStmt->execute([$id, $id]);
+    $patientAudit = $auditStmt->fetchAll();
+}
+
 include __DIR__ . '/includes/header.php';
 // Inline script for status widget (always needed on this page)
 $statusCsrfInline = csrfToken();
@@ -1164,6 +1183,15 @@ $allDone  = count(array_diff($required, $completedForms)) === 0;
         <?php endif; ?>
     </a>
     <?php endif; // canAccessClinical tabs ?>
+    <?php if (isAdmin()): ?>
+    <a href="?id=<?= $id ?>&tab=audit"
+       class="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all <?= $activeTab === 'audit' ? 'bg-white text-slate-800 shadow' : 'text-slate-500 hover:text-slate-700' ?>">
+        <i class="bi bi-shield-lock mr-1.5"></i>Audit
+        <?php if (!empty($patientAudit)): ?>
+        <span class="ml-1 bg-slate-200 text-slate-600 text-xs px-1.5 py-0.5 rounded-full"><?= count($patientAudit) ?></span>
+        <?php endif; ?>
+    </a>
+    <?php endif; ?>
 </div>
 
 <!-- Forms Tab -->
@@ -2102,6 +2130,97 @@ $photosJson = json_encode(array_map(fn($p) => [
         </div>
     </div>
 </div><!-- /diagnoses tab -->
+
+<?php elseif ($activeTab === 'audit' && isAdmin()): ?>
+<div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+    <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+        <h3 class="font-semibold text-slate-700 flex items-center gap-2">
+            <i class="bi bi-shield-lock text-slate-500"></i> Access &amp; Activity Log
+        </h3>
+        <a href="<?= BASE_URL ?>/admin/audit_log.php?q=<?= urlencode($patient['first_name'] . ' ' . $patient['last_name']) ?>"
+           class="text-xs text-blue-600 hover:underline font-medium" target="_blank">
+            Full audit log <i class="bi bi-box-arrow-up-right ml-0.5"></i>
+        </a>
+    </div>
+    <?php if (empty($patientAudit)): ?>
+    <div class="flex flex-col items-center justify-center py-12 text-slate-400">
+        <i class="bi bi-shield text-4xl mb-2 opacity-30"></i>
+        <p class="font-semibold">No activity recorded yet</p>
+    </div>
+    <?php else: ?>
+    <?php
+    $auditActionLabels = [
+        'patient_add'    => ['icon' => 'bi-person-plus-fill',   'text' => 'text-teal-700',    'label' => 'Patient Created'],
+        'patient_view'   => ['icon' => 'bi-person-lines-fill',  'text' => 'text-blue-600',    'label' => 'Patient Viewed'],
+        'patient_edit'   => ['icon' => 'bi-pencil-fill',        'text' => 'text-cyan-700',    'label' => 'Patient Edited'],
+        'patient_status' => ['icon' => 'bi-person-check-fill',  'text' => 'text-orange-600',  'label' => 'Status Changed'],
+        'form_view'      => ['icon' => 'bi-eye-fill',           'text' => 'text-sky-600',     'label' => 'Form Viewed'],
+        'form_create'    => ['icon' => 'bi-file-earmark-plus',  'text' => 'text-violet-600',  'label' => 'Form Created'],
+        'form_sign'      => ['icon' => 'bi-pen',                'text' => 'text-indigo-600',  'label' => 'Patient Signed'],
+        'provider_sign'  => ['icon' => 'bi-pen-fill',           'text' => 'text-purple-600',  'label' => 'Provider Signed'],
+        'form_amend'     => ['icon' => 'bi-pencil-square',      'text' => 'text-rose-600',    'label' => 'Form Amended'],
+        'form_export'    => ['icon' => 'bi-file-earmark-pdf',   'text' => 'text-amber-600',   'label' => 'PDF Exported'],
+    ];
+    ?>
+    <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+        <thead>
+            <tr class="bg-slate-50 border-b border-slate-100 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                <th class="px-4 py-3 text-left">Timestamp</th>
+                <th class="px-4 py-3 text-left">Action</th>
+                <th class="px-4 py-3 text-left">User</th>
+                <th class="px-4 py-3 text-left">Details</th>
+                <th class="px-4 py-3 text-left">IP</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-50">
+        <?php foreach ($patientAudit as $ae):
+            $aeCfg = $auditActionLabels[$ae['action']] ?? ['icon' => 'bi-activity', 'text' => 'text-slate-500', 'label' => $ae['action']];
+            $aeTs  = new DateTime($ae['created_at']);
+        ?>
+        <tr class="hover:bg-slate-50/60 transition-colors">
+            <td class="px-4 py-3 whitespace-nowrap">
+                <div class="font-medium text-slate-800"><?= h($aeTs->format('M j, Y')) ?></div>
+                <div class="text-xs text-slate-400"><?= h($aeTs->format('g:i:s A')) ?></div>
+            </td>
+            <td class="px-4 py-3 whitespace-nowrap">
+                <span class="inline-flex items-center gap-1.5 text-xs font-semibold <?= $aeCfg['text'] ?>">
+                    <i class="bi <?= $aeCfg['icon'] ?>"></i>
+                    <?= h($aeCfg['label']) ?>
+                </span>
+            </td>
+            <td class="px-4 py-3 whitespace-nowrap">
+                <?php if ($ae['username']): ?>
+                <div class="font-medium text-slate-700"><?= h($ae['username']) ?></div>
+                <?php if ($ae['user_role']): ?>
+                <span class="text-xs text-slate-400"><?= h($ae['user_role']) ?></span>
+                <?php endif; ?>
+                <?php else: ?>
+                <span class="text-slate-400">—</span>
+                <?php endif; ?>
+            </td>
+            <td class="px-4 py-3">
+                <span class="text-xs text-slate-500">
+                    <?php if ($ae['target_type'] === 'form' && $ae['target_id']): ?>
+                    <a href="<?= BASE_URL ?>/view_document.php?id=<?= (int)$ae['target_id'] ?>"
+                       class="text-blue-600 hover:underline"><?= h($ae['target_label'] ?? 'Form #' . $ae['target_id']) ?></a>
+                    <?php elseif ($ae['details']): ?>
+                    <?= h($ae['details']) ?>
+                    <?php else: ?>
+                    —
+                    <?php endif; ?>
+                </span>
+            </td>
+            <td class="px-4 py-3 whitespace-nowrap">
+                <span class="font-mono text-xs text-slate-400"><?= h($ae['ip_address'] ?? '—') ?></span>
+            </td>
+        </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+    </div>
+    <?php endif; ?>
+</div><!-- /audit tab -->
 
 <?php endif; ?>
 
