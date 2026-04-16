@@ -70,11 +70,30 @@ if (!isBilling()) {
     <!-- Nav links -->
     <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
         <?php
+        // Unread messages count (try/catch: safe before migration runs)
+        $_unreadMessages = 0;
+        try {
+            if (!empty($_SESSION['user_id'])) {
+                $umStmt = $pdo->prepare("
+                    SELECT COUNT(*) FROM messages m
+                    WHERE  (m.to_user_id = ? OR m.to_user_id IS NULL)
+                      AND  m.from_user_id != ?
+                      AND  NOT EXISTS (
+                          SELECT 1 FROM message_reads mr
+                          WHERE mr.message_id = m.id AND mr.user_id = ?
+                      )
+                ");
+                $umStmt->execute([$_SESSION['user_id'], $_SESSION['user_id'], $_SESSION['user_id']]);
+                $_unreadMessages = (int)$umStmt->fetchColumn();
+            }
+        } catch (PDOException $e) { /* messages table not yet migrated */ }
+
         $navItems = [
             ['href' => '/dashboard.php', 'key' => 'dashboard', 'icon' => 'bi-speedometer2',    'label' => 'Dashboard'],
             ['href' => '/patients.php',  'key' => 'patients',  'icon' => 'bi-people-fill',     'label' => 'Patients'],
             ['href' => '/schedule.php',  'key' => 'schedule',  'icon' => 'bi-calendar3',       'label' => 'Schedule',   'billingHide' => true],
             ['href' => '/esign_queue.php','key'=> 'esign',     'icon' => 'bi-pen-fill',        'label' => 'Sign Queue', 'billingHide' => true, 'badge' => $_esignCount, 'badgeCls' => 'bg-violet-500'],
+            ['href' => '/messages.php',  'key' => 'messages',  'icon' => 'bi-chat-dots-fill',  'label' => 'Messages',   'badge' => $_unreadMessages, 'badgeCls' => 'bg-emerald-500'],
         ];
         foreach ($navItems as $n):
             if (!empty($n['billingHide']) && isBilling()) continue;
@@ -174,5 +193,10 @@ if (!isBilling()) {
 </div>
 
 <!-- Page content wrapper (offset for sidebar on desktop, top bar on mobile) -->
+<?php if (!empty($fullHeight)): ?>
+<div class="md:pt-0 pt-14 h-screen overflow-hidden flex flex-col">
+<div class="flex-1 overflow-hidden">
+<?php else: ?>
 <div class="md:pt-0 pt-14 pb-12 min-h-screen">
 <div class="max-w-screen-xl mx-auto px-4 sm:px-6 py-6 page-fade">
+<?php endif; ?>
