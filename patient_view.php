@@ -19,7 +19,7 @@ $pageTitle = $patient['first_name'] . ' ' . $patient['last_name'];
 $activeNav = 'patients';
 $activeTab = $_GET['tab'] ?? 'forms';
 // Billing users can only see the forms tab; non-admins cannot see the audit tab
-if (isBilling() && in_array($activeTab, ['meds', 'photos', 'wounds', 'diagnoses', 'vitals', 'notes', 'audit'], true)) {
+if (isBilling() && in_array($activeTab, ['meds', 'photos', 'wounds', 'diagnoses', 'vitals', 'care', 'notes', 'audit'], true)) {
     $activeTab = 'forms';
 }
 if ($activeTab === 'audit' && !isAdmin()) {
@@ -712,6 +712,32 @@ if ($activeTab === 'notes' && canAccessClinical()) {
     $soapNotes = $snStmt->fetchAll();
 }
 
+// ── Care coordination notes ────────────────────────────────────
+$careNotes = [];
+if ($activeTab === 'care' && canAccessClinical()) {
+    $cnStmt = $pdo->prepare("
+        SELECT cn.id, cn.parent_id, cn.body, cn.pinned, cn.edited_at, cn.created_at,
+               s.full_name AS author_name, s.id AS author_id_val, s.role AS author_role
+        FROM care_notes cn
+        JOIN staff s ON s.id = cn.author_id
+        WHERE cn.patient_id = ?
+        ORDER BY cn.pinned DESC, cn.created_at ASC
+    ");
+    $cnStmt->execute([$id]);
+    $allCn = $cnStmt->fetchAll();
+    // Separate top-level vs replies
+    $cnTop = [];
+    $cnReplies = [];
+    foreach ($allCn as $cn) {
+        if ($cn['parent_id'] === null) {
+            $cnTop[(int)$cn['id']] = $cn;
+        } else {
+            $cnReplies[(int)$cn['parent_id']][] = $cn;
+        }
+    }
+    $careNotes = ['top' => $cnTop, 'replies' => $cnReplies];
+}
+
 // ── Vitals trend data ───────────────────────────────────────────
 $vitalsRows      = [];
 $vitalsLatest    = [];
@@ -1337,6 +1363,16 @@ $allDone  = count(array_diff($required, $completedForms)) === 0;
         <i class="bi bi-activity mr-1.5"></i>Vitals
         <?php if (!empty($vitalsRows)): ?>
         <span class="ml-1 bg-rose-100 text-rose-700 text-xs px-1.5 py-0.5 rounded-full"><?= count($vitalsRows) ?></span>
+        <?php endif; ?>
+    </a>
+    <!-- Care Notes tab -->
+    <a href="?id=<?= $id ?>&tab=care"
+       class="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all <?= $activeTab === 'care' ? 'bg-white text-teal-700 shadow' : 'text-slate-500 hover:text-slate-700' ?>">
+        <i class="bi bi-chat-square-text-fill mr-1.5"></i>Care
+        <?php
+        $cnCount = !empty($careNotes['top']) ? count($careNotes['top']) : 0;
+        if ($cnCount): ?>
+        <span class="ml-1 bg-teal-100 text-teal-700 text-xs px-1.5 py-0.5 rounded-full"><?= $cnCount ?></span>
         <?php endif; ?>
     </a>
     <!-- SOAP Notes tab -->
@@ -2441,6 +2477,292 @@ $kpiColors = [
     </div>
 </div>
 <?php endif; // vitalsRows ?>
+
+<?php elseif ($activeTab === 'care' && canAccessClinical()): ?>
+<!-- ── Care Coordination Notes Tab ─────────────────────────────────────── -->
+<?php
+$cnTop     = $careNotes['top']     ?? [];
+$cnReplies = $careNotes['replies'] ?? [];
+$cnCsrf    = csrfToken();
+?>
+<div class="space-y-4">
+
+<!-- Compose box -->
+<div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden" id="careComposeWrap">
+    <div class="px-5 py-4 border-b border-slate-100 flex items-center gap-3">
+        <div class="w-9 h-9 bg-teal-50 rounded-xl grid place-items-center flex-shrink-0">
+            <i class="bi bi-chat-square-text-fill text-teal-500"></i>
+        </div>
+        <div>
+            <h3 class="font-bold text-slate-700 text-sm">Care Coordination Notes</h3>
+            <p class="text-xs text-slate-400">Internal handoff notes — not visible to patient or outside parties</p>
+        </div>
+    </div>
+    <div class="px-5 py-4">
+        <div id="careComposeErr" class="hidden mb-3 flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-xl text-sm">
+            <i class="bi bi-exclamation-circle-fill"></i><span id="careComposeErrMsg"></span>
+        </div>
+        <textarea id="careNoteBody" rows="3" maxlength="5000"
+                  placeholder="Leave a handoff note, flag for follow-up, or update the care team…"
+                  class="w-full px-4 py-3 text-sm text-slate-700 placeholder-slate-300 border border-slate-200
+                         rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none bg-slate-50
+                         hover:bg-white transition-colors"></textarea>
+        <div class="flex items-center justify-between mt-3">
+            <span id="careCharCount" class="text-xs text-slate-400">0 / 5000</span>
+            <button id="carePostBtn" onclick="postCareNote()"
+                    class="inline-flex items-center gap-2 px-5 py-2.5 bg-teal-600 hover:bg-teal-700
+                           text-white font-bold text-sm rounded-xl transition-all shadow-sm active:scale-95">
+                <i class="bi bi-send-fill text-xs"></i> Post Note
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Notes feed -->
+<?php if (empty($cnTop)): ?>
+<div class="bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center py-14 text-slate-400">
+    <i class="bi bi-chat-square text-5xl mb-3 opacity-25"></i>
+    <p class="font-semibold text-slate-500">No care notes yet</p>
+    <p class="text-sm mt-1">Be the first to leave a handoff note for this patient.</p>
+</div>
+<?php else: ?>
+<div id="careNotesFeed" class="space-y-3">
+    <?php
+    // Sort: pinned first, then newest first for display
+    $sortedTop = $cnTop;
+    usort($sortedTop, function($a, $b) {
+        if ($b['pinned'] !== $a['pinned']) return (int)$b['pinned'] - (int)$a['pinned'];
+        return strcmp($b['created_at'], $a['created_at']);
+    });
+    foreach ($sortedTop as $cn):
+        $cnId      = (int)$cn['id'];
+        $isOwn     = ((int)$cn['author_id_val'] === (int)($_SESSION['user_id'] ?? 0));
+        $replies   = $cnReplies[$cnId] ?? [];
+        $roleLabel = match($cn['author_role']) { 'admin' => 'Admin', 'ma' => 'MA', default => ucfirst($cn['author_role']) };
+    ?>
+    <div class="care-note-card bg-white rounded-2xl border <?= $cn['pinned'] ? 'border-amber-300 shadow-amber-100 shadow' : 'border-slate-100' ?> overflow-hidden"
+         data-id="<?= $cnId ?>">
+        <!-- Thread header -->
+        <div class="px-5 py-4">
+            <div class="flex items-start gap-3">
+                <!-- Avatar -->
+                <div class="w-9 h-9 rounded-full bg-gradient-to-br from-teal-400 to-cyan-500 grid place-items-center flex-shrink-0 mt-0.5">
+                    <span class="text-white text-xs font-extrabold"><?= strtoupper(substr($cn['author_name'], 0, 2)) ?></span>
+                </div>
+                <!-- Body -->
+                <div class="flex-1 min-w-0">
+                    <div class="flex flex-wrap items-center gap-2 mb-1.5">
+                        <span class="font-bold text-slate-800 text-sm"><?= h($cn['author_name']) ?></span>
+                        <span class="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full"><?= $roleLabel ?></span>
+                        <?php if ($cn['pinned']): ?>
+                        <span class="inline-flex items-center gap-1 text-xs font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                            <i class="bi bi-pin-fill text-[10px]"></i> Pinned
+                        </span>
+                        <?php endif; ?>
+                        <span class="text-xs text-slate-400 ml-auto"><?= date('M j, Y g:i A', strtotime($cn['created_at'])) ?></span>
+                        <?php if ($cn['edited_at']): ?>
+                        <span class="text-xs text-slate-400 italic">(edited)</span>
+                        <?php endif; ?>
+                    </div>
+                    <div class="cn-body text-sm text-slate-700 leading-relaxed whitespace-pre-wrap" id="cnBody_<?= $cnId ?>"><?= h($cn['body']) ?></div>
+                    <!-- Edit textarea (hidden) -->
+                    <div id="cnEdit_<?= $cnId ?>" class="hidden mt-2">
+                        <textarea class="cn-edit-ta w-full px-3 py-2 text-sm border border-teal-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+                                  rows="3" maxlength="5000"><?= h($cn['body']) ?></textarea>
+                        <div class="flex gap-2 mt-2">
+                            <button onclick="saveCnEdit(<?= $cnId ?>)"
+                                    class="text-xs font-bold px-3 py-1.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-colors">Save</button>
+                            <button onclick="cancelCnEdit(<?= $cnId ?>)"
+                                    class="text-xs font-semibold px-3 py-1.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-colors">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Action row -->
+            <div class="mt-3 ml-12 flex flex-wrap items-center gap-3">
+                <button onclick="toggleReplyBox(<?= $cnId ?>)"
+                        class="text-xs font-semibold text-slate-500 hover:text-teal-600 flex items-center gap-1.5 transition-colors">
+                    <i class="bi bi-reply-fill"></i> Reply
+                    <?php if (count($replies)): ?>
+                    <span class="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-full"><?= count($replies) ?></span>
+                    <?php endif; ?>
+                </button>
+                <?php if ($isOwn): ?>
+                <button onclick="openCnEdit(<?= $cnId ?>)"
+                        class="text-xs font-semibold text-slate-400 hover:text-blue-600 flex items-center gap-1 transition-colors">
+                    <i class="bi bi-pencil"></i> Edit
+                </button>
+                <?php endif; ?>
+                <?php if (isAdmin()): ?>
+                <button onclick="pinCareNote(<?= $cnId ?>, <?= $cn['pinned'] ? 0 : 1 ?>)"
+                        class="text-xs font-semibold text-slate-400 hover:text-amber-600 flex items-center gap-1 transition-colors">
+                    <i class="bi <?= $cn['pinned'] ? 'bi-pin-angle' : 'bi-pin-fill' ?>"></i> <?= $cn['pinned'] ? 'Unpin' : 'Pin' ?>
+                </button>
+                <?php endif; ?>
+                <?php if ($isOwn || isAdmin()): ?>
+                <button onclick="deleteCareNote(<?= $cnId ?>)"
+                        class="ml-auto text-xs font-semibold text-slate-300 hover:text-red-500 flex items-center gap-1 transition-colors">
+                    <i class="bi bi-trash3"></i> Delete
+                </button>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <!-- Reply compose (hidden) -->
+        <div id="replyBox_<?= $cnId ?>" class="hidden border-t border-slate-100 bg-slate-50 px-5 py-3">
+            <textarea id="replyBody_<?= $cnId ?>" rows="2" maxlength="5000"
+                      placeholder="Add a reply…"
+                      class="w-full px-3 py-2.5 text-sm text-slate-700 placeholder-slate-300 border border-slate-200
+                             rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-400 resize-none bg-white"></textarea>
+            <div class="flex justify-end gap-2 mt-2">
+                <button onclick="toggleReplyBox(<?= $cnId ?>)"
+                        class="text-xs font-semibold px-3 py-1.5 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-colors">Cancel</button>
+                <button onclick="postReply(<?= $cnId ?>)"
+                        class="text-xs font-bold px-4 py-1.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-colors">Reply</button>
+            </div>
+        </div>
+
+        <!-- Replies -->
+        <?php if (!empty($replies)): ?>
+        <div class="border-t border-slate-100 bg-slate-50/60 divide-y divide-slate-100">
+            <?php foreach ($replies as $rep):
+                $repId  = (int)$rep['id'];
+                $repOwn = ((int)$rep['author_id_val'] === (int)($_SESSION['user_id'] ?? 0));
+                $repRL  = match($rep['author_role']) { 'admin' => 'Admin', 'ma' => 'MA', default => ucfirst($rep['author_role']) };
+            ?>
+            <div class="px-5 py-3 flex items-start gap-3" id="reply_<?= $repId ?>">
+                <div class="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-400 to-violet-500 grid place-items-center flex-shrink-0 mt-0.5">
+                    <span class="text-white text-[10px] font-extrabold"><?= strtoupper(substr($rep['author_name'], 0, 2)) ?></span>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex flex-wrap items-center gap-2 mb-1">
+                        <span class="font-bold text-slate-700 text-xs"><?= h($rep['author_name']) ?></span>
+                        <span class="text-[10px] text-slate-400 bg-slate-200 px-1.5 py-0.5 rounded-full"><?= $repRL ?></span>
+                        <span class="text-[10px] text-slate-400 ml-auto"><?= date('M j g:i A', strtotime($rep['created_at'])) ?></span>
+                        <?php if ($rep['edited_at']): ?><span class="text-[10px] text-slate-400 italic">(edited)</span><?php endif; ?>
+                    </div>
+                    <div class="cn-body text-sm text-slate-700 leading-relaxed whitespace-pre-wrap" id="cnBody_<?= $repId ?>"><?= h($rep['body']) ?></div>
+                    <!-- Reply edit textarea (hidden) -->
+                    <div id="cnEdit_<?= $repId ?>" class="hidden mt-2">
+                        <textarea class="cn-edit-ta w-full px-3 py-2 text-sm border border-teal-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+                                  rows="2" maxlength="5000"><?= h($rep['body']) ?></textarea>
+                        <div class="flex gap-2 mt-2">
+                            <button onclick="saveCnEdit(<?= $repId ?>)"
+                                    class="text-xs font-bold px-3 py-1.5 bg-teal-600 text-white rounded-xl hover:bg-teal-700 transition-colors">Save</button>
+                            <button onclick="cancelCnEdit(<?= $repId ?>)"
+                                    class="text-xs font-semibold px-3 py-1.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-colors">Cancel</button>
+                        </div>
+                    </div>
+                    <?php if ($repOwn || isAdmin()): ?>
+                    <div class="flex gap-3 mt-1.5">
+                        <?php if ($repOwn): ?>
+                        <button onclick="openCnEdit(<?= $repId ?>)" class="text-xs text-slate-400 hover:text-blue-600 flex items-center gap-1 transition-colors"><i class="bi bi-pencil"></i> Edit</button>
+                        <?php endif; ?>
+                        <button onclick="deleteCareNote(<?= $repId ?>)" class="text-xs text-slate-300 hover:text-red-500 flex items-center gap-1 transition-colors"><i class="bi bi-trash3"></i> Delete</button>
+                    </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; // replies ?>
+    </div>
+    <?php endforeach; ?>
+</div>
+<?php endif; // cnTop empty ?>
+</div><!-- /care notes wrapper -->
+
+<script>
+(function () {
+    const BASE  = <?= json_encode(BASE_URL) ?>;
+    const CSRF  = <?= json_encode($cnCsrf) ?>;
+    const PID   = <?= (int)$id ?>;
+
+    const postBtn  = document.getElementById('carePostBtn');
+    const bodyTa   = document.getElementById('careNoteBody');
+    const charCnt  = document.getElementById('careCharCount');
+    const errWrap  = document.getElementById('careComposeErr');
+    const errMsg   = document.getElementById('careComposeErrMsg');
+
+    bodyTa && bodyTa.addEventListener('input', () => {
+        charCnt.textContent = bodyTa.value.length + ' / 5000';
+    });
+
+    function showErr(msg) { errMsg.textContent = msg; errWrap.classList.remove('hidden'); }
+    function hideErr()    { errWrap.classList.add('hidden'); }
+
+    async function apiFetch(payload) {
+        const r = await fetch(BASE + '/api/save_care_note.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ csrf: CSRF, ...payload }),
+        });
+        return r.json();
+    }
+
+    window.postCareNote = async function() {
+        const body = bodyTa ? bodyTa.value.trim() : '';
+        if (!body) { showErr('Please write something before posting.'); return; }
+        hideErr();
+        postBtn.disabled = true;
+        const d = await apiFetch({ action: 'create', patient_id: PID, body });
+        if (d.ok) { location.reload(); }
+        else { showErr(d.error || 'Could not post note.'); postBtn.disabled = false; }
+    };
+
+    window.toggleReplyBox = function(id) {
+        const box = document.getElementById('replyBox_' + id);
+        if (!box) return;
+        box.classList.toggle('hidden');
+        if (!box.classList.contains('hidden')) {
+            const ta = document.getElementById('replyBody_' + id);
+            if (ta) ta.focus();
+        }
+    };
+
+    window.postReply = async function(parentId) {
+        const ta   = document.getElementById('replyBody_' + parentId);
+        const body = ta ? ta.value.trim() : '';
+        if (!body) return;
+        ta.disabled = true;
+        const d = await apiFetch({ action: 'create', patient_id: PID, body, parent_id: parentId });
+        if (d.ok) { location.reload(); }
+        else { alert(d.error || 'Could not post reply.'); ta.disabled = false; }
+    };
+
+    window.openCnEdit = function(id) {
+        document.getElementById('cnBody_' + id)?.classList.add('hidden');
+        const editWrap = document.getElementById('cnEdit_' + id);
+        editWrap?.classList.remove('hidden');
+        editWrap?.querySelector('.cn-edit-ta')?.focus();
+    };
+    window.cancelCnEdit = function(id) {
+        document.getElementById('cnBody_' + id)?.classList.remove('hidden');
+        document.getElementById('cnEdit_' + id)?.classList.add('hidden');
+    };
+    window.saveCnEdit = async function(id) {
+        const ta   = document.querySelector('#cnEdit_' + id + ' .cn-edit-ta');
+        const body = ta ? ta.value.trim() : '';
+        if (!body) return;
+        const d = await apiFetch({ action: 'edit', id, body });
+        if (d.ok) { location.reload(); }
+        else { alert(d.error || 'Could not save edit.'); }
+    };
+
+    window.deleteCareNote = async function(id) {
+        if (!confirm('Delete this note? Replies will also be removed.')) return;
+        const d = await apiFetch({ action: 'delete', id, patient_id: PID });
+        if (d.ok) { location.reload(); }
+        else { alert(d.error || 'Could not delete note.'); }
+    };
+
+    window.pinCareNote = async function(id, pinned) {
+        const d = await apiFetch({ action: 'pin', id, patient_id: PID, pinned });
+        if (d.ok) { location.reload(); }
+        else { alert(d.error || 'Could not update pin.'); }
+    };
+})();
+</script>
 
 <?php elseif ($activeTab === 'notes' && canAccessClinical()): ?>
 <!-- ── SOAP Notes Tab ──────────────────────────────────────────────────────── -->
