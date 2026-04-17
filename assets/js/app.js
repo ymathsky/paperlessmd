@@ -22,12 +22,16 @@ document.addEventListener('DOMContentLoaded', function () {
             const w     = wrapper.getBoundingClientRect().width || wrapper.offsetWidth;
             if (!w) return;
             const h = 200;
+            // Save drawn data BEFORE clearing
+            const saved = sigPad.isEmpty() ? null : sigPad.toData();
             canvas.width        = w * ratio;
             canvas.height       = h * ratio;
             canvas.style.width  = w + 'px';
             canvas.style.height = h + 'px';
             canvas.getContext('2d').scale(ratio, ratio);
             sigPad.clear();
+            // Restore drawn data AFTER resize
+            if (saved) sigPad.fromData(saved);
         }
 
         if (typeof ResizeObserver !== 'undefined') {
@@ -65,12 +69,16 @@ document.addEventListener('DOMContentLoaded', function () {
             const w     = maWrapper.getBoundingClientRect().width || maWrapper.offsetWidth;
             if (!w) return; // not laid out yet — ResizeObserver will retry
             const h = 160;
+            // Save drawn data BEFORE clearing
+            const saved = maSigPad.isEmpty() ? null : maSigPad.toData();
             maCanvas.width        = w * ratio;
             maCanvas.height       = h * ratio;
             maCanvas.style.width  = w + 'px';
             maCanvas.style.height = h + 'px';
             maCanvas.getContext('2d').scale(ratio, ratio);
             maSigPad.clear();
+            // Restore drawn data AFTER resize
+            if (saved) maSigPad.fromData(saved);
         }
 
         // Use ResizeObserver for reliable sizing (fires when element has real layout)
