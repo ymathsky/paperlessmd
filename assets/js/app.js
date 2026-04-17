@@ -17,32 +17,30 @@ document.addEventListener('DOMContentLoaded', function () {
             maxWidth:        3.5,
         });
 
-        function resizeCanvas() {
+        function resizeCanvas(restoreSig) {
             const ratio = Math.max(window.devicePixelRatio || 1, 1);
             const w     = wrapper.getBoundingClientRect().width || wrapper.offsetWidth;
-            if (!w) return;
-            const h = 200;
-            // Save drawn data BEFORE clearing
-            const saved = sigPad.isEmpty() ? null : sigPad.toData();
+            if (!w) return false;
+            const h     = 200;
+            const saved = (restoreSig && !sigPad.isEmpty()) ? sigPad.toData() : null;
             canvas.width        = w * ratio;
             canvas.height       = h * ratio;
             canvas.style.width  = w + 'px';
             canvas.style.height = h + 'px';
             canvas.getContext('2d').scale(ratio, ratio);
             sigPad.clear();
-            // Restore drawn data AFTER resize
             if (saved) sigPad.fromData(saved);
+            return true;
         }
 
-        if (typeof ResizeObserver !== 'undefined') {
-            const ro = new ResizeObserver(function(entries) {
-                if (entries[0].contentRect.width > 0) resizeCanvas();
-            });
-            ro.observe(wrapper);
-        } else {
-            setTimeout(resizeCanvas, 150);
-        }
-        window.addEventListener('resize', resizeCanvas);
+        // One-shot init: retry via rAF until element has real width, then stop
+        (function tryInit(attempts) {
+            if (!resizeCanvas(false) && attempts < 30) {
+                requestAnimationFrame(function() { tryInit(attempts + 1); });
+            }
+        })(0);
+        // Only re-size on actual window resize (not layout shifts during drawing)
+        window.addEventListener('resize', function() { resizeCanvas(true); });
 
         const clearBtn = document.getElementById('clearSig');
         if (clearBtn) {
@@ -64,36 +62,30 @@ document.addEventListener('DOMContentLoaded', function () {
             maxWidth:        3.5,
         });
 
-        function resizeMaCanvas() {
+        function resizeMaCanvas(restoreSig) {
             const ratio = Math.max(window.devicePixelRatio || 1, 1);
             const w     = maWrapper.getBoundingClientRect().width || maWrapper.offsetWidth;
-            if (!w) return; // not laid out yet — ResizeObserver will retry
-            const h = 160;
-            // Save drawn data BEFORE clearing
-            const saved = maSigPad.isEmpty() ? null : maSigPad.toData();
+            if (!w) return false;
+            const h     = 160;
+            const saved = (restoreSig && !maSigPad.isEmpty()) ? maSigPad.toData() : null;
             maCanvas.width        = w * ratio;
             maCanvas.height       = h * ratio;
             maCanvas.style.width  = w + 'px';
             maCanvas.style.height = h + 'px';
             maCanvas.getContext('2d').scale(ratio, ratio);
             maSigPad.clear();
-            // Restore drawn data AFTER resize
             if (saved) maSigPad.fromData(saved);
+            return true;
         }
 
-        // Use ResizeObserver for reliable sizing (fires when element has real layout)
-        if (typeof ResizeObserver !== 'undefined') {
-            const ro = new ResizeObserver(function(entries) {
-                if (entries[0].contentRect.width > 0) {
-                    resizeMaCanvas();
-                }
-            });
-            ro.observe(maWrapper);
-        } else {
-            // Fallback for older browsers
-            setTimeout(resizeMaCanvas, 300);
-        }
-        window.addEventListener('resize', resizeMaCanvas);
+        // One-shot init: retry via rAF until element has real width, then stop
+        (function tryMaInit(attempts) {
+            if (!resizeMaCanvas(false) && attempts < 30) {
+                requestAnimationFrame(function() { tryMaInit(attempts + 1); });
+            }
+        })(0);
+        // Only re-size on actual window resize (not layout shifts during drawing)
+        window.addEventListener('resize', function() { resizeMaCanvas(true); });
 
         const clearMaBtn = document.getElementById('clearMaSig');
         if (clearMaBtn) clearMaBtn.addEventListener('click', () => maSigPad.clear());
