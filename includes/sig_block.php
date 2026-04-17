@@ -51,7 +51,7 @@
             </button>
             <span class="text-xs text-slate-400">Your signature confirms agreement to the information above</span>
         </div>
-        <input type="hidden" name="patient_signature" id="sigData">
+        <input type="hidden" name="patient_signature" id="sigData" form="mainForm">
     </div>
 </div>
 
@@ -80,6 +80,6 @@
             </button>
             <span class="text-xs text-slate-400">Confirms accuracy of information recorded</span>
         </div>
-        <input type="hidden" name="ma_signature" id="maSigData">
+        <input type="hidden" name="ma_signature" id="maSigData" form="mainForm">
     </div>
 </div>
