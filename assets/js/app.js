@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', function () {
             minWidth:        1.5,
             maxWidth:        3.5,
         });
+        canvas.style.touchAction = 'none';
 
         function resizeCanvas(restoreSig) {
             const ratio = Math.max(window.devicePixelRatio || 1, 1);
@@ -61,6 +62,7 @@ document.addEventListener('DOMContentLoaded', function () {
             minWidth:        1.5,
             maxWidth:        3.5,
         });
+        maCanvas.style.touchAction = 'none';
 
         function resizeMaCanvas(restoreSig) {
             const ratio = Math.max(window.devicePixelRatio || 1, 1);
@@ -112,6 +114,11 @@ document.addEventListener('DOMContentLoaded', function () {
         const sigAlert   = document.getElementById('sigAlert');
         const maSigAlert = document.getElementById('maSigAlert');
         let valid = true;
+
+        if (!sigPad || !maSigPad) {
+            alert('Signature pad failed to load. Please refresh the page and try again.');
+            return;
+        }
 
         if (sigPad) {
             if (sigPad.isEmpty()) {

@@ -42,8 +42,8 @@
     <?= APP_NAME ?> &copy; <?= date('Y') ?> &mdash; HIPAA-Conscious Paperless Document System
 </footer>
 
-<script src="https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js"></script>
-<script src="<?= BASE_URL ?>/assets/js/app.js"></script>
+<script src="<?= BASE_URL ?>/assets/js/signature_pad.min.js"></script>
+<script src="<?= BASE_URL ?>/assets/js/app.js?v=2"></script>
 <script>window._pdBase = '<?= BASE_URL ?>';</script>
 <script src="<?= BASE_URL ?>/assets/js/autosave.js" defer></script>
 <script src="<?= BASE_URL ?>/assets/js/voice.js" defer></script>
