@@ -12,7 +12,16 @@
     'use strict';
 
     // ── Core API caller ────────────────────────────────────────────────────────
+    var _aiCooldownUntil = 0; // epoch ms — shared across all buttons
+
     async function callAI(action, payload) {
+        // Client-side cooldown guard
+        var now = Date.now();
+        if (now < _aiCooldownUntil) {
+            var secs = Math.ceil((_aiCooldownUntil - now) / 1000);
+            throw new Error('Please wait ' + secs + ' second' + (secs === 1 ? '' : 's') + ' before making another AI request.');
+        }
+
         var csrf = window._pdCsrf || '';
         var base = window._pdBase || '';
         var body = Object.assign({ action: action, csrf_token: csrf }, payload);
@@ -25,12 +34,44 @@
 
         var json = await res.json();
         if (!json.ok) {
+            var wait = json.retry_after || 30;
             if (res.status === 429) {
-                throw new Error('The AI service is busy right now \u2014 please wait a moment and try again.');
+                _aiCooldownUntil = Date.now() + wait * 1000;
+                startCooldownBadge(wait);
+                throw new Error('AI busy \u2014 auto-retrying in ' + wait + 's. Try again shortly.');
             }
             throw new Error(json.error || 'AI request failed');
         }
         return json.text;
+    }
+
+    // Floating cooldown badge on the bubble
+    function startCooldownBadge(seconds) {
+        var badge = document.getElementById('aiCooldownBadge');
+        if (!badge) {
+            badge = document.createElement('span');
+            badge.id = 'aiCooldownBadge';
+            badge.style.cssText =
+                'position:absolute;top:-4px;right:-4px;min-width:22px;height:22px;' +
+                'background:#ef4444;color:#fff;border-radius:999px;font-size:11px;' +
+                'font-weight:700;display:flex;align-items:center;justify-content:center;' +
+                'padding:0 4px;line-height:1;z-index:1;';
+            if (bubble) {
+                bubble.style.position = 'relative';
+                bubble.appendChild(badge);
+            }
+        }
+        var remaining = seconds;
+        badge.textContent = remaining + 's';
+        var t = setInterval(function () {
+            remaining--;
+            if (remaining <= 0) {
+                clearInterval(t);
+                if (badge.parentNode) badge.remove();
+            } else {
+                badge.textContent = remaining + 's';
+            }
+        }, 1000);
     }
 
     // ── DOM refs ──────────────────────────────────────────────────────────────
