@@ -175,7 +175,7 @@ include __DIR__ . '/includes/header.php';
 #print-layout { display: none; }
 
 @media print {
-    @page { size: A4 landscape; margin: 10mm 8mm; }
+    @page { size: A4 <?= $view === 'week' ? 'landscape' : 'portrait' ?>; margin: 12mm 10mm; }
 
     body, html { background: #fff !important; margin: 0 !important; padding: 0 !important; }
 
@@ -580,67 +580,126 @@ include __DIR__ . '/includes/header.php';
     <?php else: ?>
     <!-- ════ DAY VIEW ════ -->
     <?php if (empty($visits)): ?>
-    <p style="text-align: center; color: #94a3b8; font-size: 9pt; padding: 20pt 0;">No visits scheduled for this day.</p>
+    <p style="text-align: center; color: #94a3b8; font-size: 9pt; padding: 20pt 0; border: 1pt dashed #e2e8f0; border-radius: 4pt;">No visits scheduled for this day.</p>
     <?php else:
         $pVtLabels2 = ['routine'=>'Routine','new_patient'=>'New Patient','wound_care'=>'Wound Care','awv'=>'Annual Wellness Visit','ccm'=>'CCM','il'=>'IL Disclosure'];
         $pSColors   = [
-            'pending'   => ['bg'=>'#f1f5f9','color'=>'#475569','border'=>'#cbd5e1'],
-            'en_route'  => ['bg'=>'#eff6ff','color'=>'#1d4ed8','border'=>'#bfdbfe'],
-            'completed' => ['bg'=>'#f0fdf4','color'=>'#15803d','border'=>'#bbf7d0'],
-            'missed'    => ['bg'=>'#fef2f2','color'=>'#dc2626','border'=>'#fecaca'],
+            'pending'   => ['bg'=>'#f1f5f9','color'=>'#475569','border'=>'#cbd5e1','dot'=>'#94a3b8'],
+            'en_route'  => ['bg'=>'#eff6ff','color'=>'#1d4ed8','border'=>'#bfdbfe','dot'=>'#3b82f6'],
+            'completed' => ['bg'=>'#f0fdf4','color'=>'#15803d','border'=>'#bbf7d0','dot'=>'#22c55e'],
+            'missed'    => ['bg'=>'#fef2f2','color'=>'#dc2626','border'=>'#fecaca','dot'=>'#ef4444'],
         ];
     ?>
-    <table style="width: 100%; border-collapse: collapse;">
+
+    <!-- visit count label -->
+    <div style="font-size: 8pt; color: #64748b; margin-bottom: 5pt; font-weight: 600;">
+        <?= count($visits) ?> visit<?= count($visits) !== 1 ? 's' : '' ?> scheduled
+    </div>
+
+    <table style="width: 100%; border-collapse: collapse; border: 1pt solid #cbd5e1; border-radius: 4pt; font-size: 8.5pt;">
         <colgroup>
-            <col style="width: 20pt;">
-            <col><!-- patient name + notes -->
-            <col style="width: 56pt;"><!-- status -->
-            <col style="width: 72pt;"><!-- visit type -->
-            <col style="width: 44pt;"><!-- time -->
-            <col style="width: 35%;"><!-- address/phone -->
+            <col style="width: 18pt;">          <!-- # -->
+            <col style="width: 42pt;">          <!-- time -->
+            <col>                               <!-- patient + notes -->
+            <col style="width: 30%;">          <!-- address / phone -->
+            <col style="width: 60pt;">         <!-- visit type -->
+            <col style="width: 52pt;">         <!-- status -->
+            <col style="width: 44pt;">         <!-- sign-off -->
         </colgroup>
         <thead>
-            <tr style="background: #f1f5f9; border-bottom: 1.5pt solid #cbd5e1;">
-                <th style="padding: 5pt; text-align: left; font-size: 6.5pt; text-transform: uppercase; letter-spacing: 0.5pt; color: #64748b;">#</th>
-                <th style="padding: 5pt; text-align: left; font-size: 6.5pt; text-transform: uppercase; letter-spacing: 0.5pt; color: #64748b;">Patient</th>
-                <th style="padding: 5pt; text-align: left; font-size: 6.5pt; text-transform: uppercase; letter-spacing: 0.5pt; color: #64748b;">Status</th>
-                <th style="padding: 5pt; text-align: left; font-size: 6.5pt; text-transform: uppercase; letter-spacing: 0.5pt; color: #64748b;">Visit Type</th>
-                <th style="padding: 5pt; text-align: left; font-size: 6.5pt; text-transform: uppercase; letter-spacing: 0.5pt; color: #64748b;">Time</th>
-                <th style="padding: 5pt; text-align: left; font-size: 6.5pt; text-transform: uppercase; letter-spacing: 0.5pt; color: #64748b;">Address &amp; Phone</th>
+            <tr style="background: #1e3a8a; color: #fff;">
+                <th style="padding: 6pt 5pt; text-align: center; font-size: 7pt; font-weight: 700; border-right: 0.5pt solid #3b5bdb;">#</th>
+                <th style="padding: 6pt 5pt; text-align: left;   font-size: 7pt; font-weight: 700; border-right: 0.5pt solid #3b5bdb;">Time</th>
+                <th style="padding: 6pt 5pt; text-align: left;   font-size: 7pt; font-weight: 700; border-right: 0.5pt solid #3b5bdb;">Patient</th>
+                <th style="padding: 6pt 5pt; text-align: left;   font-size: 7pt; font-weight: 700; border-right: 0.5pt solid #3b5bdb;">Address &amp; Phone</th>
+                <th style="padding: 6pt 5pt; text-align: left;   font-size: 7pt; font-weight: 700; border-right: 0.5pt solid #3b5bdb;">Visit Type</th>
+                <th style="padding: 6pt 5pt; text-align: center; font-size: 7pt; font-weight: 700; border-right: 0.5pt solid #3b5bdb;">Status</th>
+                <th style="padding: 6pt 5pt; text-align: center; font-size: 7pt; font-weight: 700;">MA Sign</th>
             </tr>
         </thead>
         <tbody>
             <?php foreach ($visits as $idx => $v):
-                $psc = $pSColors[$v['status']];
-                $vt2 = $v['visit_type'] ?? 'routine';
+                $psc  = $pSColors[$v['status']];
+                $vt2  = $v['visit_type'] ?? 'routine';
+                $rowBg = $idx % 2 === 1 ? '#f8fafc' : '#ffffff';
             ?>
-            <tr style="border-bottom: 0.5pt solid #e2e8f0; <?= $idx % 2 === 1 ? 'background:#f8fafc;' : '' ?> page-break-inside: avoid; vertical-align: top;">
-                <td style="padding: 6pt 5pt;">
-                    <div style="width: 15pt; height: 15pt; background: #e0e7ff; border-radius: 3pt; font-weight: 800; color: #4338ca; font-size: 7.5pt; text-align: center; line-height: 15pt;"><?= $idx + 1 ?></div>
+            <tr style="background: <?= $rowBg ?>; border-top: 0.75pt solid #e2e8f0; page-break-inside: avoid; vertical-align: middle;">
+                <!-- # -->
+                <td style="padding: 6pt 5pt; text-align: center; border-right: 0.5pt solid #e2e8f0;">
+                    <span style="display: inline-block; width: 14pt; height: 14pt; background: #e0e7ff; border-radius: 3pt; font-weight: 800; color: #3730a3; font-size: 7.5pt; text-align: center; line-height: 14pt;"><?= $idx + 1 ?></span>
                 </td>
-                <td style="padding: 6pt 5pt;">
-                    <div style="font-size: 9.5pt; font-weight: 800; color: #0f172a; margin-bottom: 2pt;"><?= h($v['patient_name']) ?></div>
+                <!-- Time -->
+                <td style="padding: 6pt 5pt; font-size: 8.5pt; font-weight: 700; color: #1e293b; white-space: nowrap; border-right: 0.5pt solid #e2e8f0;">
+                    <?= $v['visit_time'] ? date('g:i A', strtotime($v['visit_time'])) : '<span style="color:#cbd5e1;">—</span>' ?>
+                </td>
+                <!-- Patient + notes -->
+                <td style="padding: 6pt 5pt; border-right: 0.5pt solid #e2e8f0;">
+                    <div style="font-size: 9.5pt; font-weight: 800; color: #0f172a;"><?= h($v['patient_name']) ?></div>
                     <?php if (!empty($v['notes'])): ?>
-                    <div style="font-size: 6.5pt; color: #92400e; background: #fffbeb; border: 0.5pt solid #fde68a; border-radius: 2pt; padding: 1.5pt 4pt;"><?= h($v['notes']) ?></div>
+                    <div style="margin-top: 2pt; font-size: 6.5pt; color: #92400e; background: #fffbeb; border: 0.5pt solid #fde68a; border-radius: 2pt; padding: 1.5pt 4pt; display: inline-block;"><?= h($v['notes']) ?></div>
                     <?php endif; ?>
                     <?php if (!empty($v['visit_notes'])): ?>
-                    <div style="margin-top: 2pt; font-size: 6.5pt; color: #374151; font-style: italic;">Note: <?= h($v['visit_notes']) ?></div>
+                    <div style="margin-top: 2pt; font-size: 6.5pt; color: #374151; font-style: italic;">&#128203; <?= h($v['visit_notes']) ?></div>
                     <?php endif; ?>
                 </td>
-                <td style="padding: 6pt 5pt;">
-                    <span style="display: inline-block; padding: 2pt 5pt; border-radius: 10pt; font-size: 7pt; font-weight: 700; background: <?= $psc['bg'] ?>; color: <?= $psc['color'] ?>; border: 0.5pt solid <?= $psc['border'] ?>; white-space: nowrap;"><?= $statusDefs[$v['status']]['label'] ?></span>
-                </td>
-                <td style="padding: 6pt 5pt; font-size: 8pt; color: #4338ca; font-weight: 600;"><?= h($pVtLabels2[$vt2] ?? 'Routine') ?></td>
-                <td style="padding: 6pt 5pt; font-size: 8.5pt; color: #334155; white-space: nowrap;"><?= $v['visit_time'] ? date('g:i A', strtotime($v['visit_time'])) : '&mdash;' ?></td>
-                <td style="padding: 6pt 5pt; font-size: 8pt; color: #334155;">
+                <!-- Address / Phone -->
+                <td style="padding: 6pt 5pt; border-right: 0.5pt solid #e2e8f0; font-size: 8pt; color: #334155; line-height: 1.4;">
                     <?php if ($v['patient_address']): ?><div><?= h($v['patient_address']) ?></div><?php endif; ?>
-                    <?php if ($v['patient_phone']): ?><div style="color: #64748b;"><?= h($v['patient_phone']) ?></div><?php endif; ?>
-                    <?php if (!$v['patient_address'] && !$v['patient_phone']): ?><span style="color:#cbd5e1;">&mdash;</span><?php endif; ?>
+                    <?php if ($v['patient_phone']): ?><div style="color: #64748b; margin-top: 1pt;"><?= h($v['patient_phone']) ?></div><?php endif; ?>
+                    <?php if (!$v['patient_address'] && !$v['patient_phone']): ?><span style="color:#cbd5e1;">—</span><?php endif; ?>
+                </td>
+                <!-- Visit Type -->
+                <td style="padding: 6pt 5pt; font-size: 7.5pt; color: #4f46e5; font-weight: 700; border-right: 0.5pt solid #e2e8f0;">
+                    <?= h($pVtLabels2[$vt2] ?? 'Routine') ?>
+                </td>
+                <!-- Status badge -->
+                <td style="padding: 6pt 5pt; text-align: center; border-right: 0.5pt solid #e2e8f0;">
+                    <span style="display: inline-flex; align-items: center; gap: 3pt; padding: 2.5pt 6pt; border-radius: 10pt; font-size: 7pt; font-weight: 700; background: <?= $psc['bg'] ?>; color: <?= $psc['color'] ?>; border: 0.5pt solid <?= $psc['border'] ?>; white-space: nowrap;">
+                        <span style="display:inline-block; width:5pt; height:5pt; border-radius:50%; background:<?= $psc['dot'] ?>;"></span>
+                        <?= $statusDefs[$v['status']]['label'] ?>
+                    </span>
+                </td>
+                <!-- Sign-off line -->
+                <td style="padding: 6pt 5pt; text-align: center;">
+                    <div style="border-bottom: 1pt solid #94a3b8; width: 36pt; margin: 0 auto; height: 14pt;"></div>
+                    <div style="font-size: 5.5pt; color: #94a3b8; margin-top: 1pt; text-transform: uppercase; letter-spacing: 0.3pt;">initials</div>
                 </td>
             </tr>
             <?php endforeach; ?>
         </tbody>
+        <!-- Footer row -->
+        <tfoot>
+            <tr style="background: #f1f5f9; border-top: 1.5pt solid #cbd5e1;">
+                <td colspan="5" style="padding: 5pt 7pt; font-size: 7.5pt; color: #475569; font-weight: 700;">
+                    Total: <?= count($visits) ?> visit<?= count($visits) !== 1 ? 's' : '' ?> &mdash;
+                    <?= $counts['completed'] ?> completed &bull;
+                    <?= $counts['pending'] ?> pending &bull;
+                    <?= $counts['en_route'] ?> en route &bull;
+                    <?= $counts['missed'] ?> missed
+                </td>
+                <td colspan="2" style="padding: 5pt 7pt; font-size: 7pt; color: #64748b; text-align: right;">
+                    Confirmed by: ________________________
+                </td>
+            </tr>
+        </tfoot>
     </table>
+
+    <!-- Signature block at bottom -->
+    <div style="margin-top: 18pt; display: flex; gap: 30pt;">
+        <div style="flex: 1;">
+            <div style="border-bottom: 1pt solid #334155; height: 20pt;"></div>
+            <div style="font-size: 7pt; color: #64748b; margin-top: 3pt; text-transform: uppercase; letter-spacing: 0.4pt;">MA Signature</div>
+        </div>
+        <div style="flex: 1;">
+            <div style="border-bottom: 1pt solid #334155; height: 20pt;"></div>
+            <div style="font-size: 7pt; color: #64748b; margin-top: 3pt; text-transform: uppercase; letter-spacing: 0.4pt;">Supervisor Signature</div>
+        </div>
+        <div style="width: 70pt;">
+            <div style="border-bottom: 1pt solid #334155; height: 20pt;"></div>
+            <div style="font-size: 7pt; color: #64748b; margin-top: 3pt; text-transform: uppercase; letter-spacing: 0.4pt;">Date</div>
+        </div>
+    </div>
+
     <?php endif; ?>
     <?php endif; ?>
 
