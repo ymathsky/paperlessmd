@@ -46,7 +46,7 @@ include __DIR__ . '/includes/header.php';
     <span class="text-slate-700 font-semibold">Add New Patient</span>
 </nav>
 
-<div class="max-w-2xl">
+<div class="max-w-2xl mx-auto">
     <!-- Card -->
     <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
         <div class="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4">
