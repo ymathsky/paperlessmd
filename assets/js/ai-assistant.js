@@ -24,7 +24,12 @@
         });
 
         var json = await res.json();
-        if (!json.ok) throw new Error(json.error || 'AI request failed');
+        if (!json.ok) {
+            if (res.status === 429) {
+                throw new Error('The AI service is busy right now \u2014 please wait a moment and try again.');
+            }
+            throw new Error(json.error || 'AI request failed');
+        }
         return json.text;
     }
 

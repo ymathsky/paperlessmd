@@ -164,9 +164,9 @@ switch ($action) {
         exit;
 }
 
-// ── Call Gemini API ───────────────────────────────────────────────────────────
-$model   = $imageData ? 'gemini-2.0-flash' : 'gemini-2.0-flash';
-$url     = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
+// ── Call Gemini API (with one retry on 429) ─────────────────────────────────
+$model = 'gemini-2.0-flash';
+$url   = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
 
 $parts = [];
 if ($imageData) {
@@ -183,18 +183,13 @@ $payload = [
     ],
 ];
 
-$ch = curl_init($url);
-curl_setopt_array($ch, [
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_POST           => true,
-    CURLOPT_POSTFIELDS     => json_encode($payload),
-    CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
-    CURLOPT_TIMEOUT        => 30,
-]);
-$raw  = curl_exec($ch);
-$code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-$err  = curl_error($ch);
-curl_close($ch);
+[$raw, $code, $err] = geminiPost($url, $payload);
+
+// Retry once after 3 s if rate-limited
+if ($code === 429) {
+    sleep(3);
+    [$raw, $code, $err] = geminiPost($url, $payload);
+}
 
 if ($err) {
     http_response_code(502);
@@ -203,6 +198,12 @@ if ($err) {
 }
 
 $resp = json_decode($raw, true);
+
+if ($code === 429) {
+    http_response_code(429);
+    echo json_encode(['ok' => false, 'error' => 'The AI service is busy right now. Please wait a moment and try again.']);
+    exit;
+}
 
 if ($code !== 200) {
     $msg = $resp['error']['message'] ?? 'AI service error';
@@ -226,6 +227,22 @@ try {
 echo json_encode(['ok' => true, 'text' => $text]);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+function geminiPost(string $url, array $payload): array {
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => json_encode($payload),
+        CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+        CURLOPT_TIMEOUT        => 30,
+    ]);
+    $raw  = curl_exec($ch);
+    $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err  = curl_error($ch);
+    curl_close($ch);
+    return [$raw, $code, $err];
+}
+
 function badRequest(string $msg): void {
     http_response_code(400);
     echo json_encode(['ok' => false, 'error' => $msg]);
