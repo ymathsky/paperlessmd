@@ -238,7 +238,7 @@ include __DIR__ . '/../includes/header.php';
     <span class="text-slate-700 font-semibold">Wound Care Photos</span>
 </nav>
 
-<div class="max-w-3xl">
+<div class="max-w-3xl mx-auto">
 <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-5">
     <div class="bg-gradient-to-r from-violet-600 to-violet-500 px-6 py-4 flex items-center gap-3">
         <div class="bg-white/20 p-2 rounded-xl">

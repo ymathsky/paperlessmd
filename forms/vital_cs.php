@@ -81,7 +81,7 @@ include __DIR__ . '/../includes/header.php';
     <span class="text-slate-700 font-semibold">Visit Consent Form</span>
 </nav>
 
-<div class="max-w-3xl">
+<div class="max-w-3xl mx-auto">
 
 <?php if ($prevDate): ?>
 <div id="prefillBanner"

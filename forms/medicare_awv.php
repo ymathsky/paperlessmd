@@ -79,7 +79,7 @@ function sectionHeader($num, $title, $icon='bi-circle-fill', $color='sky') {
 }
 ?>
 
-<div class="max-w-3xl">
+<div class="max-w-3xl mx-auto">
 
 <div id="wiz-resume-banner" class="hidden flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-2xl px-5 py-3.5 mb-4 text-sm text-blue-800">
     <i class="bi bi-floppy-fill text-blue-500 text-lg shrink-0"></i>
