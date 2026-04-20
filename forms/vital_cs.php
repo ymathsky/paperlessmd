@@ -32,7 +32,7 @@ $prevDate = $prevRow ? $prevRow['created_at'] : null;
 function pv(array $prev, string $key): string {
     return isset($prev[$key]) ? htmlspecialchars((string)$prev[$key], ENT_QUOTES, 'UTF-8') : '';
 }
-// Race was saved as array or comma-list â€” normalise to array
+// Race was saved as array or comma-list &mdash; normalise to array
 $prevRace = [];
 if (isset($prev['race'])) {
     $prevRace = is_array($prev['race']) ? $prev['race'] : explode(',', $prev['race']);
@@ -50,7 +50,7 @@ try {
     ");
     $medsStmt->execute([$patient_id]);
     $activeMeds = $medsStmt->fetchAll();
-} catch (PDOException $e) { /* table not yet migrated â€” fall back to empty */ }
+} catch (PDOException $e) { /* table not yet migrated &mdash; fall back to empty */ }
 
 // Build exactly 6 rows: pre-filled from master list first, then empty
 $medRows = [];
@@ -89,8 +89,8 @@ include __DIR__ . '/../includes/header.php';
     <i class="bi bi-arrow-counterclockwise text-amber-500 text-lg shrink-0"></i>
     <div class="flex-1">
         <span class="font-semibold">Pre-filled from last visit</span>
-        <span class="text-amber-600"> â€” <?= date('M j, Y', strtotime($prevDate)) ?></span>
-        <span class="text-amber-600 text-xs ml-1">(pharmacy, allergies, medications &amp; vitals carried over â€” update as needed)</span>
+        <span class="text-amber-600"> &mdash; <?= date('M j, Y', strtotime($prevDate)) ?></span>
+        <span class="text-amber-600 text-xs ml-1">(pharmacy, allergies, medications &amp; vitals carried over &mdash; update as needed)</span>
     </div>
     <button onclick="document.getElementById('prefillBanner').remove()"
             class="text-amber-400 hover:text-amber-700 transition-colors p-1 rounded-lg hover:bg-amber-100">
@@ -115,7 +115,7 @@ include __DIR__ . '/../includes/header.php';
             <i class="bi bi-file-medical-fill text-white text-xl"></i>
         </div>
         <div>
-            <h2 class="text-white font-bold text-lg"><?= h(PRACTICE_NAME) ?> â€” Consent Form</h2>
+            <h2 class="text-white font-bold text-lg"><?= h(PRACTICE_NAME) ?> &mdash; Consent Form</h2>
             <p class="text-red-100 text-sm"><?= h($patient['first_name'] . ' ' . $patient['last_name']) ?></p>
         </div>
     </div>
@@ -132,7 +132,7 @@ include __DIR__ . '/../includes/header.php';
         <div class="px-6 pb-2">
 
         <!-- â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•— -->
-        <!-- â•‘  STEP 1 â€” Visit Info             â•‘ -->
+        <!-- â•‘  STEP 1 &mdash; Visit Info             â•‘ -->
         <!-- â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
         <div class="wiz-step space-y-6 py-4"
              data-step="0"
@@ -227,7 +227,7 @@ include __DIR__ . '/../includes/header.php';
 
 
         <!-- â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•— -->
-        <!-- â•‘  STEP 2 â€” Vitals & Clinical      â•‘ -->
+        <!-- â•‘  STEP 2 &mdash; Vitals & Clinical      â•‘ -->
         <!-- â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
         <div class="wiz-step hidden space-y-6 py-4"
              data-step="1"
@@ -280,7 +280,7 @@ include __DIR__ . '/../includes/header.php';
             <div>
                 <label class="block text-sm font-bold text-slate-700 mb-1">
                     Diagnosis / ICD-10 Codes
-                    <span class="ml-1.5 text-xs font-normal text-slate-400">(up to 6 â€” required for billing)</span>
+                    <span class="ml-1.5 text-xs font-normal text-slate-400">(up to 6 &mdash; required for billing)</span>
                 </label>
                 <div id="icdChips" class="flex flex-wrap gap-2 mb-2 min-h-[2rem]"></div>
                 <div id="icdHiddenInputs"></div>
@@ -302,14 +302,14 @@ include __DIR__ . '/../includes/header.php';
                 </p>
                 <p class="text-xs text-slate-400 mt-1.5">
                     <i class="bi bi-info-circle text-slate-300 mr-0.5"></i>
-                    Wound-care ICD-10 library â€” codes pre-filled from last visit when available.
+                    Wound-care ICD-10 library &mdash; codes pre-filled from last visit when available.
                 </p>
             </div>
         </div><!-- /step 2 -->
 
 
         <!-- â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•— -->
-        <!-- â•‘  STEP 3 â€” Medications            â•‘ -->
+        <!-- â•‘  STEP 3 &mdash; Medications            â•‘ -->
         <!-- â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
         <div class="wiz-step hidden space-y-6 py-4"
              data-step="2"
@@ -372,7 +372,7 @@ include __DIR__ . '/../includes/header.php';
             <a href="<?= BASE_URL ?>/patient_view.php?id=<?= $patient_id ?>&tab=meds" target="_blank"
                class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50
                       border border-emerald-200 px-3 py-1.5 rounded-full hover:bg-emerald-100 transition-colors mb-2">
-                <i class="bi bi-arrow-counterclockwise"></i><?= count($activeMeds) ?> meds from master list â€” Manage
+                <i class="bi bi-arrow-counterclockwise"></i><?= count($activeMeds) ?> meds from master list &mdash; Manage
             </a>
             <?php endif; ?>
 
@@ -396,7 +396,7 @@ include __DIR__ . '/../includes/header.php';
                                 <select name="med_type_<?= $i ?>"
                                         class="w-full px-2 py-2 border <?= $isPrefilled ? 'border-emerald-200' : 'border-slate-200' ?> rounded-lg text-xs bg-white
                                                focus:outline-none focus:ring-2 focus:ring-red-400">
-                                    <option value="">â€”</option>
+                                    <option value="">&mdash;</option>
                                     <?php foreach (['New','Refill','D/C'] as $opt): ?>
                                     <option <?= $row['med_type'] === $opt ? 'selected' : '' ?>><?= $opt ?></option>
                                     <?php endforeach; ?>
@@ -431,7 +431,7 @@ include __DIR__ . '/../includes/header.php';
 
 
         <!-- â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•— -->
-        <!-- â•‘  STEP 4 â€” Sign & Submit          â•‘ -->
+        <!-- â•‘  STEP 4 &mdash; Sign & Submit          â•‘ -->
         <!-- â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
         <div class="wiz-step hidden space-y-6 py-4"
              data-step="3"
@@ -503,11 +503,11 @@ $extraJs = <<<JSBLOCK
                 + '<i class="bi bi-x-circle-fill text-sm"></i></button>';
             chipsEl.appendChild(chip);
 
-            // Hidden input â€” stored as "CODE â€” desc" string in array
+            // Hidden input &mdash; stored as "CODE &mdash; desc" string in array
             var inp = document.createElement('input');
             inp.type  = 'hidden';
             inp.name  = 'icd10_codes[]';
-            inp.value = item.code + ' â€” ' + item.desc;
+            inp.value = item.code + ' &mdash; ' + item.desc;
             hiddenEl.appendChild(inp);
         });
 
@@ -539,7 +539,7 @@ $extraJs = <<<JSBLOCK
         if (!items.length) {
             var empty = document.createElement('div');
             empty.className = 'px-4 py-3 text-slate-400 text-xs italic';
-            empty.textContent = 'No codes found â€” try different keywords';
+            empty.textContent = 'No codes found &mdash; try different keywords';
             dropdown.appendChild(empty);
             dropdown.classList.remove('hidden');
             return;
@@ -604,7 +604,7 @@ $extraJs = <<<JSBLOCK
     var prefill = $icdPrefillJson;
     if (Array.isArray(prefill)) {
         prefill.forEach(function (raw) {
-            // raw is "CODE â€” desc" string
+            // raw is "CODE &mdash; desc" string
             var m = raw.match(/^([A-Z0-9.]+)\s+\u2014\s+(.+)$/);
             if (m) addCode({ code: m[1], desc: m[2], cat: '' });
         });

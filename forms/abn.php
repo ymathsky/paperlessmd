@@ -146,7 +146,7 @@ If secondary insurance is available will bill 20% to secondary insurance.</texta
             <!-- Step 1: Patient Options -->
             <div class="wiz-step hidden space-y-6 py-4" data-step="1" data-title="Patient Options" data-icon="bi-check2-square">
 
-                <label class="block text-sm font-bold text-slate-700 mb-3">G. OPTIONS â€” Check only one box. We cannot choose a box for you.</label>
+                <label class="block text-sm font-bold text-slate-700 mb-3">G. OPTIONS &mdash; Check only one box. We cannot choose a box for you.</label>
                 <div class="space-y-3">
                     <label class="flex items-start gap-3 p-4 border border-slate-200 rounded-xl cursor-pointer
                                   hover:border-amber-300 hover:bg-amber-50/50 transition-colors has-[:checked]:border-amber-400 has-[:checked]:bg-amber-50">
