@@ -71,7 +71,15 @@ include __DIR__ . '/../includes/header.php';
 </nav>
 
 <div class="max-w-3xl">
-<div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-5">
+
+<div id="wiz-resume-banner" class="hidden flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-2xl px-5 py-3.5 mb-4 text-sm text-blue-800">
+    <i class="bi bi-floppy-fill text-blue-500 text-lg shrink-0"></i>
+    <div class="flex-1"><span class="font-semibold">Unsaved draft found.</span> Resume where you left off?</div>
+    <button id="wiz-resume-yes" class="px-4 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition-colors">Resume</button>
+    <button id="wiz-resume-no"  class="px-4 py-1.5 bg-white border border-blue-200 text-blue-600 text-xs font-bold rounded-lg hover:bg-blue-50 transition-colors ml-1">Start fresh</button>
+</div>
+
+<div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
     <div class="bg-gradient-to-r from-violet-700 to-violet-600 px-6 py-4 flex items-center gap-3">
         <div class="bg-white/20 p-2 rounded-xl">
             <i class="bi bi-brain text-white text-xl"></i>
@@ -82,6 +90,8 @@ include __DIR__ . '/../includes/header.php';
         </div>
     </div>
 
+    <div id="wiz-header" class="px-6 pt-5 pb-2"></div>
+
     <form id="mainForm" method="POST" action="<?= BASE_URL ?>/api/save_form.php" novalidate>
         <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
         <input type="hidden" name="patient_id" value="<?= $patient_id ?>">
@@ -89,8 +99,12 @@ include __DIR__ . '/../includes/header.php';
         <input type="hidden" name="step1_score" id="step1_total" value="0">
         <input type="hidden" name="step2_score" id="step2_total" value="0">
         <input type="hidden" name="step3_score" id="step3_total" value="0">
+        <input type="hidden" id="wiz-form-key" value="cognitive_wellness_<?= $patient_id ?>">
 
-        <div class="p-6 space-y-8">
+        <div class="px-6 pb-2">
+
+            <!-- Step 0: Patient Exam -->
+            <div class="wiz-step space-y-6 py-4" data-step="0" data-title="Patient Exam" data-icon="bi-person-bounding-box">
 
             <!-- Header -->
             <div class="grid grid-cols-2 gap-4">
@@ -209,6 +223,11 @@ include __DIR__ . '/../includes/header.php';
                 </div>
             </div>
 
+            </div><!-- /step 0 -->
+
+            <!-- Step 1: Informant Interview -->
+            <div class="wiz-step hidden space-y-6 py-4" data-step="1" data-title="Informant Interview" data-icon="bi-people-fill">
+
             <!-- STEP 2 -->
             <div>
                 <div class="flex items-center gap-2 mb-1">
@@ -269,6 +288,11 @@ include __DIR__ . '/../includes/header.php';
                     </div>
                 </div>
             </div>
+
+            </div><!-- /step 1 -->
+
+            <!-- Step 2: MIS & Notes -->
+            <div class="wiz-step hidden space-y-6 py-4" data-step="2" data-title="MIS &amp; Notes" data-icon="bi-brain">
 
             <!-- STEP 3 MIS -->
             <div>
@@ -358,25 +382,22 @@ include __DIR__ . '/../includes/header.php';
                           placeholder="Additional observations or follow-up plan..."></textarea>
             </div>
 
-        </div><!-- /p-6 -->
+            </div><!-- /step 2 -->
+
+            <!-- Step 3: Sign & Submit -->
+            <div class="wiz-step hidden py-4" data-step="3" data-title="Sign" data-icon="bi-pen">
+                <?php include __DIR__ . '/../includes/sig_block.php'; ?>
+            </div><!-- /step 3 -->
+
+            <?php
+            $accentClass = 'bg-violet-600 hover:bg-violet-700';
+            $cancelUrl   = BASE_URL . '/patient_view.php?id=' . $patient_id;
+            include __DIR__ . '/../includes/wiz_nav.php';
+            ?>
+
+        </div><!-- /px-6 -->
     </form>
 </div><!-- /card -->
-
-<?php include __DIR__ . '/../includes/sig_block.php'; ?>
-
-<div class="mt-5 flex flex-col sm:flex-row gap-3">
-    <button id="submitBtn" type="button"
-            class="flex-1 sm:flex-none flex items-center justify-center gap-2
-                   bg-violet-600 hover:bg-violet-700 active:scale-95 text-white font-bold
-                   px-10 py-3.5 rounded-xl transition-all shadow-md hover:shadow-lg text-base">
-        <i class="bi bi-check2-circle text-xl"></i> Submit &amp; Save
-    </button>
-    <a href="<?= BASE_URL ?>/patient_view.php?id=<?= $patient_id ?>"
-       class="flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl text-sm font-semibold
-              text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition-colors">
-        Cancel
-    </a>
-</div>
-</div>
+</div><!-- /max-w-3xl -->
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

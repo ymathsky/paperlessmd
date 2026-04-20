@@ -44,6 +44,7 @@
 
 <script src="<?= BASE_URL ?>/assets/js/signature_pad.min.js"></script>
 <script src="<?= BASE_URL ?>/assets/js/app.js?v=2"></script>
+<script src="<?= BASE_URL ?>/assets/js/form-wizard.js"></script>
 <script>window._pdBase = '<?= BASE_URL ?>';</script>
 <script src="<?= BASE_URL ?>/assets/js/autosave.js" defer></script>
 <script src="<?= BASE_URL ?>/assets/js/voice.js" defer></script>

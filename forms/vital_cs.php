@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/db.php';
 requireNotBilling();
@@ -15,7 +15,7 @@ $_dupQ = $pdo->prepare("SELECT id FROM form_submissions WHERE patient_id = ? AND
 $_dupQ->execute([$patient_id]);
 if ($_dupId = $_dupQ->fetchColumn()) { header('Location: ' . BASE_URL . '/view_document.php?id=' . (int)$_dupId . '&already_signed=1'); exit; }
 
-// ── Pre-fill from most recent Visit Consent submission ────────────────
+// â”€â”€ Pre-fill from most recent Visit Consent submission â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 $prevStmt = $pdo->prepare("
     SELECT form_data, created_at
     FROM form_submissions
@@ -32,13 +32,13 @@ $prevDate = $prevRow ? $prevRow['created_at'] : null;
 function pv(array $prev, string $key): string {
     return isset($prev[$key]) ? htmlspecialchars((string)$prev[$key], ENT_QUOTES, 'UTF-8') : '';
 }
-// Race was saved as array or comma-list — normalise to array
+// Race was saved as array or comma-list â€” normalise to array
 $prevRace = [];
 if (isset($prev['race'])) {
     $prevRace = is_array($prev['race']) ? $prev['race'] : explode(',', $prev['race']);
 }
 
-// ── Load current active medication list (master list = source of truth) ────────
+// â”€â”€ Load current active medication list (master list = source of truth) â”€â”€â”€â”€â”€â”€â”€â”€
 $activeMeds = [];
 try {
     $medsStmt = $pdo->prepare("
@@ -50,7 +50,7 @@ try {
     ");
     $medsStmt->execute([$patient_id]);
     $activeMeds = $medsStmt->fetchAll();
-} catch (PDOException $e) { /* table not yet migrated — fall back to empty */ }
+} catch (PDOException $e) { /* table not yet migrated â€” fall back to empty */ }
 
 // Build exactly 6 rows: pre-filled from master list first, then empty
 $medRows = [];
@@ -89,8 +89,8 @@ include __DIR__ . '/../includes/header.php';
     <i class="bi bi-arrow-counterclockwise text-amber-500 text-lg shrink-0"></i>
     <div class="flex-1">
         <span class="font-semibold">Pre-filled from last visit</span>
-        <span class="text-amber-600"> — <?= date('M j, Y', strtotime($prevDate)) ?></span>
-        <span class="text-amber-600 text-xs ml-1">(pharmacy, allergies, medications &amp; vitals carried over — update as needed)</span>
+        <span class="text-amber-600"> â€” <?= date('M j, Y', strtotime($prevDate)) ?></span>
+        <span class="text-amber-600 text-xs ml-1">(pharmacy, allergies, medications &amp; vitals carried over â€” update as needed)</span>
     </div>
     <button onclick="document.getElementById('prefillBanner').remove()"
             class="text-amber-400 hover:text-amber-700 transition-colors p-1 rounded-lg hover:bg-amber-100">
@@ -98,24 +98,48 @@ include __DIR__ . '/../includes/header.php';
     </button>
 </div>
 <?php endif; ?>
-<!-- Practice Header -->
-<div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-5">
+
+<!-- Resume draft banner (shown by JS if localStorage draft found) -->
+<div id="wiz-resume-banner" class="hidden flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-2xl px-5 py-3.5 mb-4 text-sm text-blue-800">
+    <i class="bi bi-floppy-fill text-blue-500 text-lg shrink-0"></i>
+    <div class="flex-1"><span class="font-semibold">Unsaved draft found.</span> Resume where you left off?</div>
+    <button id="wiz-resume-yes" class="px-4 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition-colors">Resume</button>
+    <button id="wiz-resume-no"  class="px-4 py-1.5 bg-white border border-blue-200 text-blue-600 text-xs font-bold rounded-lg hover:bg-blue-50 transition-colors ml-1">Start fresh</button>
+</div>
+
+<!-- Card -->
+<div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+    <!-- Card Header -->
     <div class="bg-gradient-to-r from-red-700 to-red-600 px-6 py-4 flex items-center gap-3">
         <div class="bg-white/20 p-2 rounded-xl">
             <i class="bi bi-file-medical-fill text-white text-xl"></i>
         </div>
         <div>
-            <h2 class="text-white font-bold text-lg"><?= h(PRACTICE_NAME) ?> — Consent Form</h2>
+            <h2 class="text-white font-bold text-lg"><?= h(PRACTICE_NAME) ?> â€” Consent Form</h2>
             <p class="text-red-100 text-sm"><?= h($patient['first_name'] . ' ' . $patient['last_name']) ?></p>
         </div>
     </div>
 
-    <form id="mainForm" method="POST" action="<?= BASE_URL ?>/api/save_form.php" novalidate>
-        <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
-        <input type="hidden" name="patient_id" value="<?= $patient_id ?>">
-        <input type="hidden" name="form_type"  value="vital_cs">
+    <!-- Wizard progress header -->
+    <div id="wiz-header" class="px-6 pt-5 pb-2"></div>
 
-        <div class="p-6 space-y-6">
+    <form id="mainForm" method="POST" action="<?= BASE_URL ?>/api/save_form.php" novalidate>
+        <input type="hidden" name="csrf_token"  value="<?= csrfToken() ?>">
+        <input type="hidden" name="patient_id"  value="<?= $patient_id ?>">
+        <input type="hidden" name="form_type"   value="vital_cs">
+        <input type="hidden" id="wiz-form-key"  value="vital_cs_<?= $patient_id ?>">
+
+        <div class="px-6 pb-2">
+
+        <!-- â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•— -->
+        <!-- â•‘  STEP 1 â€” Visit Info             â•‘ -->
+        <!-- â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+        <div class="wiz-step space-y-6 py-4"
+             data-step="0"
+             data-title="Visit Info"
+             data-icon="bi-calendar-check">
+
+            <p class="form-section-title"><i class="bi bi-calendar-check text-red-500"></i> Visit Information</p>
 
             <!-- Provider / Date -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -134,7 +158,7 @@ include __DIR__ . '/../includes/header.php';
                 </div>
             </div>
 
-            <!-- Visit Type + F/U + Times -->
+            <!-- Visit Type -->
             <div>
                 <label class="block text-sm font-bold text-slate-700 mb-3">Visit Type</label>
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
@@ -199,41 +223,51 @@ include __DIR__ . '/../includes/header.php';
                               focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition focus:bg-white"
                        placeholder="Leave blank if not a missed visit">
             </div>
+        </div><!-- /step 1 -->
 
-            <!-- Vitals Grid -->
-            <div>
-                <label class="block text-sm font-bold text-slate-700 mb-3">Vital Signs</label>
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <?php
-                    $vitals = [
-                        ['name'=>'bp',      'label'=>'BP',       'placeholder'=>'120/80'],
-                        ['name'=>'pulse',   'label'=>'Pulse',    'placeholder'=>'72 bpm'],
-                        ['name'=>'temp',    'label'=>'Temp',     'placeholder'=>'98.6°F'],
-                        ['name'=>'o2sat',   'label'=>'O2Sat',    'placeholder'=>'98%'],
-                        ['name'=>'glucose', 'label'=>'Glucose',  'placeholder'=>'mg/dL'],
-                        ['name'=>'height',  'label'=>'Height',   'placeholder'=>'in / cm'],
-                        ['name'=>'weight',  'label'=>'Weight',   'placeholder'=>'lbs / kg'],
-                        ['name'=>'resp',    'label'=>'Resp',     'placeholder'=>'breaths/min'],
-                    ];
-                    foreach ($vitals as $v):
-                        $prefilled = pv($prev, $v['name']);
-                    ?>
-                    <div class="bg-slate-50 border <?= $prefilled ? 'border-amber-300' : 'border-slate-200' ?> rounded-xl p-3">
-                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">
-                            <?= $v['label'] ?>
-                            <?php if ($prefilled): ?><span class="ml-1 text-amber-400" title="Pre-filled from last visit"><i class="bi bi-arrow-counterclockwise"></i></span><?php endif; ?>
-                        </label>
-                        <input type="text" name="<?= $v['name'] ?>" value="<?= $prefilled ?>"
-                               class="w-full bg-transparent text-sm font-semibold text-slate-800 border-0 border-b border-slate-300 pb-1
-                                      focus:outline-none focus:border-red-400 transition"
-                               placeholder="<?= $v['placeholder'] ?>">
-                        <p class="text-xs text-slate-400 mt-2">Checked or Per patient</p>
-                    </div>
-                    <?php endforeach; ?>
+
+        <!-- â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•— -->
+        <!-- â•‘  STEP 2 â€” Vitals & Clinical      â•‘ -->
+        <!-- â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+        <div class="wiz-step hidden space-y-6 py-4"
+             data-step="1"
+             data-title="Vitals"
+             data-icon="bi-heart-pulse">
+
+            <p class="form-section-title"><i class="bi bi-heart-pulse text-red-500"></i> Vital Signs</p>
+
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <?php
+                $vitals = [
+                    ['name'=>'bp',      'label'=>'BP',       'placeholder'=>'120/80'],
+                    ['name'=>'pulse',   'label'=>'Pulse',    'placeholder'=>'72 bpm'],
+                    ['name'=>'temp',    'label'=>'Temp',     'placeholder'=>'98.6Â°F'],
+                    ['name'=>'o2sat',   'label'=>'O2Sat',    'placeholder'=>'98%'],
+                    ['name'=>'glucose', 'label'=>'Glucose',  'placeholder'=>'mg/dL'],
+                    ['name'=>'height',  'label'=>'Height',   'placeholder'=>'in / cm'],
+                    ['name'=>'weight',  'label'=>'Weight',   'placeholder'=>'lbs / kg'],
+                    ['name'=>'resp',    'label'=>'Resp',     'placeholder'=>'breaths/min'],
+                ];
+                foreach ($vitals as $v):
+                    $prefilled = pv($prev, $v['name']);
+                ?>
+                <div class="bg-slate-50 border <?= $prefilled ? 'border-amber-300' : 'border-slate-200' ?> rounded-xl p-3">
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">
+                        <?= $v['label'] ?>
+                        <?php if ($prefilled): ?><span class="ml-1 text-amber-400" title="Pre-filled"><i class="bi bi-arrow-counterclockwise"></i></span><?php endif; ?>
+                    </label>
+                    <input type="text" name="<?= $v['name'] ?>" value="<?= $prefilled ?>"
+                           class="w-full bg-transparent text-sm font-semibold text-slate-800 border-0 border-b border-slate-300 pb-1
+                                  focus:outline-none focus:border-red-400 transition"
+                           placeholder="<?= $v['placeholder'] ?>">
+                    <p class="text-xs text-slate-400 mt-2">Checked or Per patient</p>
                 </div>
+                <?php endforeach; ?>
             </div>
 
-            <!-- Chief Complaint / Notes -->
+            <p class="form-section-title mt-2"><i class="bi bi-chat-left-text text-red-500"></i> Chief Complaint &amp; ICD-10</p>
+
+            <!-- Chief Complaint -->
             <div>
                 <label class="block text-sm font-semibold text-slate-700 mb-1.5">Chief Complaint / Notes</label>
                 <textarea name="chief_complaint" rows="4"
@@ -246,21 +280,16 @@ include __DIR__ . '/../includes/header.php';
             <div>
                 <label class="block text-sm font-bold text-slate-700 mb-1">
                     Diagnosis / ICD-10 Codes
-                    <span class="ml-1.5 text-xs font-normal text-slate-400">(up to 6 — required for billing)</span>
+                    <span class="ml-1.5 text-xs font-normal text-slate-400">(up to 6 â€” required for billing)</span>
                 </label>
-
-                <!-- Selected chips container -->
                 <div id="icdChips" class="flex flex-wrap gap-2 mb-2 min-h-[2rem]"></div>
-                <!-- Hidden inputs are injected here by JS -->
                 <div id="icdHiddenInputs"></div>
-
-                <!-- Search input -->
                 <div class="relative">
                     <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
                         <i class="bi bi-search text-sm"></i>
                     </span>
                     <input type="text" id="icdSearch" autocomplete="off"
-                           placeholder="Search by code or keyword (e.g. &quot;sacral stage 2&quot;, &quot;heel&quot;, &quot;cellulitis&quot;)…"
+                           placeholder="Search by code or keyword (e.g. &quot;sacral stage 2&quot;)â€¦"
                            class="w-full pl-8 pr-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
                                   focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition focus:bg-white">
                     <div id="icdDropdown"
@@ -269,15 +298,26 @@ include __DIR__ . '/../includes/header.php';
                          style="max-height:280px"></div>
                 </div>
                 <p id="icdMaxMsg" class="hidden text-xs text-amber-600 mt-1.5 font-semibold">
-                    Maximum of 6 codes reached. Remove a code to add another.
+                    Maximum of 6 codes reached.
                 </p>
                 <p class="text-xs text-slate-400 mt-1.5">
                     <i class="bi bi-info-circle text-slate-300 mr-0.5"></i>
-                    Wound-care ICD-10 library — codes pre-filled from last visit when available.
+                    Wound-care ICD-10 library â€” codes pre-filled from last visit when available.
                 </p>
             </div>
+        </div><!-- /step 2 -->
 
-            <!-- Pharmacy / Assistive Device / Race / Allergies -->
+
+        <!-- â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•— -->
+        <!-- â•‘  STEP 3 â€” Medications            â•‘ -->
+        <!-- â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+        <div class="wiz-step hidden space-y-6 py-4"
+             data-step="2"
+             data-title="Medications"
+             data-icon="bi-capsule">
+
+            <p class="form-section-title"><i class="bi bi-bag-heart text-red-500"></i> Pharmacy &amp; Allergies</p>
+
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">Pharmacy</label>
@@ -326,71 +366,80 @@ include __DIR__ . '/../includes/header.php';
                 </div>
             </div>
 
-            <!-- Medication List -->
-            <div>
-                <label class="block text-sm font-bold text-slate-700 mb-3 flex flex-wrap items-center gap-2">
-                    Medication List &amp; Reconciliation
-                    <?php if (!empty($activeMeds)): ?>
-                    <a href="<?= BASE_URL ?>/patient_view.php?id=<?= $patient_id ?>&tab=meds"
-                       class="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50
-                              border border-emerald-200 px-2 py-0.5 rounded-full hover:bg-emerald-100 transition-colors"
-                       target="_blank">
-                        <i class="bi bi-arrow-counterclockwise"></i><?= count($activeMeds) ?> from master list — Manage
-                    </a>
-                    <?php endif; ?>
-                </label>
-                <div class="overflow-x-auto border border-slate-200 rounded-xl">
-                    <table class="w-full text-sm">
-                        <thead class="bg-slate-50">
-                            <tr>
-                                <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide w-28">New / Refill</th>
-                                <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Medication &amp; Dose</th>
-                                <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide w-36">Frequency</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100">
-                            <?php foreach ($medRows as $mi => $row):
-                                $i           = $mi + 1;
-                                $isPrefilled = $row['med_id'] > 0;
-                            ?>
-                            <input type="hidden" name="med_id_<?= $i ?>" value="<?= $row['med_id'] ?>">
-                            <tr class="<?= $isPrefilled ? 'bg-emerald-50/30' : '' ?>">
-                                <td class="px-3 py-2">
-                                    <select name="med_type_<?= $i ?>"
-                                            class="w-full px-2 py-2 border <?= $isPrefilled ? 'border-emerald-200' : 'border-slate-200' ?> rounded-lg text-xs bg-white
-                                                   focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent">
-                                        <option value="">—</option>
-                                        <?php foreach (['New','Refill','D/C'] as $opt): ?>
-                                        <option <?= $row['med_type'] === $opt ? 'selected' : '' ?>><?= $opt ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </td>
-                                <td class="px-3 py-2">
-                                    <?php if ($isPrefilled): ?><div class="flex items-center gap-1.5"><?php endif; ?>
-                                    <?php if ($isPrefilled): ?><i class="bi bi-capsule text-emerald-500 text-xs shrink-0" title="From master list"></i><?php endif; ?>
-                                    <input type="text" name="med_name_<?= $i ?>" value="<?= h($row['med_name']) ?>"
-                                           class="w-full px-3 py-2 border <?= $isPrefilled ? 'border-emerald-200' : 'border-slate-200' ?> rounded-lg text-sm bg-white
-                                                  focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent"
-                                           placeholder="Medication name and dose">
-                                    <?php if ($isPrefilled): ?></div><?php endif; ?>
-                                </td>
-                                <td class="px-3 py-2">
-                                    <input type="text" name="med_freq_<?= $i ?>" value="<?= h($row['med_freq']) ?>"
-                                           class="w-full px-3 py-2 border <?= $isPrefilled ? 'border-emerald-200' : 'border-slate-200' ?> rounded-lg text-sm bg-white
-                                                  focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent"
-                                           placeholder="e.g. BID">
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-                <p class="text-xs text-slate-400 mt-2">
-                    <i class="bi bi-info-circle mr-0.5 text-emerald-500"></i>
-                    Pre-filled from master med list. Set type to <strong class="text-red-600">D/C</strong> to discontinue &mdash;
-                    <strong class="text-emerald-600">New</strong> rows are automatically added to the master list on save.
-                </p>
+            <p class="form-section-title"><i class="bi bi-capsule text-red-500"></i> Medication List &amp; Reconciliation</p>
+
+            <?php if (!empty($activeMeds)): ?>
+            <a href="<?= BASE_URL ?>/patient_view.php?id=<?= $patient_id ?>&tab=meds" target="_blank"
+               class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50
+                      border border-emerald-200 px-3 py-1.5 rounded-full hover:bg-emerald-100 transition-colors mb-2">
+                <i class="bi bi-arrow-counterclockwise"></i><?= count($activeMeds) ?> meds from master list â€” Manage
+            </a>
+            <?php endif; ?>
+
+            <div class="overflow-x-auto border border-slate-200 rounded-xl">
+                <table class="w-full text-sm">
+                    <thead class="bg-slate-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide w-28">New / Refill</th>
+                            <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Medication &amp; Dose</th>
+                            <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide w-36">Frequency</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        <?php foreach ($medRows as $mi => $row):
+                            $i           = $mi + 1;
+                            $isPrefilled = $row['med_id'] > 0;
+                        ?>
+                        <input type="hidden" name="med_id_<?= $i ?>" value="<?= $row['med_id'] ?>">
+                        <tr class="<?= $isPrefilled ? 'bg-emerald-50/30' : '' ?>">
+                            <td class="px-3 py-2">
+                                <select name="med_type_<?= $i ?>"
+                                        class="w-full px-2 py-2 border <?= $isPrefilled ? 'border-emerald-200' : 'border-slate-200' ?> rounded-lg text-xs bg-white
+                                               focus:outline-none focus:ring-2 focus:ring-red-400">
+                                    <option value="">â€”</option>
+                                    <?php foreach (['New','Refill','D/C'] as $opt): ?>
+                                    <option <?= $row['med_type'] === $opt ? 'selected' : '' ?>><?= $opt ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </td>
+                            <td class="px-3 py-2">
+                                <?php if ($isPrefilled): ?><div class="flex items-center gap-1.5"><?php endif; ?>
+                                <?php if ($isPrefilled): ?><i class="bi bi-capsule text-emerald-500 text-xs shrink-0"></i><?php endif; ?>
+                                <input type="text" name="med_name_<?= $i ?>" value="<?= h($row['med_name']) ?>"
+                                       class="w-full px-3 py-2 border <?= $isPrefilled ? 'border-emerald-200' : 'border-slate-200' ?> rounded-lg text-sm bg-white
+                                              focus:outline-none focus:ring-2 focus:ring-red-400"
+                                       placeholder="Medication name and dose">
+                                <?php if ($isPrefilled): ?></div><?php endif; ?>
+                            </td>
+                            <td class="px-3 py-2">
+                                <input type="text" name="med_freq_<?= $i ?>" value="<?= h($row['med_freq']) ?>"
+                                       class="w-full px-3 py-2 border <?= $isPrefilled ? 'border-emerald-200' : 'border-slate-200' ?> rounded-lg text-sm bg-white
+                                              focus:outline-none focus:ring-2 focus:ring-red-400"
+                                       placeholder="e.g. BID">
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
             </div>
+            <p class="text-xs text-slate-400 mt-1">
+                <i class="bi bi-info-circle mr-0.5 text-emerald-500"></i>
+                Set type to <strong class="text-red-600">D/C</strong> to discontinue &mdash;
+                <strong class="text-emerald-600">New</strong> rows are added to the master list on save.
+            </p>
+        </div><!-- /step 3 -->
+
+
+        <!-- â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•— -->
+        <!-- â•‘  STEP 4 â€” Sign & Submit          â•‘ -->
+        <!-- â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+        <div class="wiz-step hidden space-y-6 py-4"
+             data-step="3"
+             data-title="Sign"
+             data-icon="bi-pen">
+
+            <p class="form-section-title"><i class="bi bi-person-badge text-red-500"></i> Medical Assistant</p>
+
             <div class="max-w-xs">
                 <label class="block text-sm font-semibold text-slate-700 mb-1.5">Medical Assistant</label>
                 <input type="text" name="ma_name" value="<?= h($_SESSION['full_name'] ?? '') ?>"
@@ -398,27 +447,19 @@ include __DIR__ . '/../includes/header.php';
                               focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition focus:bg-white">
             </div>
 
-        </div><!-- /p-6 -->
+            <?php include __DIR__ . '/../includes/sig_block.php'; ?>
+
+        </div><!-- /step 4 -->
+
+        <?php
+        $accentClass = 'bg-red-700 hover:bg-red-800';
+        $cancelUrl   = BASE_URL . '/patient_view.php?id=' . $patient_id;
+        include __DIR__ . '/../includes/wiz_nav.php';
+        ?>
+
+        </div><!-- /px-6 -->
     </form>
 </div><!-- /card -->
-
-<?php include __DIR__ . '/../includes/sig_block.php'; ?>
-
-<div class="mt-5 flex flex-col sm:flex-row gap-3">
-    <button id="submitBtn" type="button"
-            class="flex-1 sm:flex-none flex items-center justify-center gap-2
-                   bg-red-700 hover:bg-red-800 active:scale-95 text-white font-bold
-                   px-10 py-3.5 rounded-xl transition-all shadow-md hover:shadow-lg text-base">
-        <i class="bi bi-check2-circle text-xl"></i> Submit &amp; Save
-    </button>
-    <a href="<?= BASE_URL ?>/patient_view.php?id=<?= $patient_id ?>"
-       class="flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl text-sm font-semibold
-              text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition-colors">
-        Cancel
-    </a>
-</div>
-</div>
-
 <?php
 // Pass pre-filled ICD codes to JS
 $prevIcdCodes = [];
@@ -443,7 +484,7 @@ $extraJs = <<<JSBLOCK
     var hiddenEl   = document.getElementById('icdHiddenInputs');
     var maxMsg     = document.getElementById('icdMaxMsg');
 
-    /* ── Render chips ────────────────────────────────────────── */
+    /* â”€â”€ Render chips â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     function renderChips() {
         chipsEl.innerHTML    = '';
         hiddenEl.innerHTML   = '';
@@ -462,11 +503,11 @@ $extraJs = <<<JSBLOCK
                 + '<i class="bi bi-x-circle-fill text-sm"></i></button>';
             chipsEl.appendChild(chip);
 
-            // Hidden input — stored as "CODE — desc" string in array
+            // Hidden input â€” stored as "CODE â€” desc" string in array
             var inp = document.createElement('input');
             inp.type  = 'hidden';
             inp.name  = 'icd10_codes[]';
-            inp.value = item.code + ' — ' + item.desc;
+            inp.value = item.code + ' â€” ' + item.desc;
             hiddenEl.appendChild(inp);
         });
 
@@ -479,7 +520,7 @@ $extraJs = <<<JSBLOCK
         });
     }
 
-    /* ── Add code (guard duplicates + max) ──────────────────── */
+    /* â”€â”€ Add code (guard duplicates + max) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     function addCode(item) {
         if (selected.length >= MAX) return;
         if (selected.some(function (s) { return s.code === item.code; })) return;
@@ -490,7 +531,7 @@ $extraJs = <<<JSBLOCK
         searchEl.focus();
     }
 
-    /* ── Dropdown ────────────────────────────────────────────── */
+    /* â”€â”€ Dropdown â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     function closeDropdown() { dropdown.classList.add('hidden'); }
 
     function showResults(items) {
@@ -498,7 +539,7 @@ $extraJs = <<<JSBLOCK
         if (!items.length) {
             var empty = document.createElement('div');
             empty.className = 'px-4 py-3 text-slate-400 text-xs italic';
-            empty.textContent = 'No codes found — try different keywords';
+            empty.textContent = 'No codes found â€” try different keywords';
             dropdown.appendChild(empty);
             dropdown.classList.remove('hidden');
             return;
@@ -529,7 +570,7 @@ $extraJs = <<<JSBLOCK
         dropdown.classList.remove('hidden');
     }
 
-    /* ── Search (debounced) ─────────────────────────────────── */
+    /* â”€â”€ Search (debounced) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     searchEl.addEventListener('input', function () {
         clearTimeout(debTimer);
         var q = searchEl.value.trim();
@@ -554,22 +595,22 @@ $extraJs = <<<JSBLOCK
         if (!dropdown.contains(e.target) && e.target !== searchEl) closeDropdown();
     });
 
-    /* ── Keyboard: close on Escape ──────────────────────────── */
+    /* â”€â”€ Keyboard: close on Escape â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     searchEl.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') { closeDropdown(); searchEl.blur(); }
     });
 
-    /* ── Pre-fill from last visit ────────────────────────────── */
+    /* â”€â”€ Pre-fill from last visit â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     var prefill = $icdPrefillJson;
     if (Array.isArray(prefill)) {
         prefill.forEach(function (raw) {
-            // raw is "CODE — desc" string
+            // raw is "CODE â€” desc" string
             var m = raw.match(/^([A-Z0-9.]+)\s+\u2014\s+(.+)$/);
             if (m) addCode({ code: m[1], desc: m[2], cat: '' });
         });
     }
 
-    /* ── Simple HTML escape ─────────────────────────────────── */
+    /* â”€â”€ Simple HTML escape â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     function escHtml(s) {
         return String(s)
             .replace(/&/g,'&amp;').replace(/</g,'&lt;')

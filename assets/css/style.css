@@ -12,6 +12,102 @@
     .badge-print { border: 1px solid #999 !important; }
 }
 
+/* ═══════════════════════ Form Wizard ═══════════════════════ */
+
+/* Step pill states */
+.wiz-pill { cursor: default; }
+.wiz-pill > span:first-child {
+    border-color: #cbd5e1;
+    color: #94a3b8;
+}
+.wiz-pill .wiz-num  { color: #94a3b8; }
+.wiz-pill > span + span { color: #94a3b8; }
+
+/* Active step */
+.wiz-pill--active > span:first-child {
+    border-color: #3b82f6 !important;
+    background: #eff6ff !important;
+    box-shadow: 0 0 0 4px rgba(59,130,246,.15);
+    color: #2563eb !important;
+}
+.wiz-pill--active .wiz-num  { color: #2563eb !important; }
+.wiz-pill--active > span + span { color: #1d4ed8 !important; }
+
+/* Completed step */
+.wiz-pill--done { cursor: pointer; }
+.wiz-pill--done > span:first-child {
+    border-color: #22c55e !important;
+    background: #f0fdf4 !important;
+    color: #16a34a !important;
+}
+.wiz-pill--done .wiz-check  { color: #16a34a !important; }
+.wiz-pill--done > span + span { color: #15803d !important; }
+.wiz-pill--done:hover > span:first-child {
+    background: #dcfce7 !important;
+}
+
+/* Future / unreached step */
+.wiz-pill--future > span:first-child {
+    border-color: #e2e8f0;
+    background: #fff;
+    color: #cbd5e1;
+}
+
+/* Invalid field highlight */
+.wiz-invalid {
+    border-color: #ef4444 !important;
+    background: #fef2f2 !important;
+    box-shadow: 0 0 0 3px rgba(239,68,68,.15);
+}
+.wiz-radio-invalid {
+    border-color: #ef4444 !important;
+    background: #fef2f2 !important;
+}
+
+/* Step body: hidden by default (JS shows current) */
+.wiz-step.hidden { display: none !important; }
+
+/* Nav button row */
+#wiz-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid #f1f5f9;
+}
+
+/* Keyboard hint badge */
+.wiz-kbd {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    font-size: 10px;
+    color: #94a3b8;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 5px;
+    padding: 1px 5px;
+    font-family: monospace;
+    user-select: none;
+}
+
+/* ═══════════════════════ Form Section Header ═══════════════════════ */
+.form-section-title {
+    font-size: 0.8125rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #64748b;
+    padding-bottom: 6px;
+    border-bottom: 1.5px solid #e2e8f0;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 /* ---- Signature Pad ---- */
 .sig-wrapper {
     background: #fff;
