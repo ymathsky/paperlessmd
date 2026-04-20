@@ -36,6 +36,88 @@
         </div>
     </div>
 </div>
+
+<!-- ── AI Assistant Bubble ───────────────────────────────────────────── -->
+<div id="aiChatWrap" class="fixed bottom-6 right-6 z-[9000] no-print flex flex-col items-end gap-3">
+
+    <!-- Panel (hidden by default) -->
+    <div id="aiPanel"
+         class="hidden flex-col w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden"
+         style="max-height:480px"
+         role="dialog" aria-label="AI Assistant">
+
+        <!-- Header -->
+        <div class="flex items-center justify-between px-4 py-3 shrink-0"
+             style="background:linear-gradient(135deg,#7c3aed,#4f46e5)">
+            <span class="font-semibold text-sm text-white flex items-center gap-2">
+                <i class="bi bi-stars"></i> AI Assistant
+            </span>
+            <button id="aiClose" aria-label="Close"
+                    class="text-white/80 hover:text-white text-lg leading-none transition">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <!-- Tabs -->
+        <div class="flex border-b border-slate-100 shrink-0">
+            <button class="ai-tab ai-tab--active flex-1 py-2 text-xs font-semibold" data-tab="chat">
+                <i class="bi bi-chat-dots"></i> Chat
+            </button>
+            <button class="ai-tab flex-1 py-2 text-xs font-semibold text-slate-500 hover:text-violet-600 transition" data-tab="quick">
+                <i class="bi bi-lightning"></i> Quick Actions
+            </button>
+        </div>
+
+        <!-- Chat tab -->
+        <div id="aiTabChat" class="flex flex-col flex-1 min-h-0" style="overflow:hidden">
+            <div id="aiMessages" class="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
+                <div class="ai-msg ai-msg-bot">
+                    Hi! I'm your clinical AI assistant. Ask me about documentation, ICD-10 coding, wound care, or anything else.
+                </div>
+            </div>
+            <div class="flex gap-2 p-3 border-t border-slate-100 shrink-0">
+                <input id="aiChatInput" type="text" placeholder="Ask a question…"
+                       class="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl
+                              focus:outline-none focus:ring-2 focus:ring-violet-400 bg-slate-50">
+                <button id="aiSend" aria-label="Send"
+                        class="shrink-0 w-9 h-9 flex items-center justify-center
+                               text-white rounded-xl transition shadow-sm"
+                        style="background:#7c3aed">
+                    <i class="bi bi-send-fill text-xs"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Quick Actions tab -->
+        <div id="aiTabQuick" class="hidden flex-col gap-2 p-4 text-sm">
+            <p class="text-xs text-slate-400 font-semibold uppercase tracking-wide mb-1">Form Actions</p>
+            <p id="aiQuickNotAvail" class="text-xs italic text-slate-400">
+                Open a patient Visit (Vitals &amp; CS) form to use these actions.
+            </p>
+            <button id="aiQuickIcd"
+                    class="hidden items-center gap-2 px-3 py-2.5 bg-slate-50 hover:bg-violet-50
+                           border border-slate-200 hover:border-violet-300 rounded-xl
+                           text-slate-700 text-sm font-semibold transition">
+                <i class="bi bi-clipboard2-pulse text-violet-500"></i> AI Suggest ICD-10 Codes
+            </button>
+            <button id="aiQuickSoap"
+                    class="hidden items-center gap-2 px-3 py-2.5 bg-slate-50 hover:bg-violet-50
+                           border border-slate-200 hover:border-violet-300 rounded-xl
+                           text-slate-700 text-sm font-semibold transition">
+                <i class="bi bi-file-medical text-violet-500"></i> Draft SOAP Note
+            </button>
+        </div>
+    </div>
+
+    <!-- Floating bubble button -->
+    <button id="aiBubble"
+            class="w-14 h-14 rounded-full text-white shadow-lg hover:shadow-xl
+                   hover:scale-105 transition-all duration-200 flex items-center justify-center"
+            style="background:linear-gradient(135deg,#7c3aed,#4f46e5)"
+            aria-label="Open AI Assistant" title="AI Assistant">
+        <i class="bi bi-stars text-xl"></i>
+    </button>
+</div>
 <?php endif; ?>
 
 <footer class="bg-white border-t border-slate-100 py-4 text-center text-xs text-slate-400 no-print">
@@ -45,10 +127,16 @@
 <script src="<?= BASE_URL ?>/assets/js/signature_pad.min.js"></script>
 <script src="<?= BASE_URL ?>/assets/js/app.js?v=2"></script>
 <script src="<?= BASE_URL ?>/assets/js/form-wizard.js"></script>
-<script>window._pdBase = '<?= BASE_URL ?>';</script>
+<script>
+window._pdBase = '<?= BASE_URL ?>';
+<?php if (!empty($_SESSION['user_id'])): ?>
+window._pdCsrf = '<?= htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8') ?>';
+<?php endif; ?>
+</script>
 <script src="<?= BASE_URL ?>/assets/js/autosave.js" defer></script>
 <script src="<?= BASE_URL ?>/assets/js/voice.js" defer></script>
 <script src="<?= BASE_URL ?>/assets/js/offline.js" defer></script>
+<script src="<?= BASE_URL ?>/assets/js/ai-assistant.js" defer></script>
 <script>
 (function () {
     // Sidebar toggle (mobile)

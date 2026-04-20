@@ -126,6 +126,38 @@ switch ($action) {
         $userPrompt = $question;
         break;
 
+    case 'icd_suggest':
+        $cc = $input['chief_complaint'] ?? '';
+        if (!$cc) { badRequest('chief_complaint required'); }
+        $userPrompt = "Based on this wound care chief complaint / clinical notes, suggest the most appropriate ICD-10 diagnosis codes.\n\n"
+                    . "Chief Complaint: $cc\n\n"
+                    . "Return ONLY a valid JSON array of objects. Each object must have: "
+                    . "\"code\" (ICD-10 string), \"description\" (full description string), \"confidence\" (\"high\"|\"medium\"|\"low\"). "
+                    . "Limit to 6 most clinically relevant codes. No markdown, no explanation — pure JSON only. "
+                    . "Example: [{\"code\":\"L89.153\",\"description\":\"Pressure ulcer of sacral region, stage 3\",\"confidence\":\"high\"}]";
+        break;
+
+    case 'autofill':
+        $freeText = $input['free_text'] ?? '';
+        $fields   = $input['fields']    ?? [];
+        if (!$freeText) { badRequest('free_text required'); }
+        $fieldList = is_array($fields) ? implode(', ', array_map('strval', $fields)) : (string)$fields;
+        $userPrompt = "Extract the following form fields from this clinical text and return ONLY valid JSON.\n\n"
+                    . "Fields to extract: $fieldList\n\n"
+                    . "Clinical text: $freeText\n\n"
+                    . "Return ONLY a JSON object with the field names as keys and extracted values as strings. "
+                    . "Use null for fields not found in the text. No explanation or markdown.";
+        break;
+
+    case 'summarize_patient':
+        $history = $input['patient_history'] ?? '';
+        if (!$history) { badRequest('patient_history required'); }
+        $userPrompt = "Summarize this wound care patient's visit history in a concise clinical summary.\n\n"
+                    . "History:\n$history\n\n"
+                    . "Include: active diagnoses, wound status trends, current treatments, allergies/medications, "
+                    . "and any outstanding concerns. Keep the summary under 200 words. Use standard medical terminology.";
+        break;
+
     default:
         http_response_code(400);
         echo json_encode(['ok' => false, 'error' => 'Unknown action']);

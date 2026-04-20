@@ -289,7 +289,7 @@ include __DIR__ . '/../includes/header.php';
                         <i class="bi bi-search text-sm"></i>
                     </span>
                     <input type="text" id="icdSearch" autocomplete="off"
-                           placeholder="Search by code or keyword (e.g. &quot;sacral stage 2&quot;)â€¦"
+                           placeholder="Search by code or keyword (e.g. &quot;sacral stage 2&quot;)&hellip;"
                            class="w-full pl-8 pr-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
                                   focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition focus:bg-white">
                     <div id="icdDropdown"
@@ -300,10 +300,15 @@ include __DIR__ . '/../includes/header.php';
                 <p id="icdMaxMsg" class="hidden text-xs text-amber-600 mt-1.5 font-semibold">
                     Maximum of 6 codes reached.
                 </p>
-                <p class="text-xs text-slate-400 mt-1.5">
-                    <i class="bi bi-info-circle text-slate-300 mr-0.5"></i>
-                    Wound-care ICD-10 library &mdash; codes pre-filled from last visit when available.
-                </p>
+                <div class="flex items-center justify-between mt-2">
+                    <p class="text-xs text-slate-400">
+                        <i class="bi bi-info-circle text-slate-300 mr-0.5"></i>
+                        Wound-care ICD-10 library &mdash; codes pre-filled from last visit when available.
+                    </p>
+                    <button type="button" id="aiIcdSuggestBtn" class="ai-btn no-print">
+                        <i class="bi bi-stars"></i> AI Suggest
+                    </button>
+                </div>
             </div>
         </div><!-- /step 2 -->
 
@@ -445,6 +450,18 @@ include __DIR__ . '/../includes/header.php';
                 <input type="text" name="ma_name" value="<?= h($_SESSION['full_name'] ?? '') ?>"
                        class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
                               focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition focus:bg-white">
+            </div>
+
+            <!-- AI SOAP Note -->
+            <div class="flex items-center gap-3 p-3 bg-violet-50 border border-violet-200 rounded-xl no-print">
+                <i class="bi bi-stars text-violet-600 text-lg shrink-0"></i>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-semibold text-violet-800">AI SOAP Note</p>
+                    <p class="text-xs text-violet-600">Draft a SOAP note from today's visit data.</p>
+                </div>
+                <button type="button" id="aiSoapBtn" class="ai-btn shrink-0">
+                    <i class="bi bi-file-medical"></i> Draft
+                </button>
             </div>
 
             <?php include __DIR__ . '/../includes/sig_block.php'; ?>
@@ -610,12 +627,17 @@ $extraJs = <<<JSBLOCK
         });
     }
 
-    /* â”€â”€ Simple HTML escape â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+    /* ── Simple HTML escape ──────────────────────────────────────────── */
     function escHtml(s) {
         return String(s)
             .replace(/&/g,'&amp;').replace(/</g,'&lt;')
             .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
+
+    /* ── Expose addCode globally for AI assistant ──────────────────────── */
+    window.icdAddChip = function (code, desc, cat) {
+        addCode({ code: String(code), desc: String(desc || code), cat: String(cat || '') });
+    };
 })();
 </script>
 JSBLOCK;
