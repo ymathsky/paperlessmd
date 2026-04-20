@@ -175,7 +175,7 @@ include __DIR__ . '/includes/header.php';
 #print-layout { display: none; }
 
 @media print {
-    @page { size: A4 <?= $view === 'week' ? 'landscape' : 'portrait' ?>; margin: 12mm 10mm; }
+    @page { size: A4 <?= $view === 'week' ? 'landscape' : 'portrait' ?>; margin: 18mm 20mm; }
 
     body, html { background: #fff !important; margin: 0 !important; padding: 0 !important; }
 
