@@ -48,6 +48,14 @@ if ($_SESSION[$rlKey] > 30) {
     exit;
 }
 
+// Spacing: enforce minimum 1 s between requests per session (avoids short-burst quota hits)
+$lastAiCall = $_SESSION['ai_last_call'] ?? 0;
+$now        = microtime(true);
+if (($now - $lastAiCall) < 1.0) {
+    usleep((int)((1.0 - ($now - $lastAiCall)) * 1_000_000));
+}
+$_SESSION['ai_last_call'] = microtime(true);
+
 // ── Build prompt by action ────────────────────────────────────────────────────
 $systemPrompt = 'You are a clinical documentation assistant for Beyond Wound Care Inc., '
               . 'a wound care medical practice. Be concise, professional, and clinically accurate. '
@@ -200,8 +208,14 @@ if ($err) {
 $resp = json_decode($raw, true);
 
 if ($code === 429) {
+    $detail = $resp['error']['message'] ?? '';
     http_response_code(429);
-    echo json_encode(['ok' => false, 'error' => 'AI rate limit reached. Please wait ~30 seconds and try again.', 'retry_after' => 30]);
+    echo json_encode([
+        'ok'          => false,
+        'error'       => 'AI rate limit reached. Please wait ~30 seconds and try again.',
+        'detail'      => $detail, // exposed for debugging (no PHI)
+        'retry_after' => 30,
+    ]);
     exit;
 }
 
