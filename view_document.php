@@ -136,7 +136,7 @@ include __DIR__ . '/includes/header.php';
 </nav>
 
 <!-- Action Bar -->
-<div class="flex flex-wrap items-center gap-3 mb-6 no-print">
+<div class="max-w-3xl mx-auto flex flex-wrap items-center gap-3 mb-6 no-print">
     <?php if (!empty($_GET['already_signed'])): ?>
     <div class="w-full flex items-center gap-3 px-5 py-3 bg-amber-50 border border-amber-200 rounded-2xl text-sm text-amber-800">
         <i class="bi bi-exclamation-triangle-fill text-amber-500 flex-shrink-0"></i>
@@ -164,7 +164,7 @@ include __DIR__ . '/includes/header.php';
 
 <!-- Screen-only status / meta bar -->
 <div class="screen-strip no-print flex flex-wrap items-center justify-between gap-3 mb-4 px-5 py-3
-            bg-white rounded-2xl shadow-sm border border-slate-100 max-w-3xl">
+            bg-white rounded-2xl shadow-sm border border-slate-100 max-w-3xl mx-auto">
     <div class="flex items-center gap-3">
         <div class="w-9 h-9 rounded-xl grid place-items-center bg-slate-100 flex-shrink-0">
             <i class="bi <?= $fm['icon'] ?> <?= $fm['color'] ?> text-lg"></i>
@@ -180,7 +180,7 @@ include __DIR__ . '/includes/header.php';
 </div>
 
 <!-- Document Card (printable) -->
-<div id="printDoc" class="bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden max-w-3xl">
+<div id="printDoc" class="bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden max-w-3xl mx-auto">
     <!-- Paper body -->
     <div class="px-10 py-8">
         <?php
@@ -242,7 +242,7 @@ include __DIR__ . '/includes/header.php';
 
 <?php if ($doc['status'] === 'draft' && !isBilling()): ?>
 <!-- ─── Signature Capture Panel ───────────────────────────────────────── -->
-<div id="signPanel" class="sign-panel max-w-3xl mt-6 bg-white rounded-2xl shadow-sm border-2 border-rose-200 overflow-hidden no-print">
+<div id="signPanel" class="sign-panel max-w-3xl mx-auto mt-6 bg-white rounded-2xl shadow-sm border-2 border-rose-200 overflow-hidden no-print">
     <div class="flex items-center gap-3 px-6 py-4 bg-gradient-to-r from-rose-50 to-orange-50 border-b border-rose-100">
         <div class="w-9 h-9 bg-rose-100 rounded-xl grid place-items-center flex-shrink-0">
             <i class="bi bi-pen-fill text-rose-600"></i>
@@ -429,7 +429,7 @@ JS;
 
 <?php if (!isBilling() && !empty($doc['provider_signature'])): ?>
 <!-- ─── Provider Signature Already Captured ─────────────────────── -->
-<div class="max-w-3xl mt-4 bg-white rounded-2xl shadow-sm border border-violet-200 overflow-hidden no-print">
+<div class="max-w-3xl mx-auto mt-4 bg-white rounded-2xl shadow-sm border border-violet-200 overflow-hidden no-print">
     <div class="flex items-center gap-3 px-5 py-3 bg-violet-50 border-b border-violet-100">
         <i class="bi bi-person-check-fill text-violet-500"></i>
         <span class="text-sm font-bold text-violet-700">Provider Countersignature</span>
@@ -446,7 +446,7 @@ JS;
 </div>
 <?php elseif (!isBilling() && $doc['status'] !== 'draft'): ?>
 <!-- ─── Provider Signature Capture Panel ────────────────────────── -->
-<div id="provPanel" class="max-w-3xl mt-4 bg-white rounded-2xl shadow-sm border-2 border-violet-200 overflow-hidden no-print">
+<div id="provPanel" class="max-w-3xl mx-auto mt-4 bg-white rounded-2xl shadow-sm border-2 border-violet-200 overflow-hidden no-print">
     <div class="flex items-center gap-3 px-6 py-4 bg-gradient-to-r from-violet-50 to-purple-50 border-b border-violet-100">
         <div class="w-9 h-9 bg-violet-100 rounded-xl grid place-items-center flex-shrink-0">
             <i class="bi bi-person-badge-fill text-violet-600"></i>
