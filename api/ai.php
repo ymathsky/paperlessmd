@@ -13,6 +13,7 @@
 
 error_reporting(0);
 ini_set('display_errors', '0');
+set_time_limit(60); // prevent XAMPP 30 s default from killing long AI calls
 
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/db.php';
@@ -183,18 +184,11 @@ $payload = [
     ],
 ];
 
-// Exponential backoff: try up to 3 times on 429
-$maxAttempts  = 3;
-$retryDelays  = [0, 15, 30]; // seconds before each attempt
-$raw = ''; $code = 0; $err = '';
-for ($attempt = 0; $attempt < $maxAttempts; $attempt++) {
-    if ($retryDelays[$attempt] > 0) { sleep($retryDelays[$attempt]); }
-    [$raw, $code, $err, $retryAfter] = geminiPost($url, $payload);
-    if ($code !== 429) { break; }
-    // Honor server's Retry-After if it's shorter than our next delay
-    if ($retryAfter > 0 && $retryAfter < $retryDelays[$attempt + 1] ?? 30) {
-        $retryDelays[$attempt + 1] = (int)$retryAfter;
-    }
+// Single retry on 429 — sleep just 5 s to stay within PHP time limit
+[$raw, $code, $err] = geminiPost($url, $payload);
+if ($code === 429) {
+    sleep(5);
+    [$raw, $code, $err] = geminiPost($url, $payload);
 }
 
 if ($err) {
@@ -207,7 +201,7 @@ $resp = json_decode($raw, true);
 
 if ($code === 429) {
     http_response_code(429);
-    echo json_encode(['ok' => false, 'error' => 'The AI service is still busy. Please wait 30 seconds and try again.', 'retry_after' => 30]);
+    echo json_encode(['ok' => false, 'error' => 'AI rate limit reached. Please wait ~30 seconds and try again.', 'retry_after' => 30]);
     exit;
 }
 
@@ -240,25 +234,13 @@ function geminiPost(string $url, array $payload): array {
         CURLOPT_POST           => true,
         CURLOPT_POSTFIELDS     => json_encode($payload),
         CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
-        CURLOPT_TIMEOUT        => 45,
-        CURLOPT_HEADER         => true, // include response headers
+        CURLOPT_TIMEOUT        => 20,
     ]);
-    $response   = curl_exec($ch);
-    $code       = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $headerSize = (int) curl_getinfo($ch, CURLINFO_HEADER_SIZE);
-    $err        = curl_error($ch);
+    $raw  = curl_exec($ch);
+    $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $err  = curl_error($ch);
     curl_close($ch);
-
-    $headers = substr($response, 0, $headerSize);
-    $raw     = substr($response, $headerSize);
-
-    // Parse Retry-After header (seconds)
-    $retryAfter = 0;
-    if (preg_match('/^Retry-After:\s*(\d+)/mi', $headers, $m)) {
-        $retryAfter = (int) $m[1];
-    }
-
-    return [$raw, $code, $err, $retryAfter];
+    return [$raw ?: '', $code, $err];
 }
 
 function badRequest(string $msg): void {

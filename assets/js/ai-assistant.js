@@ -30,9 +30,12 @@
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify(body),
+            signal:  AbortSignal.timeout(55000), // 55 s client-side timeout
         });
 
-        var json = await res.json();
+        var json = await res.json().catch(function () {
+            throw new Error('Could not connect to AI service. Check your internet connection.');
+        });
         if (!json.ok) {
             var wait = json.retry_after || 30;
             if (res.status === 429) {
