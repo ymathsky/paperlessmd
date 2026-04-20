@@ -13,7 +13,6 @@ $cancelUrl   ??= BASE_URL . '/patients.php';
             class="hidden flex items-center gap-2 px-6 py-3 bg-white border border-slate-200
                    hover:bg-slate-50 text-slate-600 font-semibold rounded-xl transition-colors text-sm">
         <i class="bi bi-arrow-left"></i> Back
-        <span class="wiz-kbd ml-1">Alt+←</span>
     </button>
 
     <div class="flex items-center gap-3 ml-auto">
@@ -28,7 +27,6 @@ $cancelUrl   ??= BASE_URL . '/patients.php';
                 class="flex items-center gap-2 px-7 py-3 <?= $accentClass ?>
                        text-white font-bold rounded-xl transition-all shadow-md hover:shadow-lg text-sm active:scale-95">
             Next <i class="bi bi-arrow-right"></i>
-            <span class="wiz-kbd ml-1 bg-white/20 border-white/30 text-white">Alt+→</span>
         </button>
 
         <!-- Submit (only visible on last step, hidden by JS) -->
