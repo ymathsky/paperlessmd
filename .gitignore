@@ -8,6 +8,7 @@
 
 # ----- Sensitive config (override locally) -----
 /includes/config.local.php
+/includes/config.keys.php
 /private/
 *.env
 .env
