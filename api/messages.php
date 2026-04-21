@@ -52,20 +52,17 @@ try {
             echo json_encode(['ok' => false, 'error' => 'Unknown action']);
     }
 } catch (PDOException $e) {
+    while (ob_get_level()) ob_end_clean();
     http_response_code(503);
-    echo json_encode([
-        'ok'     => false,
-        'error'  => 'Database error',
-        '_debug' => $e->getMessage(),
-    ]);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['ok' => false, 'error' => 'Database error', '_debug' => $e->getMessage()]);
 } catch (\Throwable $e) {
-    error_log('messages API: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+    while (ob_get_level()) ob_end_clean();
+    error_log('messages API: ' . $e->getMessage());
     http_response_code(500);
-    echo json_encode([
-        'ok'     => false,
-        'error'  => 'Server error',
-        '_debug' => $e->getMessage() . ' (line ' . $e->getLine() . ')',
-    ]);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['ok' => false, 'error' => 'Server error', '_debug' => $e->getMessage()]);
+}
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
