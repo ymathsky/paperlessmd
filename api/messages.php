@@ -277,15 +277,14 @@ function handleSend(): void
     $subject  = trim($_POST['subject']   ?? '');
     $toRaw    = trim($_POST['to']        ?? '');
     $parentId = !empty($_POST['parent_id']) ? (int)$_POST['parent_id'] : null;
-    $hasFile  = !empty($_FILES['file']) && $_FILES['file']['error'] === UPLOAD_ERR_OK;
+    $hasFile  = !empty($_FILES['files']['name'][0]) || !empty($_FILES['file']['name']);
 
+    // Body is optional when a file is attached
     if ($body === '' && !$hasFile) {
         http_response_code(422);
-        echo json_encode(['ok' => false, 'error' => 'Message body or attachment is required']);
+        echo json_encode(['ok' => false, 'error' => 'Please write a message or attach a file']);
         return;
     }
-
-    if ($body === '') $body = ' '; // whitespace placeholder when sending file-only
 
     // Resolve to_user_id (null = all-staff broadcast)
     $toUserId = null;
