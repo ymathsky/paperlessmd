@@ -300,59 +300,76 @@ function handleSend(): void
     } catch (PDOException $e) { /* ignore */ }
 
     // Optional file attachment
-    if (!empty($_FILES['file']) && $_FILES['file']['error'] === UPLOAD_ERR_OK) {
-        $file     = $_FILES['file'];
-        $maxBytes = 25 * 1024 * 1024; // 25 MB
+    if (!empty($_FILES['file'])) {
+        $fileErr = $_FILES['file']['error'];
+        if ($fileErr !== UPLOAD_ERR_OK) {
+            $errMsg = match($fileErr) {
+                UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => 'File too large. Max allowed by server: ' . ini_get('upload_max_filesize'),
+                UPLOAD_ERR_PARTIAL   => 'File upload was interrupted.',
+                UPLOAD_ERR_NO_TMP_DIR => 'Server has no temp directory for uploads.',
+                UPLOAD_ERR_CANT_WRITE => 'Server cannot write to disk.',
+                UPLOAD_ERR_EXTENSION  => 'Upload blocked by server extension.',
+                default => 'Upload error code: ' . $fileErr,
+            };
+            echo json_encode(['ok' => false, 'error' => $errMsg]);
+            return;
+        }
+
+        $file      = $_FILES['file'];
+        $maxBytes  = 25 * 1024 * 1024; // 25 MB
         $uploadDir = __DIR__ . '/../uploads/message_files';
 
         // Ensure upload directory exists
         if (!is_dir($uploadDir)) {
             mkdir($uploadDir, 0755, true);
-            // Block direct script execution
             file_put_contents($uploadDir . '/.htaccess',
                 "Options -Indexes\n<FilesMatch \"\\.php$\">\n  Deny from all\n</FilesMatch>\n");
         }
 
-        if ($file['size'] <= $maxBytes) {
-            $finfo = finfo_open(FILEINFO_MIME_TYPE);
-            $mime  = finfo_file($finfo, $file['tmp_name']);
-            finfo_close($finfo);
-
-            $allowed = [
-                'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-                'application/pdf',
-                'application/msword',
-                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                'application/vnd.ms-excel',
-                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                'text/plain', 'text/csv',
-                'application/zip',
-                'application/x-zip-compressed',
-            ];
-
-            if (!in_array($mime, $allowed, true)) {
-                echo json_encode(['ok' => false, 'error' => 'File type not allowed: ' . $mime]);
-                return;
-            }
-
-            $ext    = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-            $stored = 'msg_' . $msgId . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
-            $dest   = $uploadDir . '/' . $stored;
-
-            if (!move_uploaded_file($file['tmp_name'], $dest)) {
-                echo json_encode(['ok' => false, 'error' => 'Failed to save attachment. Check server upload directory permissions.']);
-                return;
-            }
-
-            $pdo->prepare("
-                INSERT INTO message_attachments
-                    (message_id, original_name, stored_name, file_size, mime_type)
-                VALUES (?, ?, ?, ?, ?)
-            ")->execute([$msgId, $file['name'], $stored, $file['size'], $mime]);
-        } else {
+        if ($file['size'] > $maxBytes) {
             echo json_encode(['ok' => false, 'error' => 'File exceeds 25 MB limit.']);
             return;
         }
+
+        if (!extension_loaded('fileinfo')) {
+            echo json_encode(['ok' => false, 'error' => 'Server missing fileinfo extension.']);
+            return;
+        }
+
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mime  = finfo_file($finfo, $file['tmp_name']);
+        finfo_close($finfo);
+
+        $allowed = [
+            'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'application/vnd.ms-excel',
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'text/plain', 'text/csv',
+            'application/zip', 'application/x-zip-compressed',
+        ];
+
+        if (!in_array($mime, $allowed, true)) {
+            echo json_encode(['ok' => false, 'error' => 'File type not allowed: ' . $mime]);
+            return;
+        }
+
+        $ext    = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        $stored = 'msg_' . $msgId . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
+        $dest   = $uploadDir . '/' . $stored;
+
+        if (!move_uploaded_file($file['tmp_name'], $dest)) {
+            echo json_encode(['ok' => false, 'error' => 'Failed to save attachment. Directory: ' . $uploadDir . ' Writable: ' . (is_writable($uploadDir)?'yes':'no')]);
+            return;
+        }
+
+        $pdo->prepare("
+            INSERT INTO message_attachments
+                (message_id, original_name, stored_name, file_size, mime_type)
+            VALUES (?, ?, ?, ?, ?)
+        ")->execute([$msgId, $file['name'], $stored, $file['size'], $mime]);
     }
 
     auditLog($pdo, 'message_send', 'message', $msgId, $subject ?: '(reply)');
