@@ -21,6 +21,11 @@ if (!function_exists('vdArr')) {
         return is_array($d[$k]) ? $d[$k] : array_filter(array_map('trim', explode(',', (string)$d[$k])));
     }
 }
+?>
+<style>
+  @page { size: 8in 13in; margin: 0.4in 0.5in; }
+</style>
+<?php
 
 $provider = vd($data, 'provider_name') ?: '_______________________';
 $visitType = vd($data, 'visit_type');
