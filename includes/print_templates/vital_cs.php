@@ -81,13 +81,25 @@ $vtOptions = ['New', 'Follow Up', 'Sick', 'Post Hospital F/U'];
     </div>
 
     <!-- Patient / Provider Lines -->
-    <div class="bwc-patient-line">
-        I, <span class="bwc-fill"><?= $ptName ?></span>, Date of Birth <span class="bwc-fill"><?= $ptDob ?></span> was seen today
-        <div style="font-size:9pt;color:#666;margin-top:1pt;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(Patient Name)</div>
+    <div class="bwc-patient-line" style="margin:6pt 0 2pt;">
+        I,&nbsp;
+        <span style="display:inline-block;min-width:160pt;vertical-align:bottom;">
+            <span style="display:block;border-bottom:1px solid #000;padding-bottom:1pt;"><?= $ptName ?></span>
+            <span style="display:block;font-size:8pt;color:#666;text-align:center;">(Patient Name)</span>
+        </span>
+        &nbsp;Date of Birth&nbsp;
+        <span style="display:inline-block;min-width:90pt;vertical-align:bottom;">
+            <span style="display:block;border-bottom:1px solid #000;padding-bottom:1pt;"><?= $ptDob ?></span>
+        </span>
+        &nbsp;was seen today
     </div>
-    <div class="bwc-provider-line">
-        By <span class="bwc-fill"><?= $provider ?></span> from Beyond Wound Care Inc.
-        <div style="font-size:9pt;color:#666;margin-top:1pt;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(Provider)</div>
+    <div class="bwc-provider-line" style="margin:4pt 0 6pt;">
+        By&nbsp;
+        <span style="display:inline-block;min-width:160pt;vertical-align:bottom;">
+            <span style="display:block;border-bottom:1px solid #000;padding-bottom:1pt;"><?= $provider ?></span>
+            <span style="display:block;font-size:8pt;color:#666;text-align:center;">(Provider)</span>
+        </span>
+        &nbsp;from Beyond Wound Care Inc.
     </div>
 
     <!-- Visit Type Row -->
