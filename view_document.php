@@ -82,6 +82,9 @@ include __DIR__ . '/includes/header.php';
     .no-print   { display: none !important; }
     .sign-panel { display: none !important; }
     body        { background: white !important; margin: 0 !important; padding: 0 !important; }
+    body.has-sidebar { padding-left: 0 !important; }
+    body > div  { padding: 0 !important; margin: 0 !important; }
+    body > div > div { padding: 0 !important; margin: 0 !important; }
     #printDoc   { box-shadow: none !important; border: none !important; max-width: 100% !important;
                   overflow: visible !important; border-radius: 0 !important;
                   margin: 0 !important; padding: 0 !important; }
