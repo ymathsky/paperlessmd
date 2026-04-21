@@ -141,24 +141,63 @@
     });
 
     // ── Chat messaging ────────────────────────────────────────────────────────
+    function nowTs() {
+        var d = new Date();
+        var h = d.getHours(), m = d.getMinutes();
+        var ampm = h >= 12 ? 'PM' : 'AM';
+        h = h % 12 || 12;
+        return h + ':' + (m < 10 ? '0' : '') + m + ' ' + ampm;
+    }
+
     function appendMsg(role, text) {
-        var div = document.createElement('div');
-        div.className = 'ai-msg ai-msg-' + role;
-        div.textContent = text;
-        messages.appendChild(div);
+        var row = document.createElement('div');
+        row.className = 'ai-msg-row ai-msg-row--' + role;
+
+        var msgDiv = document.createElement('div');
+        msgDiv.className = 'ai-msg ai-msg-' + role;
+        msgDiv.textContent = text;
+
+        var ts = document.createElement('span');
+        ts.className = 'ai-ts';
+        ts.textContent = nowTs();
+
+        if (role === 'bot') {
+            var avatar = document.createElement('span');
+            avatar.className = 'ai-avatar';
+            avatar.innerHTML = '<i class="bi bi-heart-pulse-fill"></i>';
+            var wrap = document.createElement('div');
+            wrap.appendChild(msgDiv);
+            wrap.appendChild(ts);
+            row.appendChild(avatar);
+            row.appendChild(wrap);
+        } else {
+            var wrap = document.createElement('div');
+            wrap.appendChild(msgDiv);
+            wrap.appendChild(ts);
+            row.appendChild(wrap);
+        }
+
+        messages.appendChild(row);
         messages.scrollTop = messages.scrollHeight;
     }
 
     function setLoading(on) {
         if (sendBtn) sendBtn.disabled = on;
         if (on) {
+            var row = document.createElement('div');
+            row.id = 'aiLoadingMsg';
+            row.className = 'ai-msg-row ai-msg-row--bot';
+            var avatar = document.createElement('span');
+            avatar.className = 'ai-avatar';
+            avatar.innerHTML = '<i class="bi bi-heart-pulse-fill"></i>';
             var ld = document.createElement('div');
-            ld.className = 'ai-msg ai-msg-bot ai-loading';
-            ld.id        = 'aiLoadingMsg';
+            ld.className = 'ai-loading';
             ld.innerHTML = '<span class="ai-dot"></span>'
                          + '<span class="ai-dot"></span>'
                          + '<span class="ai-dot"></span>';
-            messages.appendChild(ld);
+            row.appendChild(avatar);
+            row.appendChild(ld);
+            messages.appendChild(row);
             messages.scrollTop = messages.scrollHeight;
         } else {
             var ex = document.getElementById('aiLoadingMsg');

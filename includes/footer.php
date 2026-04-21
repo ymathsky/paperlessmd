@@ -42,15 +42,15 @@
 
     <!-- Panel (hidden by default) -->
     <div id="aiPanel"
-         class="hidden flex-col w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden"
-         style="max-height:480px"
+         class="hidden flex-col bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden"
+         style="width:360px;max-height:500px"
          role="dialog" aria-label="AI Assistant">
 
         <!-- Header -->
         <div class="flex items-center justify-between px-4 py-3 shrink-0"
-             style="background:linear-gradient(135deg,#7c3aed,#4f46e5)">
+             style="background:linear-gradient(135deg,#1d4ed8,#2563eb)">
             <span class="font-semibold text-sm text-white flex items-center gap-2">
-                <i class="bi bi-stars"></i> AI Assistant
+                <i class="bi bi-heart-pulse-fill"></i> Clinical AI Assistant
             </span>
             <button id="aiClose" aria-label="Close"
                     class="text-white/80 hover:text-white text-lg leading-none transition">
@@ -59,52 +59,59 @@
         </div>
 
         <!-- Tabs -->
-        <div class="flex border-b border-slate-100 shrink-0">
+        <div class="flex border-b border-slate-100 shrink-0 bg-white">
             <button class="ai-tab ai-tab--active flex-1 py-2 text-xs font-semibold" data-tab="chat">
                 <i class="bi bi-chat-dots"></i> Chat
             </button>
-            <button class="ai-tab flex-1 py-2 text-xs font-semibold text-slate-500 hover:text-violet-600 transition" data-tab="quick">
+            <button class="ai-tab flex-1 py-2 text-xs font-semibold text-slate-500 hover:text-blue-600 transition" data-tab="quick">
                 <i class="bi bi-lightning"></i> Quick Actions
             </button>
         </div>
 
         <!-- Chat tab -->
         <div id="aiTabChat" class="flex flex-col flex-1 min-h-0" style="overflow:hidden">
-            <div id="aiMessages" class="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
-                <div class="ai-msg ai-msg-bot">
-                    Hi! I'm your clinical AI assistant. Ask me about documentation, ICD-10 coding, wound care, or anything else.
+            <div id="aiMessages" class="flex-1 overflow-y-auto px-3 py-3 flex flex-col gap-3"
+                 style="background:#f8fafc">
+                <div class="ai-msg-row ai-msg-row--bot">
+                    <span class="ai-avatar"><i class="bi bi-heart-pulse-fill"></i></span>
+                    <div>
+                        <div class="ai-msg ai-msg-bot">
+                            Hi! I'm your clinical AI assistant. Ask me about documentation, ICD-10 coding, wound care, or anything else.
+                        </div>
+                        <span class="ai-ts"></span>
+                    </div>
                 </div>
             </div>
-            <div class="flex gap-2 p-3 border-t border-slate-100 shrink-0">
+            <div class="flex gap-2 p-3 border-t border-slate-100 shrink-0 bg-white">
                 <input id="aiChatInput" type="text" placeholder="Ask a question…"
                        class="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-xl
-                              focus:outline-none focus:ring-2 focus:ring-violet-400 bg-slate-50">
+                              focus:outline-none focus:ring-2 focus:ring-blue-400 bg-slate-50">
                 <button id="aiSend" aria-label="Send"
                         class="shrink-0 w-9 h-9 flex items-center justify-center
                                text-white rounded-xl transition shadow-sm"
-                        style="background:#7c3aed">
+                        style="background:#2563eb">
                     <i class="bi bi-send-fill text-xs"></i>
                 </button>
             </div>
         </div>
 
         <!-- Quick Actions tab -->
-        <div id="aiTabQuick" class="hidden flex-col gap-2 p-4 text-sm">
+        <div id="aiTabQuick" class="hidden flex-col gap-2 p-4 text-sm" style="background:#f8fafc">
             <p class="text-xs text-slate-400 font-semibold uppercase tracking-wide mb-1">Form Actions</p>
             <p id="aiQuickNotAvail" class="text-xs italic text-slate-400">
                 Open a patient Visit (Vitals &amp; CS) form to use these actions.
             </p>
             <button id="aiQuickIcd"
-                    class="hidden items-center gap-2 px-3 py-2.5 bg-slate-50 hover:bg-violet-50
-                           border border-slate-200 hover:border-violet-300 rounded-xl
+                    class="hidden items-center gap-2 px-3 py-2.5 bg-white hover:bg-blue-50
+                           border border-slate-200 hover:border-blue-300 rounded-xl
                            text-slate-700 text-sm font-semibold transition">
-                <i class="bi bi-clipboard2-pulse text-violet-500"></i> AI Suggest ICD-10 Codes
+                <i class="bi bi-clipboard2-pulse text-blue-500"></i> AI Suggest ICD-10 Codes
             </button>
             <button id="aiQuickSoap"
-                    class="hidden items-center gap-2 px-3 py-2.5 bg-slate-50 hover:bg-violet-50
-                           border border-slate-200 hover:border-violet-300 rounded-xl
+                    class="hidden items-center gap-2 px-3 py-2.5 bg-white hover:bg-blue-50
+                           border border-slate-200 hover:border-blue-300 rounded-xl
                            text-slate-700 text-sm font-semibold transition">
-                <i class="bi bi-file-medical text-violet-500"></i> Draft SOAP Note
+                <i class="bi bi-file-medical text-blue-500"></i> Draft SOAP Note
             </button>
         </div>
     </div>
@@ -113,9 +120,9 @@
     <button id="aiBubble"
             class="w-14 h-14 rounded-full text-white shadow-lg hover:shadow-xl
                    hover:scale-105 transition-all duration-200 flex items-center justify-center"
-            style="background:linear-gradient(135deg,#7c3aed,#4f46e5)"
-            aria-label="Open AI Assistant" title="AI Assistant">
-        <i class="bi bi-stars text-xl"></i>
+            style="background:linear-gradient(135deg,#1d4ed8,#2563eb)"
+            aria-label="Open AI Assistant" title="Clinical AI Assistant">
+        <i class="bi bi-heart-pulse-fill text-xl"></i>
     </button>
 </div>
 <?php endif; ?>
