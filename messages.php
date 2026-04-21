@@ -357,7 +357,7 @@ composeBackdrop.addEventListener('click', closeCompose);
 // ── Conversation list ─────────────────────────────────────────────────────────
 async function loadConvs() {
     try {
-        const res = await fetch(API+'?action=list');
+        const res = await fetch(API+'?action=list', {cache:'no-store'});
         const d   = await res.json();
         allConvs  = d.ok ? (d.conversations||[]) : [];
         renderConvList(allConvs);
@@ -418,7 +418,7 @@ async function openThread(rootId) {
     threadMessages.innerHTML = '<div class="flex items-center justify-center py-10"><div class="w-5 h-5 rounded-full border-2 border-slate-200 border-t-blue-500 animate-spin"></div></div>';
 
     try {
-        const res = await fetch(`${API}?action=thread&id=${rootId}`);
+        const res = await fetch(`${API}?action=thread&id=${rootId}`, {cache:'no-store'});
         const d   = await res.json();
         if (!d.ok) { threadMessages.innerHTML='<p class="text-center text-red-400 text-sm py-8">Failed to load.</p>'; return; }
         renderThreadHeader(d.root);
@@ -569,7 +569,7 @@ async function deleteMessage(msgId, isRoot=false) {
 // ── Users ──────────────────────────────────────────────────────────────────────
 async function loadUsers() {
     try {
-        const res = await fetch(`${API}?action=users`);
+        const res = await fetch(`${API}?action=users`, {cache:'no-store'});
         const d   = await res.json();
         if (!d.ok) return;
         allUsers = d.users||[];
@@ -645,7 +645,7 @@ setInterval(async () => {
     await loadConvs();
     if (currentRootId) {
         try {
-            const res = await fetch(`${API}?action=thread&id=${currentRootId}`);
+            const res = await fetch(`${API}?action=thread&id=${currentRootId}`, {cache:'no-store'});
             const d   = await res.json();
             if (d.ok) renderMessages(d.messages);
         } catch(e){}
