@@ -640,11 +640,11 @@ setInterval(async () => {
 }, 30000);
 
 // ── Init ───────────────────────────────────────────────────────────────────────
+const savedConv = sessionStorage.getItem('msg_conv'); // read before showView clears it
 showView('empty');
 loadUsers();
 loadConvs().then(() => {
-    const saved = sessionStorage.getItem('msg_conv');
-    if (saved) openThread(parseInt(saved, 10));
+    if (savedConv) openThread(parseInt(savedConv, 10));
 });
 
 })();
