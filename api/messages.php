@@ -16,8 +16,8 @@ register_shutdown_function(function () {
     }
 });
 
-ini_set('display_errors', '0');
-error_reporting(E_ALL & ~E_NOTICE & ~E_DEPRECATED);
+ini_set('display_errors', '1');
+error_reporting(E_ALL);
 
 // Buffer includes so any stray die()/warning output is captured
 ob_start();
