@@ -41,6 +41,7 @@ $formMeta = [
     'ccm_consent'        => ['label' => 'CCM Consent',         'icon' => 'bi-calendar2-heart-fill',    'color' => 'text-emerald-600', 'bg' => 'from-emerald-600 to-emerald-500'],
     'wound_care_consent'     => ['label' => 'Wound Care Consent',              'icon' => 'bi-bandaid-fill',              'color' => 'text-rose-600',  'bg' => 'from-rose-700 to-rose-600'],
     'informed_consent_wound' => ['label' => 'Informed Consent – Wound Care', 'icon' => 'bi-file-earmark-medical-fill', 'color' => 'text-red-700',   'bg' => 'from-red-800 to-red-700'],
+    'rpm_consent'            => ['label' => 'RPM Consent',                       'icon' => 'bi-broadcast-pin',            'color' => 'text-teal-700', 'bg' => 'from-teal-700 to-teal-600'],
 ];
 $fm  = $formMeta[$doc['form_type']] ?? ['label' => $doc['form_type'], 'icon' => 'bi-file', 'color' => 'text-slate-600', 'bg' => 'from-slate-600 to-slate-500'];
 

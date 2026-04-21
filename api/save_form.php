@@ -20,7 +20,7 @@ $maSig      = $_POST['ma_signature'] ?? '';
 $poaName    = trim($_POST['poa_name'] ?? '');
 $poaRel     = trim($_POST['poa_relationship'] ?? '');
 
-$allowed = ['vital_cs', 'new_patient', 'abn', 'pf_signup', 'ccm_consent', 'cognitive_wellness', 'medicare_awv', 'il_disclosure', 'wound_care_consent', 'informed_consent_wound'];
+$allowed = ['vital_cs', 'new_patient', 'abn', 'pf_signup', 'ccm_consent', 'cognitive_wellness', 'medicare_awv', 'il_disclosure', 'wound_care_consent', 'informed_consent_wound', 'rpm_consent'];
 if (!$patientId || !in_array($formType, $allowed, true)) {
     die('Invalid form submission.');
 }
