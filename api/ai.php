@@ -22,11 +22,25 @@ requireLogin();
 header('Content-Type: application/json; charset=utf-8');
 
 // ── Key check ─────────────────────────────────────────────────────────────────
-$apiKey = defined('GEMINI_API_KEY') ? GEMINI_API_KEY : '';
-if ($apiKey === '') {
-    http_response_code(503);
-    echo json_encode(['ok' => false, 'error' => 'AI not configured. Add GEMINI_API_KEY to config.']);
-    exit;
+$saKeyPath = defined('VERTEX_SA_KEY_PATH') ? VERTEX_SA_KEY_PATH : '';
+$useFallback = false;
+if (!$saKeyPath || !file_exists($saKeyPath)) {
+    // Fall back to direct Gemini API key if SA key not configured yet
+    $apiKey = defined('GEMINI_API_KEY') ? GEMINI_API_KEY : '';
+    if ($apiKey === '') {
+        http_response_code(503);
+        echo json_encode(['ok' => false, 'error' => 'AI not configured. Add service account key to private/vertex-sa.json.']);
+        exit;
+    }
+    $useFallback = true;
+}
+if (!$useFallback) {
+    $saJson = json_decode(file_get_contents($saKeyPath), true);
+    if (empty($saJson['client_email']) || empty($saJson['private_key'])) {
+        http_response_code(503);
+        echo json_encode(['ok' => false, 'error' => 'Invalid service account key file.']);
+        exit;
+    }
 }
 
 // ── Request parsing ───────────────────────────────────────────────────────────
@@ -173,9 +187,31 @@ switch ($action) {
         exit;
 }
 
-// ── Call Gemini API (with one retry on 429) ─────────────────────────────────
+// ── Call Vertex AI (service account OAuth2) or fallback to Gemini API key ────────
 $model = 'gemini-2.0-flash';
-$url   = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
+
+if ($useFallback) {
+    // Legacy: direct API key
+    $apiKey  = defined('GEMINI_API_KEY') ? GEMINI_API_KEY : '';
+    $url     = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
+    $headers = ['Content-Type: application/json'];
+} else {
+    // Vertex AI: OAuth2 Bearer token
+    try {
+        $accessToken = getVertexAccessToken($saJson);
+    } catch (\Throwable $e) {
+        http_response_code(502);
+        echo json_encode(['ok' => false, 'error' => 'Vertex AI auth failed: ' . $e->getMessage()]);
+        exit;
+    }
+    $project  = $saJson['project_id'];
+    $location = defined('VERTEX_LOCATION') ? VERTEX_LOCATION : 'us-central1';
+    $url      = "https://{$location}-aiplatform.googleapis.com/v1/projects/{$project}/locations/{$location}/publishers/google/models/{$model}:generateContent";
+    $headers  = [
+        'Content-Type: application/json',
+        'Authorization: Bearer ' . $accessToken,
+    ];
+}
 
 $parts = [];
 if ($imageData) {
@@ -192,11 +228,10 @@ $payload = [
     ],
 ];
 
-// Single retry on 429 — sleep just 5 s to stay within PHP time limit
-[$raw, $code, $err] = geminiPost($url, $payload);
+[$raw, $code, $err] = geminiPost($url, $payload, $headers ?? ['Content-Type: application/json']);
 if ($code === 429) {
     sleep(5);
-    [$raw, $code, $err] = geminiPost($url, $payload);
+    [$raw, $code, $err] = geminiPost($url, $payload, $headers ?? ['Content-Type: application/json']);
 }
 
 if ($err) {
@@ -241,13 +276,13 @@ try {
 echo json_encode(['ok' => true, 'text' => $text]);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function geminiPost(string $url, array $payload): array {
+function geminiPost(string $url, array $payload, array $headers = ['Content-Type: application/json']): array {
     $ch = curl_init($url);
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POST           => true,
         CURLOPT_POSTFIELDS     => json_encode($payload),
-        CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+        CURLOPT_HTTPHEADER     => $headers,
         CURLOPT_TIMEOUT        => 20,
     ]);
     $raw  = curl_exec($ch);
@@ -255,6 +290,77 @@ function geminiPost(string $url, array $payload): array {
     $err  = curl_error($ch);
     curl_close($ch);
     return [$raw ?: '', $code, $err];
+}
+
+/**
+ * Generate a Vertex AI OAuth2 access token from a service account JSON key.
+ * Token is cached in a temp file for up to 55 minutes.
+ */
+function getVertexAccessToken(array $sa): string {
+    $cacheFile = sys_get_temp_dir() . '/pd_vertex_token_' . substr(md5($sa['client_email']), 0, 8) . '.json';
+
+    // Return cached token if still valid
+    if (file_exists($cacheFile)) {
+        $cached = json_decode(file_get_contents($cacheFile), true);
+        if (!empty($cached['token']) && ($cached['expires_at'] ?? 0) > time() + 60) {
+            return $cached['token'];
+        }
+    }
+
+    // Build JWT
+    $now    = time();
+    $header = b64url(json_encode(['alg' => 'RS256', 'typ' => 'JWT']));
+    $claims = b64url(json_encode([
+        'iss'   => $sa['client_email'],
+        'scope' => 'https://www.googleapis.com/auth/cloud-platform',
+        'aud'   => 'https://oauth2.googleapis.com/token',
+        'exp'   => $now + 3600,
+        'iat'   => $now,
+    ]));
+    $toSign = $header . '.' . $claims;
+
+    $pk = openssl_pkey_get_private($sa['private_key']);
+    if (!$pk) {
+        throw new \RuntimeException('Could not load service account private key.');
+    }
+    openssl_sign($toSign, $sig, $pk, OPENSSL_ALGO_SHA256);
+    $jwt = $toSign . '.' . b64url($sig);
+
+    // Exchange JWT for access token
+    $ch = curl_init('https://oauth2.googleapis.com/token');
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => http_build_query([
+            'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+            'assertion'  => $jwt,
+        ]),
+        CURLOPT_HTTPHEADER => ['Content-Type: application/x-www-form-urlencoded'],
+        CURLOPT_TIMEOUT    => 10,
+    ]);
+    $raw  = curl_exec($ch);
+    $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $cerr = curl_error($ch);
+    curl_close($ch);
+
+    if ($cerr) { throw new \RuntimeException('Token request cURL error: ' . $cerr); }
+
+    $resp = json_decode($raw, true);
+    if ($code !== 200 || empty($resp['access_token'])) {
+        throw new \RuntimeException($resp['error_description'] ?? $resp['error'] ?? 'Unknown token error (HTTP ' . $code . ')');
+    }
+
+    // Cache token
+    file_put_contents($cacheFile, json_encode([
+        'token'      => $resp['access_token'],
+        'expires_at' => $now + ($resp['expires_in'] ?? 3600),
+    ]));
+
+    return $resp['access_token'];
+}
+
+function b64url(string $data): string {
+    return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
 }
 
 function badRequest(string $msg): void {
