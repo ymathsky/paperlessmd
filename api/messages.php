@@ -63,7 +63,6 @@ try {
     header('Content-Type: application/json; charset=utf-8');
     echo json_encode(['ok' => false, 'error' => 'Server error', '_debug' => $e->getMessage()]);
 }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LIST  — thread roots visible to current user, newest-activity first
