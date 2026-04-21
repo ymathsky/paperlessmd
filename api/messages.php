@@ -365,11 +365,32 @@ function handleSend(): void
             return;
         }
 
-        $pdo->prepare("
-            INSERT INTO message_attachments
-                (message_id, original_name, stored_name, file_size, mime_type)
-            VALUES (?, ?, ?, ?, ?)
-        ")->execute([$msgId, $file['name'], $stored, $file['size'], $mime]);
+        try {
+            $pdo->prepare("
+                INSERT INTO message_attachments
+                    (message_id, original_name, stored_name, file_size, mime_type)
+                VALUES (?, ?, ?, ?, ?)
+            ")->execute([$msgId, $file['name'], $stored, $file['size'], $mime]);
+        } catch (PDOException $e) {
+            // Table might not exist yet — try to create it then retry
+            $pdo->exec("
+                CREATE TABLE IF NOT EXISTS message_attachments (
+                    id            INT AUTO_INCREMENT PRIMARY KEY,
+                    message_id    INT          NOT NULL,
+                    original_name VARCHAR(255) NOT NULL,
+                    stored_name   VARCHAR(255) NOT NULL,
+                    file_size     INT UNSIGNED NOT NULL DEFAULT 0,
+                    mime_type     VARCHAR(100) NOT NULL DEFAULT '',
+                    created_at    DATETIME     DEFAULT CURRENT_TIMESTAMP,
+                    INDEX idx_msg (message_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
+            $pdo->prepare("
+                INSERT INTO message_attachments
+                    (message_id, original_name, stored_name, file_size, mime_type)
+                VALUES (?, ?, ?, ?, ?)
+            ")->execute([$msgId, $file['name'], $stored, $file['size'], $mime]);
+        }
     }
 
     auditLog($pdo, 'message_send', 'message', $msgId, $subject ?: '(reply)');
