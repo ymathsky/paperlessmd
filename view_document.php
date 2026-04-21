@@ -38,7 +38,8 @@ $formMeta = [
     'new_patient' => ['label' => 'New Patient Consent', 'icon' => 'bi-person-plus-fill',        'color' => 'text-blue-600',    'bg' => 'from-blue-600 to-blue-700'],
     'abn'         => ['label' => 'ABN',                 'icon' => 'bi-file-earmark-ruled-fill', 'color' => 'text-amber-600',   'bg' => 'from-amber-500 to-amber-600'],
     'pf_signup'   => ['label' => 'PF Portal Signup',    'icon' => 'bi-envelope-at-fill',        'color' => 'text-cyan-600',    'bg' => 'from-cyan-600 to-cyan-500'],
-    'ccm_consent' => ['label' => 'CCM Consent',         'icon' => 'bi-calendar2-heart-fill',    'color' => 'text-emerald-600', 'bg' => 'from-emerald-600 to-emerald-500'],
+    'ccm_consent'        => ['label' => 'CCM Consent',         'icon' => 'bi-calendar2-heart-fill',    'color' => 'text-emerald-600', 'bg' => 'from-emerald-600 to-emerald-500'],
+    'wound_care_consent' => ['label' => 'Wound Care Consent',  'icon' => 'bi-bandaid-fill',             'color' => 'text-rose-600',    'bg' => 'from-rose-700 to-rose-600'],
 ];
 $fm  = $formMeta[$doc['form_type']] ?? ['label' => $doc['form_type'], 'icon' => 'bi-file', 'color' => 'text-slate-600', 'bg' => 'from-slate-600 to-slate-500'];
 

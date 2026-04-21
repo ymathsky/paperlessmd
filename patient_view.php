@@ -69,6 +69,7 @@ $formDefs = [
     'cognitive_wellness' => ['label' => 'Cognitive Wellness Exam',  'icon' => 'bi-brain',               'bg' => 'bg-violet-100',  'text' => 'text-violet-600'],
     'medicare_awv'       => ['label' => 'Medicare AWV',             'icon' => 'bi-clipboard2-pulse',    'bg' => 'bg-sky-100',     'text' => 'text-sky-600'],
     'il_disclosure'      => ['label' => 'IL Disclosure Auth.',       'icon' => 'bi-file-earmark-text',   'bg' => 'bg-slate-100',   'text' => 'text-slate-600'],
+    'wound_care_consent' => ['label' => 'Wound Care Consent',         'icon' => 'bi-bandaid',             'bg' => 'bg-rose-100',    'text' => 'text-rose-600'],
 ];
 
 $statusCfg = [
@@ -3071,9 +3072,9 @@ $cnCsrf    = csrfToken();
         var file = input.files[0];
         if (!file) return;
 
-        // Client-side size guard (5 MB)
-        if (file.size > 5 * 1024 * 1024) {
-            alert('File too large — max 5 MB.');
+        // Client-side size guard (10 MB)
+        if (file.size > 10 * 1024 * 1024) {
+            alert('File too large — max 10 MB.');
             input.value = '';
             return;
         }
