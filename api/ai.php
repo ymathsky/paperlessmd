@@ -13,7 +13,7 @@
 
 error_reporting(0);
 ini_set('display_errors', '0');
-set_time_limit(60); // prevent XAMPP 30 s default from killing long AI calls
+set_time_limit(90); // prevent XAMPP 30 s default from killing long AI calls
 
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/db.php';
@@ -204,7 +204,11 @@ $payload = [
 
 [$raw, $code, $err] = geminiPost($url, $payload, $headers);
 if ($code === 429) {
-    sleep(5);
+    sleep(8);
+    [$raw, $code, $err] = geminiPost($url, $payload, $headers);
+}
+if ($code === 429) {
+    sleep(12);
     [$raw, $code, $err] = geminiPost($url, $payload, $headers);
 }
 
