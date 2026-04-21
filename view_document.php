@@ -95,9 +95,9 @@ include __DIR__ . '/includes/header.php';
   }
   /* BWC paper form classes */
   .bwc-form            { max-width: 100%; font-family: Arial, sans-serif; font-size: 10pt; color: #000; }
-  .bwc-header          { display: flex; flex-direction: row; align-items: center; gap: 14pt; margin-bottom: 10pt; border-bottom: 1.5pt solid #000; padding-bottom: 8pt; }
+  .bwc-header          { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 14pt; margin-bottom: 10pt; border-bottom: 1.5pt solid #000; padding-bottom: 8pt; }
   .bwc-header-logo     { width: 60pt; height: 60pt; object-fit: contain; flex-shrink: 0; }
-  .bwc-header-text     { flex: 1; text-align: center; }
+  .bwc-header-text     { text-align: left; }
   .bwc-header p        { margin: 1pt 0; }
   .bwc-practice-name   { font-size: 14pt; font-weight: bold; margin: 0 !important; }
   .bwc-form-title      { font-size: 12pt; font-weight: bold; text-decoration: underline; margin: 8pt 0 4pt !important; }
