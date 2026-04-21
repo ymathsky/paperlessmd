@@ -238,10 +238,19 @@
     </li>
     <li><a href="#s10">Admin — Staff Management</a></li>
     <li><a href="#s11">Admin — Audit Log</a></li>
-    <li><a href="#s12">Offline Mode (PWA)</a></li>
-    <li><a href="#s13">Security &amp; Privacy</a></li>
-    <li><a href="#s14">Troubleshooting</a></li>
-    <li><a href="#s15">Quick-Reference Cheat Sheet</a></li>
+    <li><a href="#s12">Messages</a>
+      <ul class="sub">
+        <li><a href="#s12a">Conversation List</a></li>
+        <li><a href="#s12b">Reading &amp; Replying</a></li>
+        <li><a href="#s12c">Composing a New Message</a></li>
+        <li><a href="#s12d">File Attachments</a></li>
+        <li><a href="#s12e">Deleting Messages</a></li>
+      </ul>
+    </li>
+    <li><a href="#s13">Offline Mode (PWA)</a></li>
+    <li><a href="#s14">Security &amp; Privacy</a></li>
+    <li><a href="#s15">Troubleshooting</a></li>
+    <li><a href="#s16">Quick-Reference Cheat Sheet</a></li>
   </ol>
 </div>
 
@@ -286,6 +295,11 @@ can continue working even when connectivity is temporarily lost.</p>
     <div class="icon">🗺️</div>
     <h3>Route Optimizer</h3>
     <p>Auto-sorts a day's visits by geographic proximity to minimize total drive time.</p>
+  </div>
+  <div class="feature-card">
+    <div class="icon">💬</div>
+    <h3>Internal Messaging</h3>
+    <p>Secure staff-to-staff messaging with multi-file attachments, drag-and-drop, and real-time unread badge.</p>
   </div>
   <div class="feature-card">
     <div class="icon">🎤</div>
@@ -852,14 +866,14 @@ newest first, 50 records per page.</p>
 
 
 <!-- ═══════════════════════════════════════════════
-     12. OFFLINE MODE
+     13. OFFLINE MODE (PWA)
 ═══════════════════════════════════════════════ -->
-<h1 class="section" id="s12"><span class="num">12</span> Offline Mode (PWA)</h1>
+<h1 class="section" id="s13"><span class="num">13</span> Offline Mode (PWA)</h1>
 
 <p>PaperlessMD is a <strong>Progressive Web App (PWA)</strong>. Key pages and assets are cached by
 the browser's Service Worker so you can continue working with limited or no connectivity.</p>
 
-<h2 class="sub">12.1 Installing on Your Device</h2>
+<h2 class="sub">13.1 Installing on Your Device</h2>
 <ul>
   <li><strong>Android/Chrome:</strong> A banner may appear "Add PaperlessMD to Home Screen".
     Alternatively, tap the browser menu ⋮ → <em>Add to Home screen</em>.</li>
@@ -867,7 +881,7 @@ the browser's Service Worker so you can continue working with limited or no conn
   <li><strong>Desktop Chrome/Edge:</strong> Click the install icon (⊕) in the address bar.</li>
 </ul>
 
-<h2 class="sub">12.2 What Works Offline</h2>
+<h2 class="sub">13.2 What Works Offline</h2>
 <ul>
   <li>Viewing previously cached pages (dashboard, patient list, schedule).</li>
   <li>Filling forms — auto-save saves to <code>localStorage</code> on the device.</li>
@@ -881,9 +895,9 @@ the browser's Service Worker so you can continue working with limited or no conn
 
 
 <!-- ═══════════════════════════════════════════════
-     13. SECURITY & PRIVACY
+     14. SECURITY & PRIVACY (was 13)
 ═══════════════════════════════════════════════ -->
-<h1 class="section" id="s13"><span class="num">13</span> Security &amp; Privacy</h1>
+<h1 class="section" id="s14"><span class="num">14</span> Security &amp; Privacy</h1>
 
 <div class="tbl-wrap">
 <table>
@@ -912,9 +926,9 @@ the browser's Service Worker so you can continue working with limited or no conn
 
 
 <!-- ═══════════════════════════════════════════════
-     14. TROUBLESHOOTING
+     15. TROUBLESHOOTING (was 14)
 ═══════════════════════════════════════════════ -->
-<h1 class="section" id="s14"><span class="num">14</span> Troubleshooting</h1>
+<h1 class="section" id="s15"><span class="num">15</span> Troubleshooting</h1>
 
 <div class="tbl-wrap">
 <table>
@@ -965,6 +979,16 @@ the browser's Service Worker so you can continue working with limited or no conn
     <td>Contact admin to run the pending migration scripts at <code>/migrate_*.php</code>.</td>
   </tr>
   <tr>
+    <td>Message attachment not showing after send</td>
+    <td>File type not supported or file too large</td>
+    <td>Check that the file is under 25 MB and is one of the supported types (JPG, PNG, PDF, DOC, DOCX, XLS, XLSX, TXT, CSV, ZIP). An error alert will appear if rejected.</td>
+  </tr>
+  <tr>
+    <td>Conversation list shows "No conversations yet" after reload</td>
+    <td>Browser was caching a stale API response</td>
+    <td>Hard-reload the page (Ctrl+Shift+R). The Messages API sends no-cache headers — this should be a one-time issue on older cached versions.</td>
+  </tr>
+  <tr>
     <td>Offline page showing even with internet</td>
     <td>Stale Service Worker cache</td>
     <td>Open browser DevTools → Application → Service Workers → click "Update", then hard-reload (Ctrl+Shift+R).</td>
@@ -974,9 +998,9 @@ the browser's Service Worker so you can continue working with limited or no conn
 
 
 <!-- ═══════════════════════════════════════════════
-     15. QUICK REFERENCE
+     16. QUICK REFERENCE (was 15)
 ═══════════════════════════════════════════════ -->
-<h1 class="section" id="s15"><span class="num">15</span> Quick-Reference Cheat Sheet</h1>
+<h1 class="section" id="s16"><span class="num">16</span> Quick-Reference Cheat Sheet</h1>
 
 <h2 class="sub">Daily MA Workflow</h2>
 <ol class="steps">
