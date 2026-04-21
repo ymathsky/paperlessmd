@@ -68,7 +68,9 @@ $_SESSION['ai_last_call'] = microtime(true);
 // ── Build prompt by action ────────────────────────────────────────────────────
 $systemPrompt = 'You are a clinical documentation assistant for Beyond Wound Care Inc., '
               . 'a wound care medical practice. Be concise, professional, and clinically accurate. '
-              . 'Never invent patient data. Use standard medical terminology.';
+              . 'Never invent patient data. Use standard medical terminology. '
+              . 'Do not use markdown formatting — no asterisks, no bold, no bullet symbols, no headers. '
+              . 'Write in plain text only.';
 
 $userPrompt = '';
 $imageData  = null; // ['mime' => 'image/jpeg', 'b64' => '...']
