@@ -597,12 +597,27 @@ replyBtn.addEventListener('click',   () => sendReply());
 composeBody.addEventListener('keydown', e => { if (e.key==='Enter'&&(e.ctrlKey||e.metaKey)) sendNew(); });
 replyBody.addEventListener('keydown',   e => { if (e.key==='Enter'&&(e.ctrlKey||e.metaKey)) sendReply(); });
 
+const MAX_FILE = 25 * 1024 * 1024; // 25 MB — must match server .htaccess
+
 composeFileInput.addEventListener('change', () => {
-    composeFileName.textContent = composeFileInput.files[0]?.name || 'Click to attach a file';
+    const f = composeFileInput.files[0];
+    if (f && f.size > MAX_FILE) {
+        alert('File is too large (' + (f.size/1048576).toFixed(1) + ' MB). Maximum is 25 MB.');
+        composeFileInput.value = '';
+        composeFileName.textContent = 'Click to attach a file';
+        return;
+    }
+    composeFileName.textContent = f?.name || 'Click to attach a file';
 });
 replyFileInput.addEventListener('change', () => {
     const f = replyFileInput.files[0];
-    if (f) { replyFileNameEl.textContent = '📎 ' + f.name; replyFileNameEl.classList.remove('hidden'); }
+    if (f && f.size > MAX_FILE) {
+        alert('File is too large (' + (f.size/1048576).toFixed(1) + ' MB). Maximum is 25 MB.');
+        replyFileInput.value = '';
+        replyFileNameEl.classList.add('hidden');
+        return;
+    }
+    if (f) { replyFileNameEl.textContent = '\uD83D\uDCCE ' + f.name; replyFileNameEl.classList.remove('hidden'); }
     else   { replyFileNameEl.classList.add('hidden'); }
 });
 
