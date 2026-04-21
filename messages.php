@@ -452,6 +452,9 @@ async function postWithProgress(fd, progressBar) {
         xhr.send(fd);
     });
 }
+
+// ── Compose modal ──────────────────────────────────────────────────────────────
+function openCompose() {
     composeModal.classList.remove('hidden');
     composeModal.classList.add('flex');
     setTimeout(() => composeSubject.focus(), 50);
