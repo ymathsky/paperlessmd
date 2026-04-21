@@ -506,7 +506,7 @@ async function sendReply() {
     setBusy(replyBtn, true);
     const fd = new FormData();
     fd.append('csrf_token', CSRF);
-    fd.append('body', body||' ');
+    fd.append('body', body);
     fd.append('parent_id', currentRootId);
     if (replyFileInput.files[0]) fd.append('file', replyFileInput.files[0]);
     try {
@@ -530,7 +530,7 @@ async function sendNew() {
     const subject = composeSubject.value.trim();
     const to      = composeTo.value;
     if (!subject) { composeSubject.focus(); return; }
-    if (!body)    { composeBody.focus();    return; }
+    if (!body && !composeFileInput.files[0]) { composeBody.focus(); return; }
     setBusy(sendNewBtn, true);
     const fd = new FormData();
     fd.append('csrf_token', CSRF);
