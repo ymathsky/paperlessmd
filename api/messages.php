@@ -69,95 +69,65 @@ try {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LIST  — conversations visible to current user, most-recently-active first
+// LIST  — thread roots visible to current user, newest-activity first
+// Single query using correlated subqueries — no GROUP BY, any SQL mode
 // ─────────────────────────────────────────────────────────────────────────────
 function handleList(): void
 {
     global $pdo, $me;
 
-    // ── Step 1: root messages (simple, no subqueries) ─────────────────────────
     $stmt = $pdo->prepare("
-        SELECT m.id, m.subject, m.from_user_id, m.to_user_id, m.created_at,
-               sf.full_name AS from_name,
-               sf.role      AS from_role,
-               COALESCE(st.full_name, 'All Staff') AS to_name
-        FROM   messages m
-        JOIN   staff sf ON sf.id = m.from_user_id
-        LEFT   JOIN staff st ON st.id = m.to_user_id
-        WHERE  m.parent_id IS NULL
-          AND  (m.from_user_id = ? OR m.to_user_id = ? OR m.to_user_id IS NULL)
-        ORDER  BY m.created_at DESC
-        LIMIT  200
+        SELECT
+            m.id,
+            m.subject,
+            m.from_user_id,
+            m.to_user_id,
+            m.created_at,
+            sf.full_name                        AS from_name,
+            sf.role                             AS from_role,
+            COALESCE(st.full_name, 'All Staff') AS to_name,
+
+            COALESCE(
+                (SELECT MAX(r.created_at)
+                 FROM   messages r
+                 WHERE  r.id = m.id OR r.parent_id = m.id),
+                m.created_at
+            ) AS last_activity,
+
+            (SELECT LEFT(r.body, 120)
+             FROM   messages r
+             WHERE  r.id = m.id OR r.parent_id = m.id
+             ORDER  BY r.created_at DESC
+             LIMIT  1
+            ) AS last_body,
+
+            (SELECT COUNT(*)
+             FROM   messages u
+             LEFT   JOIN message_reads mr2
+                         ON  mr2.message_id = u.id
+                         AND mr2.user_id    = :me_unread
+             WHERE  (u.id = m.id OR u.parent_id = m.id)
+               AND  u.from_user_id != :me_sender
+               AND  mr2.id IS NULL
+            ) AS unread_count
+
+        FROM  messages m
+        JOIN  staff sf ON sf.id = m.from_user_id
+        LEFT  JOIN staff st ON st.id = m.to_user_id
+        WHERE m.parent_id IS NULL
+          AND (m.from_user_id = :me_from OR m.to_user_id = :me_to OR m.to_user_id IS NULL)
+        ORDER BY last_activity DESC
+        LIMIT 200
     ");
-    $stmt->execute([$me, $me]);
-    $rows = $stmt->fetchAll();
 
-    if (empty($rows)) {
-        echo json_encode(['ok' => true, 'conversations' => []]);
-        return;
-    }
+    $stmt->execute([
+        ':me_unread' => $me,
+        ':me_sender' => $me,
+        ':me_from'   => $me,
+        ':me_to'     => $me,
+    ]);
 
-    $rootIds = array_map('intval', array_column($rows, 'id'));
-    $ph      = implode(',', array_fill(0, count($rootIds), '?'));
-
-    // ── Step 2: last activity + last body per thread ──────────────────────────
-    // "latest row per group" pattern compatible with MySQL 5.6+
-    $actStmt = $pdo->prepare("
-        SELECT latest.root_id,
-               latest.last_activity,
-               ANY_VALUE(LEFT(m2.body, 120)) AS last_body
-        FROM (
-            SELECT COALESCE(parent_id, id) AS root_id,
-                   MAX(created_at)          AS last_activity
-            FROM   messages
-            WHERE  COALESCE(parent_id, id) IN ($ph)
-            GROUP  BY COALESCE(parent_id, id)
-        ) AS latest
-        JOIN messages m2
-             ON  COALESCE(m2.parent_id, m2.id) = latest.root_id
-             AND m2.created_at                  = latest.last_activity
-        GROUP  BY latest.root_id, latest.last_activity
-    ");
-    $actStmt->execute($rootIds);
-    $actMap = [];
-    foreach ($actStmt->fetchAll() as $r) {
-        $actMap[(int)$r['root_id']] = $r;
-    }
-
-    // ── Step 3: unread count per thread ──────────────────────────────────────
-    $unreadStmt = $pdo->prepare("
-        SELECT COALESCE(m.parent_id, m.id) AS root_id,
-               COUNT(*)                    AS unread_count
-        FROM   messages m
-        LEFT   JOIN message_reads mr
-                    ON  mr.message_id = m.id
-                    AND mr.user_id    = ?
-        WHERE  m.from_user_id != ?
-          AND  mr.id IS NULL
-          AND  COALESCE(m.parent_id, m.id) IN ($ph)
-        GROUP  BY COALESCE(m.parent_id, m.id)
-    ");
-    $unreadStmt->execute(array_merge([$me, $me], $rootIds));
-    $unreadMap = [];
-    foreach ($unreadStmt->fetchAll() as $r) {
-        $unreadMap[(int)$r['root_id']] = (int)$r['unread_count'];
-    }
-
-    // ── Step 4: merge ─────────────────────────────────────────────────────────
-    foreach ($rows as &$row) {
-        $rid                  = (int)$row['id'];
-        $act                  = $actMap[$rid] ?? null;
-        $row['last_activity'] = $act ? $act['last_activity'] : $row['created_at'];
-        $row['last_body']     = $act ? $act['last_body']     : '';
-        $row['unread_count']  = $unreadMap[$rid] ?? 0;
-    }
-    unset($row);
-
-    usort($rows, function ($a, $b) {
-        return strcmp($b['last_activity'], $a['last_activity']);
-    });
-
-    echo json_encode(['ok' => true, 'conversations' => $rows]);
+    echo json_encode(['ok' => true, 'conversations' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
