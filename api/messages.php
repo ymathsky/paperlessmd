@@ -16,8 +16,8 @@ register_shutdown_function(function () {
     }
 });
 
-ini_set('display_errors', '1');
-error_reporting(E_ALL);
+ini_set('display_errors', '0');
+error_reporting(E_ALL & ~E_NOTICE & ~E_DEPRECATED);
 
 // Buffer includes so any stray die()/warning output is captured
 ob_start();
@@ -67,64 +67,98 @@ try {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LIST  — thread roots visible to current user, newest-activity first
-// Single query using correlated subqueries — no GROUP BY, any SQL mode
+// 4 simple queries merged in PHP — no complex GROUP BY, no named params
 // ─────────────────────────────────────────────────────────────────────────────
 function handleList(): void
 {
     global $pdo, $me;
 
+    // ── 1. Root messages visible to me ────────────────────────────────────────
     $stmt = $pdo->prepare("
-        SELECT
-            m.id,
-            m.subject,
-            m.from_user_id,
-            m.to_user_id,
-            m.created_at,
-            sf.full_name                        AS from_name,
-            sf.role                             AS from_role,
-            COALESCE(st.full_name, 'All Staff') AS to_name,
-
-            COALESCE(
-                (SELECT MAX(r.created_at)
-                 FROM   messages r
-                 WHERE  r.id = m.id OR r.parent_id = m.id),
-                m.created_at
-            ) AS last_activity,
-
-            (SELECT LEFT(r.body, 120)
-             FROM   messages r
-             WHERE  r.id = m.id OR r.parent_id = m.id
-             ORDER  BY r.created_at DESC
-             LIMIT  1
-            ) AS last_body,
-
-            (SELECT COUNT(*)
-             FROM   messages u
-             LEFT   JOIN message_reads mr2
-                         ON  mr2.message_id = u.id
-                         AND mr2.user_id    = :me_unread
-             WHERE  (u.id = m.id OR u.parent_id = m.id)
-               AND  u.from_user_id != :me_sender
-               AND  mr2.id IS NULL
-            ) AS unread_count
-
-        FROM  messages m
-        JOIN  staff sf ON sf.id = m.from_user_id
-        LEFT  JOIN staff st ON st.id = m.to_user_id
-        WHERE m.parent_id IS NULL
-          AND (m.from_user_id = :me_from OR m.to_user_id = :me_to OR m.to_user_id IS NULL)
-        ORDER BY last_activity DESC
-        LIMIT 200
+        SELECT m.id, m.subject, m.from_user_id, m.to_user_id, m.created_at,
+               sf.full_name                        AS from_name,
+               sf.role                             AS from_role,
+               COALESCE(st.full_name, 'All Staff') AS to_name
+        FROM   messages m
+        JOIN   staff sf ON sf.id = m.from_user_id
+        LEFT   JOIN staff st ON st.id = m.to_user_id
+        WHERE  m.parent_id IS NULL
+          AND  (m.from_user_id = ? OR m.to_user_id = ? OR m.to_user_id IS NULL)
+        ORDER  BY m.created_at DESC
+        LIMIT  200
     ");
+    $stmt->execute([$me, $me]);
+    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    $stmt->execute([
-        ':me_unread' => $me,
-        ':me_sender' => $me,
-        ':me_from'   => $me,
-        ':me_to'     => $me,
-    ]);
+    if (empty($rows)) {
+        echo json_encode(['ok' => true, 'conversations' => []]);
+        return;
+    }
 
-    echo json_encode(['ok' => true, 'conversations' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+    $rootIds = array_map('intval', array_column($rows, 'id'));
+    $ph      = implode(',', array_fill(0, count($rootIds), '?'));
+
+    // ── 2. Last activity per thread (GROUP BY only the grouped column) ─────────
+    $actStmt = $pdo->prepare("
+        SELECT COALESCE(parent_id, id) AS root_id,
+               MAX(created_at)         AS last_activity
+        FROM   messages
+        WHERE  COALESCE(parent_id, id) IN ($ph)
+        GROUP  BY COALESCE(parent_id, id)
+    ");
+    $actStmt->execute($rootIds);
+    $actMap = [];
+    foreach ($actStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $actMap[(int)$r['root_id']] = $r['last_activity'];
+    }
+
+    // ── 3. Latest body preview per thread (ORDER BY + PHP first-seen dedup) ───
+    $bodyStmt = $pdo->prepare("
+        SELECT COALESCE(parent_id, id) AS root_id,
+               LEFT(body, 120)         AS snippet,
+               created_at
+        FROM   messages
+        WHERE  COALESCE(parent_id, id) IN ($ph)
+        ORDER  BY created_at DESC
+    ");
+    $bodyStmt->execute($rootIds);
+    $bodyMap = [];
+    foreach ($bodyStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $rid = (int)$r['root_id'];
+        if (!isset($bodyMap[$rid])) $bodyMap[$rid] = $r['snippet'];
+    }
+
+    // ── 4. Unread count per thread (GROUP BY only the grouped column) ─────────
+    $unreadStmt = $pdo->prepare("
+        SELECT COALESCE(m.parent_id, m.id) AS root_id,
+               COUNT(*)                    AS unread_count
+        FROM   messages m
+        LEFT   JOIN message_reads mr
+                    ON  mr.message_id = m.id
+                    AND mr.user_id    = ?
+        WHERE  m.from_user_id != ?
+          AND  mr.id IS NULL
+          AND  COALESCE(m.parent_id, m.id) IN ($ph)
+        GROUP  BY COALESCE(m.parent_id, m.id)
+    ");
+    $unreadStmt->execute(array_merge([$me, $me], $rootIds));
+    $unreadMap = [];
+    foreach ($unreadStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+        $unreadMap[(int)$r['root_id']] = (int)$r['unread_count'];
+    }
+
+    // ── 5. Merge and sort by last activity ────────────────────────────────────
+    foreach ($rows as &$row) {
+        $rid                  = (int)$row['id'];
+        $row['last_activity'] = $actMap[$rid] ?? $row['created_at'];
+        $row['last_body']     = $bodyMap[$rid] ?? '';
+        $row['unread_count']  = $unreadMap[$rid] ?? 0;
+    }
+    unset($row);
+
+    usort($rows, fn($a, $b) => strcmp($b['last_activity'], $a['last_activity']));
+
+    echo json_encode(['ok' => true, 'conversations' => $rows]);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
