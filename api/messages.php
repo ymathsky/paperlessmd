@@ -75,20 +75,39 @@ function handleList(): void
     global $pdo, $me;
 
     // ── 1. Root messages visible to me ────────────────────────────────────────
-    $stmt = $pdo->prepare("
-        SELECT m.id, m.subject, m.from_user_id, m.to_user_id, m.created_at,
-               sf.full_name                        AS from_name,
-               sf.role                             AS from_role,
-               COALESCE(st.full_name, 'All Staff') AS to_name
-        FROM   messages m
-        JOIN   staff sf ON sf.id = m.from_user_id
-        LEFT   JOIN staff st ON st.id = m.to_user_id
-        WHERE  m.parent_id IS NULL
-          AND  (m.from_user_id = ? OR m.to_user_id = ? OR m.to_user_id IS NULL)
-        ORDER  BY m.created_at DESC
-        LIMIT  200
-    ");
-    $stmt->execute([$me, $me]);
+    $isAdmin = ($_SESSION['role'] ?? '') === 'admin';
+
+    if ($isAdmin) {
+        // Admins see all conversations
+        $stmt = $pdo->prepare("
+            SELECT m.id, m.subject, m.from_user_id, m.to_user_id, m.created_at,
+                   sf.full_name                        AS from_name,
+                   sf.role                             AS from_role,
+                   COALESCE(st.full_name, 'All Staff') AS to_name
+            FROM   messages m
+            JOIN   staff sf ON sf.id = m.from_user_id
+            LEFT   JOIN staff st ON st.id = m.to_user_id
+            WHERE  m.parent_id IS NULL
+            ORDER  BY m.created_at DESC
+            LIMIT  200
+        ");
+        $stmt->execute([]);
+    } else {
+        $stmt = $pdo->prepare("
+            SELECT m.id, m.subject, m.from_user_id, m.to_user_id, m.created_at,
+                   sf.full_name                        AS from_name,
+                   sf.role                             AS from_role,
+                   COALESCE(st.full_name, 'All Staff') AS to_name
+            FROM   messages m
+            JOIN   staff sf ON sf.id = m.from_user_id
+            LEFT   JOIN staff st ON st.id = m.to_user_id
+            WHERE  m.parent_id IS NULL
+              AND  (m.from_user_id = ? OR m.to_user_id = ? OR m.to_user_id IS NULL)
+            ORDER  BY m.created_at DESC
+            LIMIT  200
+        ");
+        $stmt->execute([$me, $me]);
+    }
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     if (empty($rows)) {

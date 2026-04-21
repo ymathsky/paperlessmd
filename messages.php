@@ -359,9 +359,14 @@ async function loadConvs() {
     try {
         const res = await fetch(API+'?action=list', {cache:'no-store'});
         const d   = await res.json();
-        allConvs  = d.ok ? (d.conversations||[]) : [];
+        if (!d.ok) {
+            console.error('loadConvs API error:', d.error, d._debug||'');
+            renderConvList([]);
+            return;
+        }
+        allConvs = d.conversations||[];
         renderConvList(allConvs);
-    } catch(e) { console.error('loadConvs error:', e); renderConvList([]); }
+    } catch(e) { console.error('loadConvs fetch error:', e); renderConvList([]); }
 }
 
 function renderConvList(convs) {
