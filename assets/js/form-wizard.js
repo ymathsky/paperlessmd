@@ -86,6 +86,8 @@
             updateHeader();
             updateNavButtons();
             scrollToTop();
+            // Reinitialize signature canvases that may have been in a hidden step on load
+            window.dispatchEvent(new Event('resize'));
         }
 
         function markDone(idx) {
