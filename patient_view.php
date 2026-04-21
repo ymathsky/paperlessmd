@@ -69,7 +69,8 @@ $formDefs = [
     'cognitive_wellness' => ['label' => 'Cognitive Wellness Exam',  'icon' => 'bi-brain',               'bg' => 'bg-violet-100',  'text' => 'text-violet-600'],
     'medicare_awv'       => ['label' => 'Medicare AWV',             'icon' => 'bi-clipboard2-pulse',    'bg' => 'bg-sky-100',     'text' => 'text-sky-600'],
     'il_disclosure'      => ['label' => 'IL Disclosure Auth.',       'icon' => 'bi-file-earmark-text',   'bg' => 'bg-slate-100',   'text' => 'text-slate-600'],
-    'wound_care_consent' => ['label' => 'Wound Care Consent',         'icon' => 'bi-bandaid',             'bg' => 'bg-rose-100',    'text' => 'text-rose-600'],
+    'wound_care_consent'     => ['label' => 'Wound Care Consent',              'icon' => 'bi-bandaid',                  'bg' => 'bg-rose-100',    'text' => 'text-rose-600'],
+    'informed_consent_wound' => ['label' => 'Informed Consent – Wound Care', 'icon' => 'bi-file-earmark-medical',     'bg' => 'bg-red-100',     'text' => 'text-red-700'],
 ];
 
 $statusCfg = [
