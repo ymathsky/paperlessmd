@@ -132,7 +132,7 @@ $option     = vd($data, 'abn_option'); // 'option1', 'option2', 'option3'
     <!-- Staff / MA Signature -->
     <div style="margin-top:10pt;display:flex;gap:40pt;align-items:flex-end;">
         <div style="flex:1;">
-            <div style="min-height:38pt;">
+            <div style="min-height:38pt;position:relative;">
                 <?php if (!empty($f['ma_signature'])): ?>
                 <img src="<?= h($f['ma_signature']) ?>" class="bwc-sig-img" alt="MA Signature">
                 <?php endif; ?>
