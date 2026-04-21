@@ -323,103 +323,122 @@ function handleSend(): void
             ->execute([$msgId, $me]);
     } catch (PDOException $e) { /* ignore */ }
 
-    // Optional file attachment
-    if (!empty($_FILES['file'])) {
-        $fileErr = $_FILES['file']['error'];
-        if ($fileErr !== UPLOAD_ERR_OK) {
-            $errMsg = match($fileErr) {
-                UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => 'File too large. Max allowed by server: ' . ini_get('upload_max_filesize'),
-                UPLOAD_ERR_PARTIAL   => 'File upload was interrupted.',
-                UPLOAD_ERR_NO_TMP_DIR => 'Server has no temp directory for uploads.',
-                UPLOAD_ERR_CANT_WRITE => 'Server cannot write to disk.',
-                UPLOAD_ERR_EXTENSION  => 'Upload blocked by server extension.',
-                default => 'Upload error code: ' . $fileErr,
-            };
-            echo json_encode(['ok' => false, 'error' => $errMsg]);
-            return;
+    // Optional file attachments (supports files[] array from multi-file input)
+    $uploadDir = __DIR__ . '/../uploads/message_files';
+
+    // Ensure upload directory exists with security .htaccess
+    if (!is_dir($uploadDir)) {
+        mkdir($uploadDir, 0755, true);
+        file_put_contents($uploadDir . '/.htaccess',
+            "Options -Indexes\nphp_flag engine off\n<FilesMatch \"\\.(php|phtml|php3|php4|php5|cgi|pl|py)$\">\n  Deny from all\n</FilesMatch>\n");
+    }
+
+    // Normalise $_FILES into a flat array of individual files
+    $uploads = [];
+    if (!empty($_FILES['files']['name'])) {
+        // multi-file: files[]
+        foreach ($_FILES['files']['name'] as $i => $name) {
+            $uploads[] = [
+                'name'     => $name,
+                'tmp_name' => $_FILES['files']['tmp_name'][$i],
+                'error'    => $_FILES['files']['error'][$i],
+                'size'     => $_FILES['files']['size'][$i],
+            ];
         }
+    } elseif (!empty($_FILES['file']['name'])) {
+        // legacy single file: file
+        $uploads[] = $_FILES['file'];
+    }
 
-        $file      = $_FILES['file'];
-        $maxBytes  = 25 * 1024 * 1024; // 25 MB
-        $uploadDir = __DIR__ . '/../uploads/message_files';
+    if (empty($uploads)) {
+        auditLog($pdo, 'message_send', 'message', $msgId, $subject ?: '(reply)');
+        echo json_encode(['ok' => true, 'message_id' => $msgId]);
+        return;
+    }
 
-        // Ensure upload directory exists
-        if (!is_dir($uploadDir)) {
-            mkdir($uploadDir, 0755, true);
-            file_put_contents($uploadDir . '/.htaccess',
-                "Options -Indexes\n<FilesMatch \"\\.php$\">\n  Deny from all\n</FilesMatch>\n");
+    $maxBytes = 25 * 1024 * 1024;
+
+    // MIME → canonical safe extension map (prevents ext spoofing)
+    $mimeExtMap = [
+        'image/jpeg'  => 'jpg',  'image/png'  => 'png',  'image/gif'  => 'gif',
+        'image/webp'  => 'webp', 'application/pdf' => 'pdf',
+        'application/msword' => 'doc',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
+        'application/vnd.ms-excel' => 'xls',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
+        'text/plain'  => 'txt',  'text/csv'   => 'csv',
+        'application/zip' => 'zip', 'application/x-zip-compressed' => 'zip',
+    ];
+
+    $finfo = extension_loaded('fileinfo') ? finfo_open(FILEINFO_MIME_TYPE) : null;
+    $insAtt = $pdo->prepare("
+        INSERT INTO message_attachments (message_id, original_name, stored_name, file_size, mime_type)
+        VALUES (?, ?, ?, ?, ?)
+    ");
+
+    // Ensure table exists
+    try { $pdo->query("SELECT 1 FROM message_attachments LIMIT 1"); }
+    catch (PDOException $e) {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS message_attachments (
+            id INT AUTO_INCREMENT PRIMARY KEY, message_id INT NOT NULL,
+            original_name VARCHAR(255) NOT NULL, stored_name VARCHAR(255) NOT NULL,
+            file_size INT UNSIGNED NOT NULL DEFAULT 0, mime_type VARCHAR(100) NOT NULL DEFAULT '',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP, INDEX idx_msg (message_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+
+    $errors = [];
+    foreach ($uploads as $file) {
+        $errCode = $file['error'];
+        if ($errCode !== UPLOAD_ERR_OK) {
+            $errors[] = match($errCode) {
+                UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => '"' . $file['name'] . '" is too large (server limit: ' . ini_get('upload_max_filesize') . ')',
+                UPLOAD_ERR_PARTIAL    => '"' . $file['name'] . '" upload was interrupted.',
+                UPLOAD_ERR_NO_TMP_DIR => 'Server has no temp directory.',
+                UPLOAD_ERR_CANT_WRITE => 'Server cannot write to disk.',
+                default               => '"' . $file['name'] . '" upload error ' . $errCode,
+            };
+            continue;
         }
 
         if ($file['size'] > $maxBytes) {
-            echo json_encode(['ok' => false, 'error' => 'File exceeds 25 MB limit.']);
-            return;
+            $errors[] = '"' . $file['name'] . '" exceeds 25 MB limit.';
+            continue;
         }
 
-        if (!extension_loaded('fileinfo')) {
-            echo json_encode(['ok' => false, 'error' => 'Server missing fileinfo extension.']);
-            return;
+        $mime = $finfo ? finfo_file($finfo, $file['tmp_name']) : 'application/octet-stream';
+
+        if (!isset($mimeExtMap[$mime])) {
+            $errors[] = '"' . $file['name'] . '" has an unsupported file type (' . $mime . ').';
+            continue;
         }
 
-        $finfo = finfo_open(FILEINFO_MIME_TYPE);
-        $mime  = finfo_file($finfo, $file['tmp_name']);
-        finfo_close($finfo);
-
-        $allowed = [
-            'image/jpeg', 'image/png', 'image/gif', 'image/webp',
-            'application/pdf',
-            'application/msword',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'application/vnd.ms-excel',
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'text/plain', 'text/csv',
-            'application/zip', 'application/x-zip-compressed',
-        ];
-
-        if (!in_array($mime, $allowed, true)) {
-            echo json_encode(['ok' => false, 'error' => 'File type not allowed: ' . $mime]);
-            return;
-        }
-
-        $ext    = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-        $stored = 'msg_' . $msgId . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
-        $dest   = $uploadDir . '/' . $stored;
+        // Use MIME-derived extension, not the user-supplied one (security)
+        $safeExt = $mimeExtMap[$mime];
+        $stored  = 'msg_' . $msgId . '_' . bin2hex(random_bytes(6)) . '.' . $safeExt;
+        $dest    = $uploadDir . '/' . $stored;
 
         if (!move_uploaded_file($file['tmp_name'], $dest)) {
-            echo json_encode(['ok' => false, 'error' => 'Failed to save attachment. Directory: ' . $uploadDir . ' Writable: ' . (is_writable($uploadDir)?'yes':'no')]);
-            return;
+            $errors[] = '"' . $file['name'] . '" could not be saved.';
+            continue;
         }
 
-        try {
-            $pdo->prepare("
-                INSERT INTO message_attachments
-                    (message_id, original_name, stored_name, file_size, mime_type)
-                VALUES (?, ?, ?, ?, ?)
-            ")->execute([$msgId, $file['name'], $stored, $file['size'], $mime]);
-        } catch (PDOException $e) {
-            // Table might not exist yet — try to create it then retry
-            $pdo->exec("
-                CREATE TABLE IF NOT EXISTS message_attachments (
-                    id            INT AUTO_INCREMENT PRIMARY KEY,
-                    message_id    INT          NOT NULL,
-                    original_name VARCHAR(255) NOT NULL,
-                    stored_name   VARCHAR(255) NOT NULL,
-                    file_size     INT UNSIGNED NOT NULL DEFAULT 0,
-                    mime_type     VARCHAR(100) NOT NULL DEFAULT '',
-                    created_at    DATETIME     DEFAULT CURRENT_TIMESTAMP,
-                    INDEX idx_msg (message_id)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-            ");
-            $pdo->prepare("
-                INSERT INTO message_attachments
-                    (message_id, original_name, stored_name, file_size, mime_type)
-                VALUES (?, ?, ?, ?, ?)
-            ")->execute([$msgId, $file['name'], $stored, $file['size'], $mime]);
-        }
+        $insAtt->execute([$msgId, $file['name'], $stored, $file['size'], $mime]);
+    }
+
+    if ($finfo) finfo_close($finfo);
+
+    if (!empty($errors) && count($errors) === count($uploads)) {
+        // All files failed — report errors but message was already saved
+        auditLog($pdo, 'message_send', 'message', $msgId, $subject ?: '(reply)');
+        echo json_encode(['ok' => false, 'error' => implode("\n", $errors), 'message_id' => $msgId]);
+        return;
     }
 
     auditLog($pdo, 'message_send', 'message', $msgId, $subject ?: '(reply)');
-
-    echo json_encode(['ok' => true, 'message_id' => $msgId]);
+    $resp = ['ok' => true, 'message_id' => $msgId];
+    if (!empty($errors)) $resp['warnings'] = $errors; // partial success
+    echo json_encode($resp);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

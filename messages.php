@@ -49,12 +49,19 @@ include __DIR__ . '/includes/header.php';
 .bubble-me   { background: #2563eb; color:#fff; border-radius:18px 18px 4px 18px; }
 .bubble-them { background: #fff;    color:#1e293b; border-radius:18px 18px 18px 4px; box-shadow:0 1px 2px rgba(0,0,0,.08); border:1px solid #e2e8f0; }
 .att-chip { display:inline-flex; align-items:center; gap:6px; font-size:12px; font-weight:500;
-            border-radius:10px; padding:5px 10px; transition:background .15s; }
+            border-radius:10px; padding:5px 10px; transition:background .15s; text-decoration:none; }
 .att-chip-blue { background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; }
 .att-chip-blue:hover { background:#dbeafe; }
 .att-chip-white { background:rgba(255,255,255,.15); color:#fff; border:1px solid rgba(255,255,255,.3); }
 .att-chip-white:hover { background:rgba(255,255,255,.25); }
 .reply-input { resize:none; min-height:44px; max-height:120px; overflow-y:auto; }
+#replyDropZone.drag-over { background:#dbeafe; border-color:#3b82f6; }
+.file-preview-chip { display:inline-flex; align-items:center; gap:4px; background:#eff6ff;
+    border:1px solid #bfdbfe; color:#1d4ed8; border-radius:8px; padding:3px 8px;
+    font-size:11px; font-weight:500; max-width:180px; }
+.file-preview-chip button { line-height:1; color:#93c5fd; }
+.file-preview-chip button:hover { color:#1d4ed8; }
+.upload-bar { height:3px; background:#2563eb; border-radius:2px; transition:width .2s; width:0; }
 </style>
 
 <!-- ═══════ MESSAGES APP ═══════ -->
@@ -132,11 +139,16 @@ include __DIR__ . '/includes/header.php';
             </div>
 
             <!-- Reply bar -->
-            <div class="shrink-0 bg-white border-t border-slate-100 px-4 py-3">
+            <div id="replyDropZone" class="shrink-0 bg-white border-t border-slate-100 px-4 py-3 transition-colors"
+                 style="border-top:2px solid transparent">
+                <div id="replyUploadBar" class="upload-bar mb-1 hidden"></div>
+                <!-- File previews -->
+                <div id="replyFilePreviews" class="flex flex-wrap gap-1.5 mb-2 empty:hidden"></div>
+                <!-- Input row -->
                 <div class="flex items-end gap-3 bg-slate-100 rounded-2xl px-4 py-2.5">
-                    <label class="shrink-0 text-slate-400 hover:text-blue-600 cursor-pointer transition pb-0.5" title="Attach file">
+                    <label class="shrink-0 text-slate-400 hover:text-blue-600 cursor-pointer transition pb-0.5" title="Attach file (or drag &amp; drop)">
                         <i class="bi bi-paperclip text-lg leading-none"></i>
-                        <input type="file" id="replyFileInput" class="hidden"
+                        <input type="file" id="replyFileInput" class="hidden" multiple
                                accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip">
                     </label>
                     <textarea id="replyBody" rows="1" placeholder="Write a reply… (Ctrl+Enter to send)"
@@ -148,7 +160,6 @@ include __DIR__ . '/includes/header.php';
                         <i class="bi bi-send-fill text-sm leading-none"></i>
                     </button>
                 </div>
-                <p id="replyFileName" class="text-[11px] text-blue-600 mt-1 ml-2 hidden truncate"></p>
             </div>
         </div>
 
@@ -206,17 +217,18 @@ include __DIR__ . '/includes/header.php';
 
             <div>
                 <label class="block text-xs font-bold text-slate-500 mb-1.5 uppercase tracking-wider">
-                    Attachment <span class="font-normal normal-case text-slate-400">(optional · max 25 MB)</span>
+                    Attachments <span class="font-normal normal-case text-slate-400">(optional · max 25 MB each · drag &amp; drop ok)</span>
                 </label>
-                <label class="flex items-center gap-3 cursor-pointer border-2 border-dashed border-slate-200
+                <label id="composeDropZone" class="flex items-center gap-3 cursor-pointer border-2 border-dashed border-slate-200
                               hover:border-blue-400 rounded-xl px-4 py-3 transition group">
                     <i class="bi bi-paperclip text-slate-400 group-hover:text-blue-500 text-lg transition"></i>
-                    <span id="composeFileName" class="text-sm text-slate-400 group-hover:text-blue-600 transition truncate">
-                        Click to attach a file
+                    <span class="text-sm text-slate-400 group-hover:text-blue-600 transition truncate">
+                        Click or drag files here
                     </span>
-                    <input type="file" id="composeFileInput" class="hidden"
+                    <input type="file" id="composeFileInput" class="hidden" multiple
                            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip">
                 </label>
+                <div id="composeFilePreviews" class="flex flex-wrap gap-1.5 mt-2 empty:hidden"></div>
             </div>
         </div>
 
@@ -259,15 +271,21 @@ const threadMessages   = document.getElementById('threadMessages');
 const replyBody        = document.getElementById('replyBody');
 const replyBtn         = document.getElementById('replyBtn');
 const replyFileInput   = document.getElementById('replyFileInput');
-const replyFileNameEl  = document.getElementById('replyFileName');
+const replyFilePreviews= document.getElementById('replyFilePreviews');
+const replyDropZone    = document.getElementById('replyDropZone');
+const replyUploadBar   = document.getElementById('replyUploadBar');
 const composeModal     = document.getElementById('composeModal');
 const composeBackdrop  = document.getElementById('composeBackdrop');
 const composeTo        = document.getElementById('composeTo');
 const composeSubject   = document.getElementById('composeSubject');
 const composeBody      = document.getElementById('composeBody');
 const composeFileInput = document.getElementById('composeFileInput');
-const composeFileName  = document.getElementById('composeFileName');
+const composeFilePreviews = document.getElementById('composeFilePreviews');
+const composeDropZone  = document.getElementById('composeDropZone');
 const sendNewBtn       = document.getElementById('sendNewBtn');
+
+let replyFiles   = [];  // DataTransfer-managed list
+let composeFiles = [];
 
 // ── Utils ───────────────────────────────────────────────────────────────────
 function esc(s) {
@@ -336,8 +354,104 @@ function setBusy(btn, b) {
     btn.classList.toggle('cursor-not-allowed', b);
 }
 
-// ── Compose modal ────────────────────────────────────────────────────────────
-function openCompose() {
+// ── File handling helpers ────────────────────────────────────────────────────
+const MAX_FILE   = 25 * 1024 * 1024;
+const ALLOWED_EXT = /\.(jpe?g|png|gif|webp|pdf|docx?|xlsx?|txt|csv|zip)$/i;
+
+function fileIcon(name) {
+    const ext = (name.split('.').pop()||'').toLowerCase();
+    return ({jpg:'bi-file-image-fill',jpeg:'bi-file-image-fill',png:'bi-file-image-fill',
+             gif:'bi-file-image-fill',webp:'bi-file-image-fill',pdf:'bi-file-pdf-fill',
+             doc:'bi-file-word-fill',docx:'bi-file-word-fill',
+             xls:'bi-file-excel-fill',xlsx:'bi-file-excel-fill',
+             csv:'bi-filetype-csv',txt:'bi-file-text-fill',zip:'bi-file-zip-fill'})[ext]
+        ?? 'bi-file-earmark-fill';
+}
+
+function validateFile(f) {
+    if (!ALLOWED_EXT.test(f.name)) return `"${f.name}" has an unsupported file type.`;
+    if (f.size > MAX_FILE) return `"${f.name}" is ${(f.size/1048576).toFixed(1)} MB — max is 25 MB.`;
+    return null;
+}
+
+function renderFilePreviews(container, files, onRemove) {
+    container.innerHTML = files.map((f, i) => `
+        <span class="file-preview-chip" title="${esc(f.name)}">
+            <i class="bi ${fileIcon(f.name)} text-xs"></i>
+            <span class="truncate max-w-[140px]">${esc(f.name)}</span>
+            <span class="opacity-60">${fmtBytes(f.size)}</span>
+            <button type="button" data-i="${i}" title="Remove" class="ml-1">&times;</button>
+        </span>`).join('');
+    container.querySelectorAll('button[data-i]').forEach(btn => {
+        btn.addEventListener('click', () => onRemove(parseInt(btn.dataset.i, 10)));
+    });
+}
+
+function addFiles(fileList, store, container, onRemove) {
+    const errors = [];
+    Array.from(fileList).forEach(f => {
+        const err = validateFile(f);
+        if (err) { errors.push(err); return; }
+        if (store.some(x => x.name === f.name && x.size === f.size)) return; // dedupe
+        store.push(f);
+    });
+    if (errors.length) alert(errors.join('\n'));
+    renderFilePreviews(container, store, (i) => {
+        store.splice(i, 1);
+        renderFilePreviews(container, store, onRemove);
+    });
+}
+
+function setupDropZone(zone, store, container, input) {
+    const onRemove = (i) => { store.splice(i,1); renderFilePreviews(container, store, onRemove); };
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+    zone.addEventListener('drop', e => {
+        e.preventDefault();
+        zone.classList.remove('drag-over');
+        addFiles(e.dataTransfer.files, store, container, onRemove);
+    });
+    input.addEventListener('change', () => {
+        addFiles(input.files, store, container, onRemove);
+        input.value = ''; // allow re-selecting same file
+    });
+}
+
+// Init drop zones
+setupDropZone(replyDropZone, replyFiles, replyFilePreviews, replyFileInput);
+setupDropZone(composeDropZone, composeFiles, composeFilePreviews, composeFileInput);
+
+function buildFormData(extra, files) {
+    const fd = new FormData();
+    fd.append('csrf_token', CSRF);
+    Object.entries(extra).forEach(([k,v]) => { if (v !== null && v !== undefined) fd.append(k, v); });
+    files.forEach(f => fd.append('files[]', f));
+    return fd;
+}
+
+function setProgress(bar, pct) {
+    bar.classList.toggle('hidden', pct <= 0 || pct >= 100);
+    bar.style.width = pct + '%';
+}
+
+async function postWithProgress(fd, progressBar) {
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', API + '?action=send');
+        if (progressBar) {
+            xhr.upload.addEventListener('progress', e => {
+                if (e.lengthComputable) setProgress(progressBar, (e.loaded/e.total)*95);
+            });
+        }
+        xhr.onload = () => {
+            if (progressBar) setProgress(progressBar, 0);
+            try { resolve(JSON.parse(xhr.responseText)); }
+            catch(e) { reject(new Error('Invalid JSON response')); }
+        };
+        xhr.onerror = () => reject(new Error('Network error'));
+        xhr.send(fd);
+    });
+}
     composeModal.classList.remove('hidden');
     composeModal.classList.add('flex');
     setTimeout(() => composeSubject.focus(), 50);
@@ -346,6 +460,8 @@ function openCompose() {
 function closeCompose() {
     composeModal.classList.add('hidden');
     composeModal.classList.remove('flex');
+    composeFiles.length = 0;
+    composeFilePreviews.innerHTML = '';
 }
 
 document.getElementById('composeBtn').addEventListener('click', openCompose);
@@ -505,25 +621,20 @@ function bubbleHtml(m) {
 // ── Reply ──────────────────────────────────────────────────────────────────────
 async function sendReply() {
     const body = replyBody.value.trim();
-    if (!body && !replyFileInput.files[0]) { replyBody.focus(); return; }
+    if (!body && !replyFiles.length) { replyBody.focus(); return; }
     setBusy(replyBtn, true);
-    const fd = new FormData();
-    fd.append('csrf_token', CSRF);
-    fd.append('body', body);
-    fd.append('parent_id', currentRootId);
-    if (replyFileInput.files[0]) fd.append('file', replyFileInput.files[0]);
+    const fd = buildFormData({body, parent_id: currentRootId}, replyFiles);
     try {
-        const res = await fetch(`${API}?action=send`, {method:'POST',body:fd});
-        const d   = await res.json();
+        const d = await postWithProgress(fd, replyUploadBar);
         if (d.ok) {
             replyBody.value = '';
-            replyFileInput.value = '';
-            replyFileNameEl.classList.add('hidden');
-            replyFileNameEl.textContent = '';
             replyBody.style.height = '';
+            replyFiles.length = 0;
+            replyFilePreviews.innerHTML = '';
             await openThread(currentRootId);
+            if (d.warnings?.length) alert('Some files were skipped:\n' + d.warnings.join('\n'));
         } else { alert(d.error||'Failed to send.'); }
-    } catch(e) { alert('Network error.'); }
+    } catch(e) { alert(e.message||'Network error.'); }
     finally { setBusy(replyBtn,false); }
 }
 
@@ -533,25 +644,21 @@ async function sendNew() {
     const subject = composeSubject.value.trim();
     const to      = composeTo.value;
     if (!subject) { composeSubject.focus(); return; }
-    if (!body && !composeFileInput.files[0]) { composeBody.focus(); return; }
+    if (!body && !composeFiles.length) { composeBody.focus(); return; }
     setBusy(sendNewBtn, true);
-    const fd = new FormData();
-    fd.append('csrf_token', CSRF);
-    fd.append('body', body);
-    fd.append('subject', subject);
-    fd.append('to', to);
-    if (composeFileInput.files[0]) fd.append('file', composeFileInput.files[0]);
+    const fd = buildFormData({body, subject, to}, composeFiles);
     try {
-        const res = await fetch(`${API}?action=send`, {method:'POST',body:fd});
-        const d   = await res.json();
+        const d = await postWithProgress(fd, null);
         if (d.ok) {
-            composeSubject.value=''; composeBody.value='';
-            composeFileInput.value=''; composeFileName.textContent='Click to attach a file';
+            composeSubject.value = ''; composeBody.value = '';
+            composeFiles.length  = 0;
+            composeFilePreviews.innerHTML = '';
             closeCompose();
             await loadConvs();
             await openThread(d.message_id);
+            if (d.warnings?.length) alert('Some files were skipped:\n' + d.warnings.join('\n'));
         } else { alert(d.error||'Failed to send.'); }
-    } catch(e) { alert('Network error.'); }
+    } catch(e) { alert(e.message||'Network error.'); }
     finally { setBusy(sendNewBtn,false); }
 }
 
@@ -599,30 +706,6 @@ replyBtn.addEventListener('click',   () => sendReply());
 
 composeBody.addEventListener('keydown', e => { if (e.key==='Enter'&&(e.ctrlKey||e.metaKey)) sendNew(); });
 replyBody.addEventListener('keydown',   e => { if (e.key==='Enter'&&(e.ctrlKey||e.metaKey)) sendReply(); });
-
-const MAX_FILE = 25 * 1024 * 1024; // 25 MB — must match server .htaccess
-
-composeFileInput.addEventListener('change', () => {
-    const f = composeFileInput.files[0];
-    if (f && f.size > MAX_FILE) {
-        alert('File is too large (' + (f.size/1048576).toFixed(1) + ' MB). Maximum is 25 MB.');
-        composeFileInput.value = '';
-        composeFileName.textContent = 'Click to attach a file';
-        return;
-    }
-    composeFileName.textContent = f?.name || 'Click to attach a file';
-});
-replyFileInput.addEventListener('change', () => {
-    const f = replyFileInput.files[0];
-    if (f && f.size > MAX_FILE) {
-        alert('File is too large (' + (f.size/1048576).toFixed(1) + ' MB). Maximum is 25 MB.');
-        replyFileInput.value = '';
-        replyFileNameEl.classList.add('hidden');
-        return;
-    }
-    if (f) { replyFileNameEl.textContent = '\uD83D\uDCCE ' + f.name; replyFileNameEl.classList.remove('hidden'); }
-    else   { replyFileNameEl.classList.add('hidden'); }
-});
 
 // Delegated: delete buttons in thread
 threadHeader.addEventListener('click', e => {
