@@ -97,6 +97,7 @@
             panel.classList.add('ai-panel--open');
         });
         isOpen = true;
+        loadChatHistory();
         if (chatInput) chatInput.focus();
     }
 
@@ -149,7 +150,50 @@
         return h + ':' + (m < 10 ? '0' : '') + m + ' ' + ampm;
     }
 
-    function appendMsg(role, text) {
+    // Format a DB timestamp string ("YYYY-MM-DD HH:MM:SS") for display
+    function fmtTs(dbTs) {
+        var d = new Date(dbTs.replace(' ', 'T'));
+        if (isNaN(d.getTime())) return '';
+        var h = d.getHours(), m = d.getMinutes();
+        var ampm = h >= 12 ? 'PM' : 'AM';
+        h = h % 12 || 12;
+        return h + ':' + (m < 10 ? '0' : '') + m + ' ' + ampm;
+    }
+
+    // ── Chat history (DB persistence) ────────────────────────────────────────
+    var historyLoaded = false;
+
+    async function loadChatHistory() {
+        if (historyLoaded) return;
+        historyLoaded = true;
+        try {
+            var csrf = window._pdCsrf || '';
+            var base = window._pdBase || '';
+            var res  = await fetch(base + '/api/ai_chat.php', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ csrf_token: csrf, action: 'history' }),
+            });
+            var d = await res.json();
+            if (d.ok && d.messages && d.messages.length) {
+                d.messages.forEach(function (m) {
+                    appendMsg(m.role, m.content, fmtTs(m.created_at));
+                });
+            }
+        } catch (e) { /* silent — history is non-critical */ }
+    }
+
+    function saveChatMsg(role, text) {
+        var csrf = window._pdCsrf || '';
+        var base = window._pdBase || '';
+        fetch(base + '/api/ai_chat.php', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ csrf_token: csrf, action: 'save', role: role, content: text }),
+        }).catch(function () {}); // fire-and-forget
+    }
+
+    function appendMsg(role, text, timestamp) {
         var row = document.createElement('div');
         row.className = 'ai-msg-row ai-msg-row--' + role;
 
@@ -159,7 +203,7 @@
 
         var ts = document.createElement('span');
         ts.className = 'ai-ts';
-        ts.textContent = nowTs();
+        ts.textContent = timestamp || nowTs();
 
         if (role === 'bot') {
             var avatar = document.createElement('span');
@@ -211,11 +255,13 @@
         if (!q) return;
         chatInput.value = '';
         appendMsg('user', q);
+        saveChatMsg('user', q);
         setLoading(true);
         try {
             var ans = await callAI('chat', { question: q });
             setLoading(false);
             appendMsg('bot', ans);
+            saveChatMsg('bot', ans);
         } catch (e) {
             setLoading(false);
             appendMsg('bot', '\u26a0\ufe0f Error: ' + e.message);
