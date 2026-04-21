@@ -105,7 +105,7 @@ function handleList(): void
     $actStmt = $pdo->prepare("
         SELECT latest.root_id,
                latest.last_activity,
-               LEFT(m2.body, 120) AS last_body
+               ANY_VALUE(LEFT(m2.body, 120)) AS last_body
         FROM (
             SELECT COALESCE(parent_id, id) AS root_id,
                    MAX(created_at)          AS last_activity
@@ -116,7 +116,7 @@ function handleList(): void
         JOIN messages m2
              ON  COALESCE(m2.parent_id, m2.id) = latest.root_id
              AND m2.created_at                  = latest.last_activity
-        GROUP  BY latest.root_id
+        GROUP  BY latest.root_id, latest.last_activity
     ");
     $actStmt->execute($rootIds);
     $actMap = [];
