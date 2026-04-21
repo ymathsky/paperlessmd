@@ -8,6 +8,9 @@ $ptDob   = $patient['dob'] ? date('m/d/Y', strtotime($patient['dob'])) : '';
 $sigDate = date('m/d/Y', strtotime($f['created_at']));
 $maName  = h($f['ma_name'] ?? '');
 ?>
+<style>
+  @page { size: 8in 13in; margin: 0.4in 0.5in; }
+</style>
 <div class="bwc-form">
     <!-- Practice Header -->
     <div class="bwc-header">

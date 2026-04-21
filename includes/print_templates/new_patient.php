@@ -15,6 +15,9 @@ $emergName        = vd($data, 'emergency_name');
 $emergRel         = vd($data, 'emergency_relationship');
 $emergPhone       = vd($data, 'emergency_phone');
 ?>
+<style>
+  @page { size: 8in 13in; margin: 0.4in 0.5in; }
+</style>
 <div class="bwc-form">
     <!-- Practice Header -->
     <div class="bwc-header">

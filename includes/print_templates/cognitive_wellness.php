@@ -35,6 +35,9 @@ if (!function_exists('yn2')) { function yn2(array $d, string $k): string {
     return '<span style="color:#aaa;">—</span>';
 }}
 ?>
+<style>
+  @page { size: 8in 13in; margin: 0.4in 0.5in; }
+</style>
 <div class="bwc-form">
     <!-- Practice Header -->
     <div class="bwc-header">

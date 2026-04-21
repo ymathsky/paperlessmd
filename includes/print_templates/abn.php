@@ -14,6 +14,9 @@ $estimatedCost = vd($data, 'estimated_cost') ?: '20%';
 $addlInfo   = vd($data, 'additional_info');
 $option     = vd($data, 'abn_option'); // 'option1', 'option2', 'option3'
 ?>
+<style>
+  @page { size: 8in 13in; margin: 0.4in 0.5in; }
+</style>
 <div class="bwc-form">
     <!-- Header Row A/B/C -->
     <table style="width:100%;border:2px solid #000;border-collapse:collapse;margin-bottom:0;">

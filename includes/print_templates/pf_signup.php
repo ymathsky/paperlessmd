@@ -11,6 +11,9 @@ $decision  = vd($data, 'pf_decision');  // 'participate' or 'decline'
 $email     = vd($data, 'pf_email');
 $repName   = vd($data, 'rep_name');
 ?>
+<style>
+  @page { size: 8in 13in; margin: 0.4in 0.5in; }
+</style>
 <div class="bwc-form">
     <!-- Practice Header -->
     <div class="bwc-header">

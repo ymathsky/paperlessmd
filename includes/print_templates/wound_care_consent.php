@@ -13,6 +13,9 @@ function wcc_checked(array $fd, string $key): string {
     return !empty($fd[$key]) ? '&#10003;' : '&#9744;';
 }
 ?>
+<style>
+  @page { size: 8in 13in; margin: 0.4in 0.5in; }
+</style>
 <div class="bwc-form">
 
     <!-- ── Practice Header ─────────────────────────────────────── -->

@@ -28,6 +28,9 @@ if (!function_exists('awvArr')) { function awvArr(array $d, string $k): array {
     return is_array($d[$k]) ? $d[$k] : array_filter(array_map('trim', explode(',', (string)$d[$k])));
 }}
 ?>
+<style>
+  @page { size: 8in 13in; margin: 0.4in 0.5in; }
+</style>
 <div class="bwc-form">
     <!-- Header -->
     <div class="bwc-header">
