@@ -77,14 +77,17 @@ if (!function_exists('vdArr')) {
 include __DIR__ . '/includes/header.php';
 ?>
 <style>
-  @page { size: letter; margin: 0.25in 0.5in 0.5in 0.5in; }
+  @page { size: letter; margin: 0.5in; }
   @media print {
-    .no-print  { display: none !important; }
-    .sign-panel{ display: none !important; }
-    body       { background: white !important; }
-    #printDoc  { box-shadow: none !important; border: none !important; max-width: 100% !important; overflow: visible !important; border-radius: 0 !important; }
+    .no-print   { display: none !important; }
+    .sign-panel { display: none !important; }
+    body        { background: white !important; margin: 0 !important; padding: 0 !important; }
+    #printDoc   { box-shadow: none !important; border: none !important; max-width: 100% !important;
+                  overflow: visible !important; border-radius: 0 !important;
+                  margin: 0 !important; padding: 0 !important; }
+    #printDoc > div { padding: 0 !important; }
     .screen-strip { display: none !important; }
-    .bwc-sigs  { padding-top: 4pt; margin-top: 6pt; }
+    .bwc-sigs   { padding-top: 4pt; margin-top: 6pt; }
     .bwc-sig-label:last-child { margin-bottom: 0 !important; }
   }
   /* BWC paper form classes */
