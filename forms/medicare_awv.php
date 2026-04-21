@@ -19,9 +19,9 @@ $pageTitle = 'Medicare AWV Health History';
 $activeNav = 'patients';
 
 $extraJs = '<script>
-// GDS auto-score
-const gdsYesScore  = [2,5,6,10,14];  // 1-based question numbers that score YES=1
-const gdsNoScore   = [1,3,4,7,8,9,11,12,13,15];
+// GDS auto-score — standard GDS-15 depressive key
+const gdsYesScore  = [2,3,4,6,8,9,10,12,14,15]; // YES = depressive (score 1)
+const gdsNoScore   = [1,5,7,11,13];              // NO  = depressive (score 1)
 function calcGDS() {
     let score = 0;
     for (let i=1;i<=15;i++){
@@ -34,7 +34,8 @@ function calcGDS() {
     document.getElementById("gds_display").textContent = score;
     const box = document.getElementById("gds_result");
     if (score <= 5) { box.className = "mt-3 p-3 rounded-xl text-sm bg-emerald-50 border border-emerald-200 text-emerald-800"; box.textContent = "Score " + score + "/15 — Normal (0–5)"; }
-    else { box.className = "mt-3 p-3 rounded-xl text-sm bg-rose-50 border border-rose-200 text-rose-800"; box.textContent = "Score " + score + "/15 — Possible depression indicated (>5). Consider further evaluation."; }
+    else if (score <= 9) { box.className = "mt-3 p-3 rounded-xl text-sm bg-amber-50 border border-amber-200 text-amber-800"; box.textContent = "Score " + score + "/15 — Mild depression suggested (6–9). Consider further evaluation."; }
+    else { box.className = "mt-3 p-3 rounded-xl text-sm bg-rose-50 border border-rose-200 text-rose-800"; box.textContent = "Score " + score + "/15 — Severe depression likely (10–15). Further evaluation required."; }
 }
 document.addEventListener("change", function(e) {
     if (e.target.name && e.target.name.startsWith("gds_")) calcGDS();
@@ -429,7 +430,7 @@ function sectionHeader($num, $title, $icon='bi-circle-fill', $color='sky') {
                     <div class="flex items-center gap-3">
                         <span class="text-sm font-bold text-rose-700">GDS Score:</span>
                         <span class="text-2xl font-extrabold text-rose-800" id="gds_display">0</span>
-                        <span class="text-sm text-rose-600">/ 15 &nbsp;|&nbsp; 0–5 = Normal &nbsp;|&nbsp; &gt;5 = Possible depression</span>
+                        <span class="text-sm text-rose-600">/ 15 &nbsp;|&nbsp; 0–5 = Normal &nbsp;|&nbsp; 6–9 = Mild depression &nbsp;|&nbsp; 10–15 = Severe depression</span>
                     </div>
                     <div id="gds_result" class="mt-3 p-3 rounded-xl text-sm bg-slate-100 border border-slate-200 text-slate-500">
                         Select answers above to calculate score.
