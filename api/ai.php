@@ -22,25 +22,20 @@ requireLogin();
 header('Content-Type: application/json; charset=utf-8');
 
 // ── Key check ─────────────────────────────────────────────────────────────────
-$saKeyPath = defined('VERTEX_SA_KEY_PATH') ? VERTEX_SA_KEY_PATH : '';
-$useFallback = false;
-if (!$saKeyPath || !file_exists($saKeyPath)) {
-    // Fall back to direct Gemini API key if SA key not configured yet
-    $apiKey = defined('GEMINI_API_KEY') ? GEMINI_API_KEY : '';
-    if ($apiKey === '') {
-        http_response_code(503);
-        echo json_encode(['ok' => false, 'error' => 'AI not configured. Add service account key to private/vertex-sa.json.']);
-        exit;
-    }
-    $useFallback = true;
-}
-if (!$useFallback) {
-    $saJson = json_decode(file_get_contents($saKeyPath), true);
-    if (empty($saJson['client_email']) || empty($saJson['private_key'])) {
-        http_response_code(503);
-        echo json_encode(['ok' => false, 'error' => 'Invalid service account key file.']);
-        exit;
-    }
+// Priority: Vertex Express key → legacy Gemini key
+$useSa  = false;
+$apiKey = '';
+$apiBase = '';
+if (defined('VERTEX_API_KEY') && VERTEX_API_KEY !== '') {
+    $apiKey  = VERTEX_API_KEY;
+    $apiBase = 'https://generativelanguage.googleapis.com/v1beta/models';
+} elseif (defined('GEMINI_API_KEY') && GEMINI_API_KEY !== '') {
+    $apiKey  = GEMINI_API_KEY;
+    $apiBase = 'https://generativelanguage.googleapis.com/v1beta/models';
+} else {
+    http_response_code(503);
+    echo json_encode(['ok' => false, 'error' => 'AI not configured. Add VERTEX_API_KEY to config.']);
+    exit;
 }
 
 // ── Request parsing ───────────────────────────────────────────────────────────
@@ -187,31 +182,10 @@ switch ($action) {
         exit;
 }
 
-// ── Call Vertex AI (service account OAuth2) or fallback to Gemini API key ────────
-$model = 'gemini-2.0-flash';
-
-if ($useFallback) {
-    // Legacy: direct API key
-    $apiKey  = defined('GEMINI_API_KEY') ? GEMINI_API_KEY : '';
-    $url     = "https://generativelanguage.googleapis.com/v1beta/models/{$model}:generateContent?key={$apiKey}";
-    $headers = ['Content-Type: application/json'];
-} else {
-    // Vertex AI: OAuth2 Bearer token
-    try {
-        $accessToken = getVertexAccessToken($saJson);
-    } catch (\Throwable $e) {
-        http_response_code(502);
-        echo json_encode(['ok' => false, 'error' => 'Vertex AI auth failed: ' . $e->getMessage()]);
-        exit;
-    }
-    $project  = $saJson['project_id'];
-    $location = defined('VERTEX_LOCATION') ? VERTEX_LOCATION : 'us-central1';
-    $url      = "https://{$location}-aiplatform.googleapis.com/v1/projects/{$project}/locations/{$location}/publishers/google/models/{$model}:generateContent";
-    $headers  = [
-        'Content-Type: application/json',
-        'Authorization: Bearer ' . $accessToken,
-    ];
-}
+// ── Build API URL ────────────────────────────────────────────────────────────────
+$model   = 'gemini-2.0-flash';
+$url     = "{$apiBase}/{$model}:generateContent?key={$apiKey}";
+$headers = ['Content-Type: application/json'];
 
 $parts = [];
 if ($imageData) {
@@ -228,10 +202,10 @@ $payload = [
     ],
 ];
 
-[$raw, $code, $err] = geminiPost($url, $payload, $headers ?? ['Content-Type: application/json']);
+[$raw, $code, $err] = geminiPost($url, $payload, $headers);
 if ($code === 429) {
     sleep(5);
-    [$raw, $code, $err] = geminiPost($url, $payload, $headers ?? ['Content-Type: application/json']);
+    [$raw, $code, $err] = geminiPost($url, $payload, $headers);
 }
 
 if ($err) {
