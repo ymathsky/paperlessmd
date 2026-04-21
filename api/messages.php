@@ -264,7 +264,7 @@ function handleSend(): void
         return;
     }
 
-    if ($body === '') $body = '📎'; // placeholder when sending file-only
+    if ($body === '') $body = ' '; // whitespace placeholder when sending file-only
 
     // Resolve to_user_id (null = all-staff broadcast)
     $toUserId = null;

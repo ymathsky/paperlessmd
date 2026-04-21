@@ -491,9 +491,7 @@ function bubbleHtml(m) {
                 <span class="text-[10px] text-slate-400" title="${esc(fmtFull(m.created_at))}">${esc(fmtTime(m.created_at))}</span>
                 ${delBtn}
             </div>
-            <div class="${isMine?'bubble-me':'bubble-them'} px-4 py-2.5 text-sm leading-relaxed break-words max-w-full">
-                ${esc(m.body).replace(/\n/g,'<br>')}
-            </div>
+            ${m.body.trim()?`<div class="${isMine?'bubble-me':'bubble-them'} px-4 py-2.5 text-sm leading-relaxed break-words max-w-full">${esc(m.body).replace(/\n/g,'<br>')}</div>`:''}
             ${attachments?`<div class="flex flex-wrap gap-2 ${isMine?'justify-end':''}">${attachments}</div>`:''}
         </div>
     </div>`;
