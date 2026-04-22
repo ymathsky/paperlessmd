@@ -7,7 +7,16 @@ $ptName    = h($patient['first_name'] . ' ' . $patient['last_name']);
 $ptDob     = $patient['dob'] ? date('m/d/Y', strtotime($patient['dob'])) : '';
 $sigDate   = date('m/d/Y', strtotime($f['created_at']));
 $fmDate    = vd($data, 'form_date') ? date('m/d/Y', strtotime(vd($data,'form_date'))) : $sigDate;
-$gdsScore  = (int)vd($data, 'gds_score');
+// Always recompute GDS from stored answers (gds_score may be 0 if JS never fired)
+$_gdsDepressiveAns = [
+    'gds_q1'=>'no', 'gds_q2'=>'yes','gds_q3'=>'yes','gds_q4'=>'yes','gds_q5'=>'no',
+    'gds_q6'=>'yes','gds_q7'=>'no', 'gds_q8'=>'yes','gds_q9'=>'yes','gds_q10'=>'yes',
+    'gds_q11'=>'no','gds_q12'=>'yes','gds_q13'=>'no','gds_q14'=>'yes','gds_q15'=>'yes',
+];
+$gdsScore = 0;
+foreach ($_gdsDepressiveAns as $_qk => $_da) {
+    if (strtolower(trim($data[$_qk] ?? '')) === $_da) $gdsScore++;
+}
 $notes     = vd($data, 'clinical_notes');
 
 // Build answer helper for simple text fields

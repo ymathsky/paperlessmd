@@ -40,6 +40,11 @@ function calcGDS() {
 document.addEventListener("change", function(e) {
     if (e.target.name && e.target.name.startsWith("gds_")) calcGDS();
 });
+// Always recalculate before submit so score is correct even if draft-restored
+document.addEventListener("DOMContentLoaded", function() {
+    var frm = document.getElementById("mainForm");
+    if (frm) frm.addEventListener("submit", function() { calcGDS(); });
+});
 </script>';
 
 include __DIR__ . '/../includes/header.php';
