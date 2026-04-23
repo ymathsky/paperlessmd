@@ -11,7 +11,7 @@ $patient = $pStmt->fetch();
 if (!$patient) { header('Location: ' . BASE_URL . '/patients.php'); exit; }
 
 // One-signature rule
-$_dupQ = $pdo->prepare("SELECT id FROM form_submissions WHERE patient_id = ? AND form_type = 'new_patient_packet' AND status IN ('signed','uploaded') AND DATE(created_at) = CURDATE() LIMIT 1");
+$_dupQ = $pdo->prepare("SELECT id FROM form_submissions WHERE patient_id = ? AND form_type = 'new_patient_pocket' AND status IN ('signed','uploaded') AND DATE(created_at) = CURDATE() LIMIT 1");
 $_dupQ->execute([$patient_id]);
 if ($_dupId = $_dupQ->fetchColumn()) { header('Location: ' . BASE_URL . '/view_document.php?id=' . (int)$_dupId . '&already_signed=1'); exit; }
 
@@ -19,7 +19,7 @@ if ($_dupId = $_dupQ->fetchColumn()) { header('Location: ' . BASE_URL . '/view_d
 $prevStmt = $pdo->prepare("
     SELECT form_data, created_at
     FROM form_submissions
-    WHERE patient_id = ? AND form_type IN ('vital_cs','new_patient_packet')
+    WHERE patient_id = ? AND form_type IN ('vital_cs','new_patient_pocket')
     ORDER BY created_at DESC LIMIT 1
 ");
 $prevStmt->execute([$patient_id]);
@@ -60,7 +60,7 @@ $dob          = $patient['dob'] ?? '';
 $formattedDob = $dob ? date('m/d/Y', strtotime($dob)) : '';
 $patientFullName = h($patient['first_name'] . ' ' . $patient['last_name']);
 
-$pageTitle = 'New Patient Packet';
+$pageTitle = 'New Patient Pocket';
 $activeNav = 'patients';
 include __DIR__ . '/../includes/header.php';
 ?>
@@ -72,7 +72,7 @@ include __DIR__ . '/../includes/header.php';
         <?= $patientFullName ?>
     </a>
     <i class="bi bi-chevron-right text-xs"></i>
-    <span class="text-slate-700 font-semibold">New Patient Packet</span>
+    <span class="text-slate-700 font-semibold">New Patient Pocket</span>
 </nav>
 
 <div class="max-w-3xl mx-auto">
@@ -108,7 +108,7 @@ include __DIR__ . '/../includes/header.php';
             <i class="bi bi-folder2-open text-white text-xl"></i>
         </div>
         <div>
-            <h2 class="text-white font-bold text-lg"><?= h(PRACTICE_NAME) ?> &mdash; New Patient Packet</h2>
+            <h2 class="text-white font-bold text-lg"><?= h(PRACTICE_NAME) ?> &mdash; New Patient Pocket</h2>
             <p class="text-indigo-100 text-sm"><?= $patientFullName ?> &mdash; CS &bull; CCM &bull; ABN &bull; Wound Care Consent &bull; PHI &bull; Patient Fusion</p>
         </div>
     </div>
@@ -118,8 +118,8 @@ include __DIR__ . '/../includes/header.php';
     <form id="mainForm" method="POST" action="<?= BASE_URL ?>/api/save_form.php" novalidate>
         <input type="hidden" name="csrf_token"  value="<?= csrfToken() ?>">
         <input type="hidden" name="patient_id"  value="<?= $patient_id ?>">
-        <input type="hidden" name="form_type"   value="new_patient_packet">
-        <input type="hidden" id="wiz-form-key"  value="new_patient_packet_<?= $patient_id ?>">
+        <input type="hidden" name="form_type"   value="new_patient_pocket">
+        <input type="hidden" id="wiz-form-key"  value="new_patient_pocket_<?= $patient_id ?>">
 
         <div class="px-6 pb-2">
 

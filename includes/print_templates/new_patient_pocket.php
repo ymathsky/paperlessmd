@@ -1,6 +1,6 @@
 <?php
 /**
- * Print Template: New Patient Packet
+ * Print Template: New Patient Pocket
  * Combined: CS · CCM · ABN · Wound Care Consent · PHI Authorization · Patient Fusion
  */
 $ptName  = h($patient['first_name'] . ' ' . $patient['last_name']);
@@ -73,7 +73,7 @@ $purposeLabels = [
     </div>
 
     <p style="text-align:center;font-size:13pt;font-weight:bold;color:#3730a3;margin:6pt 0 2pt;letter-spacing:0.08em;">
-        NEW PATIENT PACKET
+        New Patient Pocket
     </p>
     <p style="text-align:center;font-size:9pt;color:#64748b;margin:0 0 8pt;">
         <?= h($ptName) ?> &nbsp;&bull;&nbsp; DOB: <?= $patient['dob'] ? date('m/d/Y', strtotime($patient['dob'])) : '&nbsp;' ?> &nbsp;&bull;&nbsp; Date: <?= $visitDate ?>
@@ -425,10 +425,10 @@ $purposeLabels = [
     <!-- COMBINED SIGNATURE PAGE                                 -->
     <!-- ═══════════════════════════════════════════════════════ -->
     <hr class="npp-divider npp-section-break" style="page-break-before:always;">
-    <p class="npp-section-title">Signatures &mdash; New Patient Packet</p>
+    <p class="npp-section-title">Signatures &mdash; New Patient Pocket</p>
 
     <p class="npp-body" style="margin-bottom:10pt;text-align:justify;">
-        By signing below, <strong><?= h($ptName) ?></strong> (or authorized representative) acknowledges having read, understood, and agreed to all sections of this New Patient Packet, including:
+        By signing below, <strong><?= h($ptName) ?></strong> (or authorized representative) acknowledges having read, understood, and agreed to all sections of this New Patient Pocket, including:
         (1) Visit Consent / CS, (2) CCM Consent, (3) Advance Beneficiary Notice, (4) Informed Consent for Wound Care Treatment, (5) Authorization to Disclose / Obtain PHI, and (6) Patient Fusion Portal Consent.
         The patient has had the opportunity to ask questions and has received answers to all questions. The attending provider confirms medical supervision, authorization of the care plan, and accuracy of the clinical information recorded herein.
     </p>
@@ -514,7 +514,7 @@ $purposeLabels = [
 
     <!-- Footer note -->
     <p style="font-size:7pt;color:#94a3b8;text-align:center;margin-top:10pt;border-top:0.5pt solid #e2e8f0;padding-top:4pt;">
-        New Patient Packet &mdash; <?= h(PRACTICE_NAME) ?> &mdash; Generated <?= $sigDate ?> &mdash; Patient: <?= h($ptName) ?>
+        New Patient Pocket &mdash; <?= h(PRACTICE_NAME) ?> &mdash; Generated <?= $sigDate ?> &mdash; Patient: <?= h($ptName) ?>
     </p>
 
 </div><!-- /.bwc-form -->

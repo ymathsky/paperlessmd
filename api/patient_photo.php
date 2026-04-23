@@ -69,11 +69,11 @@ if ($action === 'upload') {
     }
 
     $file     = $_FILES['photo'];
-    $maxBytes = 5 * 1024 * 1024; // 5 MB
+    $maxBytes = 10 * 1024 * 1024; // 10 MB
 
     if ($file['size'] > $maxBytes) {
         http_response_code(422);
-        echo json_encode(['ok' => false, 'error' => 'File too large (max 5 MB)']);
+        echo json_encode(['ok' => false, 'error' => 'File too large (max 10 MB)']);
         exit;
     }
 
