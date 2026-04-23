@@ -291,7 +291,7 @@ function nppFooter(string $formTitle, string $ptName, string $sigDate): void { ?
       /* FORM 3 &mdash; ABN                                                 */
       /* ============================================================ */ ?>
 <div class="bwc-form npp-doc">
-<?php nppFormHeader('Advance Beneficiary Notice of Non-Coverage (ABN) &mdash; Form CMS-R-131', $ptName, $ptDob, $visitDate); ?>
+<?php nppFormHeader('Advance Beneficiary Notice of Non-Coverage (ABN) — Form CMS-R-131', $ptName, $ptDob, $visitDate); ?>
 
 <div class="npp-g2" style="margin-bottom:6pt;">
     <div><span class="npp-lbl">A. Notifier</span><span class="npp-fld"><?= _npp($fd,'notifier', h(PRACTICE_NAME)) ?></span></div>
@@ -405,7 +405,7 @@ foreach ($abnOpts as $opt => $text): ?>
       /* FORM 5 &mdash; PHI AUTHORIZATION (IL DHS)                          */
       /* ============================================================ */ ?>
 <div class="bwc-form npp-doc">
-<?php nppFormHeader('Authorization to Disclose / Obtain PHI &mdash; Illinois DHS', $ptName, $ptDob, $visitDate); ?>
+<?php nppFormHeader('Authorization to Disclose / Obtain PHI — Illinois DHS', $ptName, $ptDob, $visitDate); ?>
 
 <p class="npp-body" style="margin-bottom:5pt;">
     I authorize <strong><?= h(PRACTICE_NAME) ?></strong> to
@@ -452,7 +452,7 @@ foreach ($abnOpts as $opt => $text): ?>
       /* FORM 6 &mdash; PATIENT FUSION PORTAL CONSENT                       */
       /* ============================================================ */ ?>
 <div class="bwc-form npp-doc">
-<?php nppFormHeader('Patient Fusion Portal &mdash; Consent Form', $ptName, $ptDob, $visitDate); ?>
+<?php nppFormHeader('Patient Fusion Portal — Consent Form', $ptName, $ptDob, $visitDate); ?>
 
 <p class="npp-body" style="margin-bottom:6pt;text-align:justify;">
     I acknowledge that I have read and fully understand this consent form. I have been given the risks and benefits of Patient Fusion and understand the risks associated with online communications between our office and patients. By signing this form and providing an e-mail address, I hereby give my informed consent to participate in Patient Fusion. By declining and not providing an email, my signature indicates that I am informed about Patient Fusion being offered to me, but I do not wish to participate.
