@@ -1069,7 +1069,9 @@ $extraJs = <<<JSBLOCK
     window.addEventListener('resize', initProviderPad);
 
     clearBtn && clearBtn.addEventListener('click', function () {
-        if (canvas._sp) canvas._sp.clear();
+        if (!canvas._sp || canvas._sp.isEmpty()) return;
+        if (!confirm('Clear the provider signature? This cannot be undone.')) return;
+        canvas._sp.clear();
         hidden.value = '';
         var ph = wrapper.querySelector('.sig-placeholder');
         if (ph) ph.style.display = '';

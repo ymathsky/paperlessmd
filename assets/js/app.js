@@ -45,7 +45,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const clearBtn = document.getElementById('clearSig');
         if (clearBtn) {
-            clearBtn.addEventListener('click', () => sigPad.clear());
+            clearBtn.addEventListener('click', () => {
+                if (sigPad.isEmpty()) return;
+                if (confirm('Clear the patient signature? This cannot be undone.')) sigPad.clear();
+            });
         }
     }
 
@@ -90,7 +93,10 @@ document.addEventListener('DOMContentLoaded', function () {
         window.addEventListener('resize', function() { resizeMaCanvas(true); });
 
         const clearMaBtn = document.getElementById('clearMaSig');
-        if (clearMaBtn) clearMaBtn.addEventListener('click', () => maSigPad.clear());
+        if (clearMaBtn) clearMaBtn.addEventListener('click', () => {
+            if (maSigPad.isEmpty()) return;
+            if (confirm('Clear the MA signature? This cannot be undone.')) maSigPad.clear();
+        });
     }
 
     // ── POA Toggle ────────────────────────────────────────────────────
