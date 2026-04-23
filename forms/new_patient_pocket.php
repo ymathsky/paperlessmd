@@ -1085,6 +1085,35 @@ $extraJs = <<<JSBLOCK
         }
     }, true);
 })();
+
+/* ── Auto-fill provider_print_name from provider_name (step 0) ── */
+(function () {
+    var srcField   = document.querySelector('[name="provider_name"]');
+    var destField  = document.querySelector('[name="provider_print_name"]');
+    var signStep   = document.querySelector('.wiz-step[data-step="8"]');
+    if (!srcField || !destField || !signStep) return;
+
+    function maybeFill() {
+        if (!signStep.classList.contains('hidden') && destField.value.trim() === '') {
+            var val = srcField.value.trim();
+            if (val) {
+                destField.value = val;
+                // Brief highlight so the MA notices it was auto-filled
+                destField.style.transition = 'border-color .3s, background .3s';
+                destField.style.borderColor = '#a78bfa';
+                destField.style.background  = '#f5f3ff';
+                setTimeout(function () {
+                    destField.style.borderColor = '';
+                    destField.style.background  = '';
+                }, 2000);
+            }
+        }
+    }
+
+    // Watch for the sign step becoming visible (wizard removes 'hidden' class)
+    var observer = new MutationObserver(maybeFill);
+    observer.observe(signStep, { attributes: true, attributeFilter: ['class'] });
+})();
 </script>
 JSBLOCK;
 
