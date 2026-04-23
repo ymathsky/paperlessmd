@@ -349,21 +349,21 @@ foreach ($abnOpts as $opt => $text): ?>
 <?php /* ============================================================ */
       /* FORM 4 &mdash; INFORMED CONSENT FOR WOUND CARE                     */
       /* ============================================================ */ ?>
-<div class="bwc-form npp-doc">
+<div class="bwc-form npp-doc" style="font-size:7.8pt;">
 <?php nppFormHeader('Informed Consent for Wound Care Treatment', $ptName, $ptDob, $visitDate); ?>
 
-<div class="npp-g2" style="margin-bottom:6pt;">
+<div class="npp-g2" style="margin-bottom:3pt;">
     <div><span class="npp-lbl">Patient Name</span><span class="npp-fld"><?= _npp($fd,'wc_patient_name', $ptName) ?></span></div>
     <div><span class="npp-lbl">Date of Birth</span><span class="npp-fld"><?= _npp($fd,'wc_dob', $ptDob) ?></span></div>
 </div>
 
-<p class="npp-body" style="margin-bottom:6pt;text-align:justify;">
+<p style="font-size:7.8pt;line-height:1.4;color:#1e293b;margin:0 0 4pt;text-align:justify;">
     Patient/caregiver hereby voluntarily consents to wound care treatment by the provider (MD/NP) of <strong>BEYOND WOUND CARE INC.</strong>
     Patient/Caregiver understands that this consent form will be valid and remain in effect as long as the patient remains active and receives services and treatments at BEYOND WOUND CARE INC.
     <strong>Patient has the right to give or refuse consent to any proposed service or treatment.</strong>
 </p>
 
-<table style="width:100%;border-collapse:collapse;font-size:8.5pt;margin-bottom:7pt;">
+<table style="width:100%;border-collapse:collapse;font-size:7.8pt;margin-bottom:4pt;">
     <?php
     $wcItems = [
         ['General Description of Wound Care Treatment',
@@ -387,13 +387,13 @@ foreach ($abnOpts as $opt => $text): ?>
     ];
     foreach ($wcItems as $idx => $item): ?>
     <tr>
-        <td style="padding:2pt 5pt;width:16pt;vertical-align:top;font-weight:bold;color:#3730a3;"><?= $idx+1 ?>.</td>
-        <td style="padding:2pt 0;vertical-align:top;"><strong><?= h($item[0]) ?>:</strong> <?= h($item[1]) ?></td>
+        <td style="padding:1pt 5pt;width:16pt;vertical-align:top;font-weight:bold;color:#3730a3;"><?= $idx+1 ?>.</td>
+        <td style="padding:1pt 0;vertical-align:top;line-height:1.4;"><strong><?= h($item[0]) ?>:</strong> <?= h($item[1]) ?></td>
     </tr>
     <?php endforeach; ?>
 </table>
 
-<p class="npp-body" style="text-align:justify;margin-bottom:6pt;">
+<p style="font-size:7.8pt;line-height:1.4;color:#1e293b;margin:0 0 4pt;text-align:justify;">
     The patient/caregiver or POA hereby acknowledges that he or she has read and agrees to the contents of sections 1 through 9 above. By signing, patient consents to the care, treatment and services described herein.
 </p>
 
