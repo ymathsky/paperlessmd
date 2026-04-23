@@ -83,7 +83,7 @@ function nppSigBlock(array $f, array $fd, string $sigDate): void { ?>
                 </div>
             </td>
             <td style="width:36%;vertical-align:bottom;">
-                <div style="min-height:54pt;border-bottom:1px solid #000;padding-bottom:2pt;font-size:12pt;"><?= $sigDate ?></div>
+                <div style="min-height:54pt;border-bottom:1px solid #000;display:flex;align-items:flex-end;padding-bottom:2pt;font-size:12pt;"><?= $sigDate ?></div>
                 <div class="bwc-sig-label">Date</div>
             </td>
         </tr>
@@ -100,11 +100,11 @@ function nppSigBlock(array $f, array $fd, string $sigDate): void { ?>
                 <div class="bwc-sig-label">Medical Assistant Signature</div>
             </td>
             <td style="width:30%;padding-right:16pt;vertical-align:bottom;">
-                <div style="min-height:54pt;border-bottom:1px solid #000;padding-top:34pt;padding-bottom:2pt;"><?= h($fd['ma_name'] ?? '') ?></div>
+                <div style="min-height:54pt;border-bottom:1px solid #000;display:flex;align-items:flex-end;padding-bottom:2pt;"><?= h($fd['ma_name'] ?? '') ?></div>
                 <div class="bwc-sig-label">MA Name (Print)</div>
             </td>
             <td style="width:26%;vertical-align:bottom;">
-                <div style="min-height:54pt;border-bottom:1px solid #000;padding-bottom:2pt;font-size:12pt;"><?= $sigDate ?></div>
+                <div style="min-height:54pt;border-bottom:1px solid #000;display:flex;align-items:flex-end;padding-bottom:2pt;font-size:12pt;"><?= $sigDate ?></div>
                 <div class="bwc-sig-label">Date</div>
             </td>
         </tr>
@@ -121,11 +121,11 @@ function nppSigBlock(array $f, array $fd, string $sigDate): void { ?>
                 <div class="bwc-sig-label">Provider / Physician Signature</div>
             </td>
             <td style="width:30%;padding-right:16pt;vertical-align:bottom;">
-                <div style="min-height:54pt;border-bottom:1px solid #000;padding-top:34pt;padding-bottom:2pt;"><?= h($fd['provider_print_name'] ?? $fd['provider_name'] ?? '') ?></div>
+                <div style="min-height:54pt;border-bottom:1px solid #000;display:flex;align-items:flex-end;padding-bottom:2pt;"><?= h($fd['provider_print_name'] ?? $fd['provider_name'] ?? '') ?></div>
                 <div class="bwc-sig-label">Provider Name (Print)</div>
             </td>
             <td style="width:26%;vertical-align:bottom;">
-                <div style="min-height:54pt;border-bottom:1px solid #000;padding-bottom:2pt;font-size:8.5pt;color:#555;">
+                <div style="min-height:54pt;border-bottom:1px solid #000;display:flex;align-items:flex-end;padding-bottom:2pt;font-size:8.5pt;color:#555;">
                     <?php if (!empty($fd['provider_npi'])): ?>NPI: <?= h($fd['provider_npi']) ?><?php endif; ?>
                 </div>
                 <div class="bwc-sig-label">Provider NPI</div>
