@@ -70,7 +70,7 @@ function nppSigBlock(array $f, array $fd, string $sigDate): void { ?>
     <table style="width:100%;border-collapse:collapse;font-size:9pt;margin-bottom:12pt;">
         <tr>
             <td style="width:64%;padding-right:16pt;vertical-align:bottom;">
-                <div style="position:relative;min-height:36pt;border-bottom:1px solid #000;">
+                <div style="position:relative;min-height:54pt;border-bottom:1px solid #000;">
                     <?php if (!empty($f['patient_signature'])): ?>
                     <img src="<?= h($f['patient_signature']) ?>" class="bwc-sig-img" alt="Patient Signature">
                     <?php endif; ?>
@@ -83,7 +83,7 @@ function nppSigBlock(array $f, array $fd, string $sigDate): void { ?>
                 </div>
             </td>
             <td style="width:36%;vertical-align:bottom;">
-                <div style="min-height:36pt;border-bottom:1px solid #000;padding-bottom:2pt;font-size:10pt;"><?= $sigDate ?></div>
+                <div style="min-height:54pt;border-bottom:1px solid #000;padding-bottom:2pt;font-size:12pt;"><?= $sigDate ?></div>
                 <div class="bwc-sig-label">Date</div>
             </td>
         </tr>
@@ -92,7 +92,7 @@ function nppSigBlock(array $f, array $fd, string $sigDate): void { ?>
     <table style="width:100%;border-collapse:collapse;font-size:9pt;margin-bottom:12pt;">
         <tr>
             <td style="width:44%;padding-right:16pt;vertical-align:bottom;">
-                <div style="position:relative;min-height:36pt;border-bottom:1px solid #000;">
+                <div style="position:relative;min-height:54pt;border-bottom:1px solid #000;">
                     <?php if (!empty($f['ma_signature'])): ?>
                     <img src="<?= h($f['ma_signature']) ?>" class="bwc-sig-img" alt="MA Signature">
                     <?php endif; ?>
@@ -100,11 +100,11 @@ function nppSigBlock(array $f, array $fd, string $sigDate): void { ?>
                 <div class="bwc-sig-label">Medical Assistant Signature</div>
             </td>
             <td style="width:30%;padding-right:16pt;vertical-align:bottom;">
-                <div style="min-height:36pt;border-bottom:1px solid #000;padding-top:18pt;padding-bottom:2pt;"><?= h($fd['ma_name'] ?? '') ?></div>
+                <div style="min-height:54pt;border-bottom:1px solid #000;padding-top:34pt;padding-bottom:2pt;"><?= h($fd['ma_name'] ?? '') ?></div>
                 <div class="bwc-sig-label">MA Name (Print)</div>
             </td>
             <td style="width:26%;vertical-align:bottom;">
-                <div style="min-height:36pt;border-bottom:1px solid #000;padding-bottom:2pt;font-size:10pt;"><?= $sigDate ?></div>
+                <div style="min-height:54pt;border-bottom:1px solid #000;padding-bottom:2pt;font-size:12pt;"><?= $sigDate ?></div>
                 <div class="bwc-sig-label">Date</div>
             </td>
         </tr>
@@ -113,7 +113,7 @@ function nppSigBlock(array $f, array $fd, string $sigDate): void { ?>
     <table style="width:100%;border-collapse:collapse;font-size:9pt;">
         <tr>
             <td style="width:44%;padding-right:16pt;vertical-align:bottom;">
-                <div style="position:relative;min-height:36pt;border-bottom:1px solid #000;">
+                <div style="position:relative;min-height:54pt;border-bottom:1px solid #000;">
                     <?php if (!empty($fd['provider_signature'])): ?>
                     <img src="<?= h($fd['provider_signature']) ?>" class="bwc-sig-img" alt="Provider Signature">
                     <?php endif; ?>
@@ -121,11 +121,11 @@ function nppSigBlock(array $f, array $fd, string $sigDate): void { ?>
                 <div class="bwc-sig-label">Provider / Physician Signature</div>
             </td>
             <td style="width:30%;padding-right:16pt;vertical-align:bottom;">
-                <div style="min-height:36pt;border-bottom:1px solid #000;padding-top:18pt;padding-bottom:2pt;"><?= h($fd['provider_print_name'] ?? $fd['provider_name'] ?? '') ?></div>
+                <div style="min-height:54pt;border-bottom:1px solid #000;padding-top:34pt;padding-bottom:2pt;"><?= h($fd['provider_print_name'] ?? $fd['provider_name'] ?? '') ?></div>
                 <div class="bwc-sig-label">Provider Name (Print)</div>
             </td>
             <td style="width:26%;vertical-align:bottom;">
-                <div style="min-height:36pt;border-bottom:1px solid #000;padding-bottom:2pt;font-size:8.5pt;color:#555;">
+                <div style="min-height:54pt;border-bottom:1px solid #000;padding-bottom:2pt;font-size:8.5pt;color:#555;">
                     <?php if (!empty($fd['provider_npi'])): ?>NPI: <?= h($fd['provider_npi']) ?><?php endif; ?>
                 </div>
                 <div class="bwc-sig-label">Provider NPI</div>
@@ -144,6 +144,7 @@ function nppFooter(string $formTitle, string $ptName, string $sigDate): void { ?
 
 <style>
   @page { size: letter; margin: 0.4in 0.5in; }
+  .bwc-sig-img { max-height: 50pt; max-width: 220pt; object-fit: contain; position: absolute; bottom: 2pt; }
   .npp-doc { page-break-after: always; }
   .npp-doc:last-child { page-break-after: auto; }
   .npp-sub  { font-size:9pt; font-weight:bold; color:#1e1b4b; margin:5pt 0 2pt; }
