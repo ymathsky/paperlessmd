@@ -131,7 +131,7 @@ include __DIR__ . '/../includes/header.php';
 
             <p class="form-section-title">
                 <i class="bi bi-calendar-check text-indigo-500"></i>
-                Section 1 of 8 &mdash; Visit Information <span class="text-slate-400 font-normal text-xs">(Visit Consent / CS)</span>
+                Section 1 of 9 &mdash; Visit Information <span class="text-slate-400 font-normal text-xs">(Visit Consent / CS)</span>
             </p>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -224,7 +224,7 @@ include __DIR__ . '/../includes/header.php';
 
             <p class="form-section-title">
                 <i class="bi bi-heart-pulse text-indigo-500"></i>
-                Section 2 of 8 &mdash; Vital Signs &amp; Clinical <span class="text-slate-400 font-normal text-xs">(Visit Consent / CS)</span>
+                Section 2 of 9 &mdash; Vital Signs &amp; Clinical <span class="text-slate-400 font-normal text-xs">(Visit Consent / CS)</span>
             </p>
 
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -303,7 +303,7 @@ include __DIR__ . '/../includes/header.php';
 
             <p class="form-section-title">
                 <i class="bi bi-bag-heart text-indigo-500"></i>
-                Section 3 of 8 &mdash; Pharmacy, Allergies &amp; Medications <span class="text-slate-400 font-normal text-xs">(Visit Consent / CS)</span>
+                Section 3 of 9 &mdash; Pharmacy, Allergies &amp; Medications <span class="text-slate-400 font-normal text-xs">(Visit Consent / CS)</span>
             </p>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -422,7 +422,7 @@ include __DIR__ . '/../includes/header.php';
 
             <p class="form-section-title">
                 <i class="bi bi-calendar2-heart text-indigo-500"></i>
-                Section 4 of 8 &mdash; Chronic Care Management Consent
+                Section 4 of 9 &mdash; Chronic Care Management Consent
             </p>
 
             <div class="bg-slate-50 border border-slate-200 rounded-xl p-5 text-sm text-slate-700 space-y-3 leading-relaxed max-h-[380px] overflow-y-auto">
@@ -504,7 +504,7 @@ include __DIR__ . '/../includes/header.php';
 
             <p class="form-section-title">
                 <i class="bi bi-file-earmark-ruled text-indigo-500"></i>
-                Section 5 of 8 &mdash; Advance Beneficiary Notice (ABN) <span class="text-slate-400 font-normal text-xs">CMS-R-131</span>
+                Section 5 of 9 &mdash; Advance Beneficiary Notice (ABN) <span class="text-slate-400 font-normal text-xs">CMS-R-131</span>
             </p>
 
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -598,7 +598,7 @@ If secondary insurance is available will bill 20% to secondary insurance.</texta
 
             <p class="form-section-title">
                 <i class="bi bi-file-earmark-medical text-indigo-500"></i>
-                Section 6 of 8 &mdash; Informed Consent for Wound Care Treatment
+                Section 6 of 9 &mdash; Informed Consent for Wound Care Treatment
             </p>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -643,7 +643,7 @@ If secondary insurance is available will bill 20% to secondary insurance.</texta
 
             <p class="form-section-title">
                 <i class="bi bi-key-fill text-indigo-500"></i>
-                Section 7 of 8 &mdash; Authorization to Disclose / Obtain PHI <span class="text-slate-400 font-normal text-xs">(IL DHS)</span>
+                Section 7 of 9 &mdash; Authorization to Disclose / Obtain PHI <span class="text-slate-400 font-normal text-xs">(IL DHS)</span>
             </p>
 
             <!-- Auth type -->
@@ -799,7 +799,7 @@ If secondary insurance is available will bill 20% to secondary insurance.</texta
 
             <p class="form-section-title">
                 <i class="bi bi-envelope-at text-indigo-500"></i>
-                Section 8 of 8 &mdash; Patient Fusion Portal Consent
+                Section 8 of 9 &mdash; Patient Fusion Portal Consent
             </p>
 
             <div class="bg-slate-50 border border-slate-200 rounded-xl p-5 text-sm text-slate-700 space-y-3 leading-relaxed">
@@ -844,6 +844,11 @@ If secondary insurance is available will bill 20% to secondary insurance.</texta
         <!-- ═══════════════════════════════════════════════════════ -->
         <div class="wiz-step hidden space-y-6 py-4"
              data-step="8" data-title="Sign" data-icon="bi-pen">
+
+            <p class="form-section-title">
+                <i class="bi bi-pen text-indigo-500"></i>
+                Section 9 of 9 &mdash; Signatures <span class="text-slate-400 font-normal text-xs">(Patient &bull; MA &bull; Provider)</span>
+            </p>
 
             <p class="form-section-title"><i class="bi bi-person-badge text-indigo-500"></i> Staff Information</p>
 
