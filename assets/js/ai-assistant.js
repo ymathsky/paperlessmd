@@ -24,7 +24,7 @@
 
         var csrf = window._pdCsrf || '';
         var base = window._pdBase || '';
-        var body = Object.assign({ action: action, csrf_token: csrf }, payload);
+        var body = Object.assign({ action: action, csrf_token: csrf, company: window._pdCompany || '' }, payload);
 
         var res = await fetch(base + '/api/ai.php', {
             method:  'POST',

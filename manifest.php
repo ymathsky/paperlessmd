@@ -3,7 +3,7 @@ require_once __DIR__ . '/includes/config.php';
 header('Content-Type: application/manifest+json');
 $base = BASE_URL; // '' on production, '/pd' on local
 echo json_encode([
-    'name'             => APP_NAME . ' — Beyond Wound Care',
+    'name'             => APP_NAME,
     'short_name'       => 'PaperlessMD',
     'description'      => 'Offline-capable paperless forms for mobile medical visits',
     'start_url'        => $base . '/dashboard.php',

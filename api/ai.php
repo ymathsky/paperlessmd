@@ -66,7 +66,12 @@ if (($now - $lastAiCall) < 1.0) {
 $_SESSION['ai_last_call'] = microtime(true);
 
 // ── Build prompt by action ────────────────────────────────────────────────────
-$systemPrompt = 'You are a clinical documentation assistant for Beyond Wound Care Inc., '
+// Whitelist company names to prevent prompt injection via the company field
+$_allowedCompanies = ['Beyond Wound Care Inc.', 'Visiting Medical Physician Inc.'];
+$_company = in_array($input['company'] ?? '', $_allowedCompanies, true)
+    ? $input['company']
+    : 'Beyond Wound Care Inc.';
+$systemPrompt = 'You are a clinical documentation assistant for ' . $_company . ', '
               . 'a wound care medical practice. Be concise, professional, and clinically accurate. '
               . 'Never invent patient data. Use standard medical terminology. '
               . 'Do not use markdown formatting — no asterisks, no bold, no bullet symbols, no headers. '
