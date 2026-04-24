@@ -154,6 +154,12 @@ if (!isBilling()) {
                 </div>
             </div>
         </div>
+        <a href="<?= BASE_URL ?>/profile.php"
+           class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150
+                  <?= ($activeNav ?? '') === 'profile' ? 'bg-white/20 text-white shadow-sm' : 'text-blue-200 hover:bg-white/10 hover:text-white' ?>">
+            <i class="bi bi-person-circle text-base w-5 shrink-0 text-center"></i>
+            <span>My Profile</span>
+        </a>
         <a href="<?= BASE_URL ?>/logout.php"
            class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-blue-200 hover:bg-red-500/20 hover:text-red-300 transition-all duration-150">
             <i class="bi bi-box-arrow-right text-base w-5 shrink-0 text-center"></i>
