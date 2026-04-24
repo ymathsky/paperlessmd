@@ -17,14 +17,19 @@ $isToday  = $date === date('Y-m-d');
 // View mode: day | week
 $view = in_array($_GET['view'] ?? '', ['day','week']) ? $_GET['view'] : 'day';
 
-// Admins can view any MA's schedule via ?ma_id=X
-$viewMaId = isAdmin() && isset($_GET['ma_id']) ? (int)$_GET['ma_id'] : (int)$_SESSION['user_id'];
+// Admins can view any MA's schedule via ?ma_id=X, or all via ?ma_id=all
+$viewAll  = isAdmin() && ($_GET['ma_id'] ?? '') === 'all';
+$viewMaId = (!$viewAll && isAdmin() && isset($_GET['ma_id'])) ? (int)$_GET['ma_id'] : (int)$_SESSION['user_id'];
 
 // Fetch MA info
-$maStmt = $pdo->prepare("SELECT id, full_name FROM staff WHERE id = ?");
-$maStmt->execute([$viewMaId]);
-$ma = $maStmt->fetch();
-if (!$ma) { header('Location: ' . BASE_URL . '/dashboard.php'); exit; }
+if ($viewAll) {
+    $ma = ['id' => 0, 'full_name' => 'All MAs'];
+} else {
+    $maStmt = $pdo->prepare("SELECT id, full_name FROM staff WHERE id = ?");
+    $maStmt->execute([$viewMaId]);
+    $ma = $maStmt->fetch();
+    if (!$ma) { header('Location: ' . BASE_URL . '/dashboard.php'); exit; }
+}
 
 // Week bounds (Monday–Sunday of the week containing $date)
 $dow       = (int)date('N', strtotime($date));   // 1=Mon … 7=Sun
@@ -70,6 +75,38 @@ $schedStmt = $pdo->prepare("
 $schedStmt->execute([$viewMaId, $date]);
 $visits = $schedStmt->fetchAll();
 
+// When admin views all MAs, also build grouped structure
+$allMaVisits = []; // [ma_id => ['name'=>'...', 'counts'=>[], 'visits'=>[]]]
+if ($viewAll && $view === 'day') {
+    $allStmt = $pdo->prepare("
+        SELECT sc.*,
+               CONCAT(p.first_name,' ',p.last_name) AS patient_name,
+               p.address AS patient_address,
+               p.phone   AS patient_phone,
+               p.id      AS patient_id,
+               s.full_name AS ma_name
+        FROM `schedule` sc
+        JOIN patients p ON p.id = sc.patient_id
+        JOIN staff s    ON s.id = sc.ma_id
+        WHERE sc.visit_date = ?
+        ORDER BY s.full_name, sc.visit_order ASC, sc.visit_time ASC
+    ");
+    $allStmt->execute([$date]);
+    foreach ($allStmt->fetchAll() as $av) {
+        if (!isset($allMaVisits[$av['ma_id']])) {
+            $allMaVisits[$av['ma_id']] = [
+                'name'   => $av['ma_name'],
+                'counts' => ['pending'=>0,'en_route'=>0,'completed'=>0,'missed'=>0],
+                'visits' => [],
+            ];
+        }
+        $allMaVisits[$av['ma_id']]['visits'][] = $av;
+        $allMaVisits[$av['ma_id']]['counts'][$av['status']]++;
+    }
+    // Flatten for total stats
+    $visits = array_merge(...(array_column($allMaVisits, 'visits') ?: [[]]));
+}
+
 // Stats
 $counts = ['pending'=>0,'en_route'=>0,'completed'=>0,'missed'=>0];
 foreach ($visits as $v) $counts[$v['status']]++;
@@ -107,8 +144,9 @@ include __DIR__ . '/includes/header.php';
             <input type="hidden" name="view" value="<?= h($view) ?>">
             <select name="ma_id" onchange="this.form.submit()"
                     class="px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                <option value="all" <?= $viewAll ? 'selected' : '' ?>>All MAs</option>
                 <?php foreach ($allMas as $m): ?>
-                <option value="<?= $m['id'] ?>" <?= $m['id'] == $viewMaId ? 'selected' : '' ?>>
+                <option value="<?= $m['id'] ?>" <?= (!$viewAll && $m['id'] == $viewMaId) ? 'selected' : '' ?>>
                     <?= h($m['full_name']) ?>
                 </option>
                 <?php endforeach; ?>
@@ -117,12 +155,13 @@ include __DIR__ . '/includes/header.php';
         <?php endif; ?>
 
         <!-- Day / Week toggle -->
+        <?php $maParam = $viewAll ? 'all' : $viewMaId; ?>
         <div class="flex items-center bg-slate-100 rounded-xl p-1 gap-0.5">
-            <a href="?date=<?= $date ?>&ma_id=<?= $viewMaId ?>&view=day"
+            <a href="?date=<?= $date ?>&ma_id=<?= $maParam ?>&view=day"
                class="px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-all <?= $view === 'day' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700' ?>">
                 <i class="bi bi-calendar3 mr-1"></i>Day
             </a>
-            <a href="?date=<?= $weekStart ?>&ma_id=<?= $viewMaId ?>&view=week"
+            <a href="?date=<?= $weekStart ?>&ma_id=<?= $maParam ?>&view=week"
                class="px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-all <?= $view === 'week' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700' ?>">
                 <i class="bi bi-calendar-week mr-1"></i>Week
             </a>
@@ -130,28 +169,28 @@ include __DIR__ . '/includes/header.php';
 
         <!-- Date navigation -->
         <?php if ($view === 'week'): ?>
-        <a href="?date=<?= $prevWeek ?>&ma_id=<?= $viewMaId ?>&view=week"
+        <a href="?date=<?= $prevWeek ?>&ma_id=<?= $maParam ?>&view=week"
            class="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors text-slate-600">
             <i class="bi bi-chevron-left text-sm"></i>
         </a>
-        <a href="?date=<?= date('Y-m-d') ?>&ma_id=<?= $viewMaId ?>&view=week"
+        <a href="?date=<?= date('Y-m-d') ?>&ma_id=<?= $maParam ?>&view=week"
            class="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors <?= (date('Y-m-d') >= $weekStart && date('Y-m-d') <= $weekEnd) ? 'border-indigo-300 text-indigo-600' : '' ?>">
             Today
         </a>
-        <a href="?date=<?= $nextWeek ?>&ma_id=<?= $viewMaId ?>&view=week"
+        <a href="?date=<?= $nextWeek ?>&ma_id=<?= $maParam ?>&view=week"
            class="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors text-slate-600">
             <i class="bi bi-chevron-right text-sm"></i>
         </a>
         <?php else: ?>
-        <a href="?date=<?= $prevDate ?>&ma_id=<?= $viewMaId ?>&view=day"
+        <a href="?date=<?= $prevDate ?>&ma_id=<?= $maParam ?>&view=day"
            class="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors text-slate-600">
             <i class="bi bi-chevron-left text-sm"></i>
         </a>
-        <a href="?date=<?= date('Y-m-d') ?>&ma_id=<?= $viewMaId ?>&view=day"
+        <a href="?date=<?= date('Y-m-d') ?>&ma_id=<?= $maParam ?>&view=day"
            class="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors <?= $isToday ? 'border-indigo-300 text-indigo-600' : '' ?>">
             Today
         </a>
-        <a href="?date=<?= $nextDate ?>&ma_id=<?= $viewMaId ?>&view=day"
+        <a href="?date=<?= $nextDate ?>&ma_id=<?= $maParam ?>&view=day"
            class="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors text-slate-600">
             <i class="bi bi-chevron-right text-sm"></i>
         </a>
@@ -313,7 +352,183 @@ include __DIR__ . '/includes/header.php';
 
 <?php else: ?>
 <!-- ═══════════════════════ DAILY VIEW ═══════════════════════ -->
-<?php if (empty($visits)): ?>
+
+<?php if ($viewAll && !empty($allMaVisits)): ?>
+<!-- ── All-MAs filter pills ── -->
+<div class="flex flex-wrap items-center gap-2 mb-4 no-print">
+    <span class="text-xs font-semibold text-slate-500 mr-1">Filter:</span>
+    <button onclick="filterMa('all')" id="pill-all"
+            class="ma-pill px-3 py-1.5 rounded-full text-xs font-bold border transition-colors bg-indigo-600 text-white border-indigo-600">
+        All MAs
+    </button>
+    <?php foreach ($allMaVisits as $mid => $mg): ?>
+    <button onclick="filterMa(<?= $mid ?>)" id="pill-<?= $mid ?>"
+            class="ma-pill px-3 py-1.5 rounded-full text-xs font-bold border transition-colors bg-white text-slate-600 border-slate-200 hover:border-indigo-400 hover:text-indigo-600">
+        <?= h($mg['name']) ?>
+        <span class="ml-1 px-1.5 py-0.5 bg-slate-100 rounded-full text-[10px]"><?= count($mg['visits']) ?></span>
+    </button>
+    <?php endforeach; ?>
+</div>
+<script>
+function filterMa(maId) {
+    document.querySelectorAll('.ma-section').forEach(el => {
+        el.style.display = (maId === 'all' || el.dataset.maId == maId) ? '' : 'none';
+    });
+    document.querySelectorAll('.ma-pill').forEach(btn => {
+        const active = (maId === 'all' && btn.id === 'pill-all') || (btn.id === 'pill-' + maId);
+        btn.className = btn.className.replace(/bg-indigo-600 text-white border-indigo-600|bg-white text-slate-600 border-slate-200/g, '');
+        btn.classList.add(...(active
+            ? ['bg-indigo-600','text-white','border-indigo-600']
+            : ['bg-white','text-slate-600','border-slate-200']));
+    });
+}
+</script>
+
+<?php foreach ($allMaVisits as $mid => $mg): ?>
+<div class="ma-section mb-6" data-ma-id="<?= $mid ?>">
+    <!-- MA header -->
+    <div class="flex items-center gap-3 mb-3 px-1">
+        <div class="w-8 h-8 bg-indigo-100 text-indigo-700 font-extrabold text-xs rounded-lg grid place-items-center shrink-0">
+            <i class="bi bi-person-fill"></i>
+        </div>
+        <div class="flex-1">
+            <p class="font-bold text-slate-800"><?= h($mg['name']) ?></p>
+            <p class="text-xs text-slate-400">
+                <?php foreach (['completed'=>'text-emerald-600','en_route'=>'text-blue-600','pending'=>'text-slate-500','missed'=>'text-red-500'] as $sk=>$sc): if ($mg['counts'][$sk]): ?>
+                <span class="<?= $sc ?> font-semibold"><?= $mg['counts'][$sk] ?> <?= ucwords(str_replace('_',' ',$sk)) ?></span>
+                <?php endif; endforeach; ?>
+            </p>
+        </div>
+        <a href="?date=<?= $date ?>&ma_id=<?= $mid ?>&view=day"
+           class="no-print text-xs text-indigo-600 font-semibold hover:underline">View only &rsaquo;</a>
+    </div>
+    <div class="space-y-3">
+    <?php foreach ($mg['visits'] as $idx => $v):
+        $sd      = $statusDefs[$v['status']];
+        $addr    = $v['patient_address'] ? rawurlencode($v['patient_address']) : '';
+        $mapsUrl = $addr ? 'https://www.google.com/maps/dir/?api=1&destination=' . $addr : '#'; ?>
+    <div class="bg-white border border-slate-100 rounded-2xl shadow-sm hover:shadow-md transition-shadow print-visit-card"
+         id="visit-<?= $v['id'] ?>">
+        <div class="flex items-start gap-4 p-4">
+            <div class="w-10 h-10 bg-indigo-100 text-indigo-700 font-extrabold text-sm rounded-xl grid place-items-center shrink-0">
+                <?= $idx + 1 ?>
+            </div>
+            <div class="flex-1 min-w-0">
+                <div class="flex flex-wrap items-center gap-2 mb-1">
+                    <a href="<?= BASE_URL ?>/patient_view.php?id=<?= $v['patient_id'] ?>"
+                       class="font-bold text-slate-800 hover:text-indigo-600 transition-colors text-base">
+                        <?= h($v['patient_name']) ?>
+                    </a>
+                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold <?= $sd['bg'] ?> <?= $sd['text'] ?>">
+                        <span class="w-1.5 h-1.5 rounded-full <?= $sd['dot'] ?>"></span>
+                        <?= $sd['label'] ?>
+                    </span>
+                    <?php $vt = $v['visit_type'] ?? 'routine';
+                    $vtLabels = ['routine'=>'Routine','new_patient'=>'New Pt','wound_care'=>'Wound Care','awv'=>'AWV','ccm'=>'CCM','il'=>'IL Disc.']; ?>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-700">
+                        <?= h($vtLabels[$vt] ?? 'Routine') ?>
+                    </span>
+                </div>
+                <?php if ($v['visit_time']): ?>
+                <div class="flex items-center gap-1.5 text-sm text-slate-500 mb-1">
+                    <i class="bi bi-clock text-slate-400"></i>
+                    <?= date('g:i A', strtotime($v['visit_time'])) ?>
+                </div>
+                <?php endif; ?>
+                <?php if ($v['patient_address']): ?>
+                <div class="flex items-start gap-1.5 text-sm text-slate-500 mb-1">
+                    <i class="bi bi-geo-alt text-slate-400 mt-0.5 shrink-0"></i>
+                    <a href="https://www.google.com/maps/dir/?api=1&destination=<?= $addr ?>" target="_blank" rel="noopener"
+                       class="hover:text-blue-600 underline decoration-dotted"><?= h($v['patient_address']) ?></a>
+                </div>
+                <?php endif; ?>
+                <?php if ($v['patient_phone']): ?>
+                <div class="flex items-center gap-1.5 text-sm text-slate-500">
+                    <i class="bi bi-telephone text-slate-400"></i>
+                    <a href="tel:<?= h(preg_replace('/\D/','',$v['patient_phone'])) ?>"
+                       class="hover:text-indigo-600"><?= h($v['patient_phone']) ?></a>
+                </div>
+                <?php endif; ?>
+                <?php if ($v['notes']): ?>
+                <div class="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
+                    <i class="bi bi-sticky-fill mr-1"></i><?= h($v['notes']) ?>
+                </div>
+                <?php endif; ?>
+            </div>
+            <div class="flex flex-col gap-2 shrink-0 no-print">
+                <?php if ($v['status'] === 'pending'): ?>
+                <button onclick="startVisit(<?= $v['id'] ?>, <?= $v['patient_id'] ?>, this)"
+                        class="flex items-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-sm transition-all">
+                    <i class="bi bi-play-fill text-sm"></i> Start Visit
+                </button>
+                <?php elseif ($v['status'] === 'en_route'): ?>
+                <a href="<?= BASE_URL ?>/patient_view.php?id=<?= $v['patient_id'] ?>&tab=forms&visit=<?= $v['id'] ?>"
+                   class="flex items-center gap-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all">
+                    <i class="bi bi-file-earmark-plus-fill text-sm"></i> Open Forms
+                </a>
+                <?php endif; ?>
+                <?php if ($v['patient_address']): ?>
+                <a href="<?= h($mapsUrl) ?>" target="_blank" rel="noopener"
+                   class="flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-xs font-semibold hover:bg-blue-100 transition-colors">
+                    <i class="bi bi-navigation-fill"></i> Navigate
+                </a>
+                <?php endif; ?>
+                <a href="<?= BASE_URL ?>/patient_view.php?id=<?= $v['patient_id'] ?>"
+                   class="flex items-center gap-1.5 px-3 py-2 bg-slate-50 text-slate-600 border border-slate-200 rounded-xl text-xs font-semibold hover:bg-slate-100 transition-colors">
+                    <i class="bi bi-person-lines-fill"></i> Chart
+                </a>
+            </div>
+        </div>
+        <div class="border-t border-slate-100 px-4 py-3 flex flex-wrap gap-2 bg-slate-50/60 no-print">
+            <span class="text-xs text-slate-500 font-medium self-center mr-1">Update:</span>
+            <?php foreach ($statusDefs as $sKey => $sDef): ?>
+            <button onclick="updateStatus(<?= $v['id'] ?>, '<?= $sKey ?>')"
+                    class="status-btn px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors
+                           <?= $v['status'] === $sKey
+                               ? $sDef['bg'] . ' ' . $sDef['text'] . ' border-transparent ring-2 ring-offset-1 ring-' . explode('-',$sDef['dot'])[1] . '-400'
+                               : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-100' ?>"
+                    data-visit="<?= $v['id'] ?>" data-status="<?= $sKey ?>">
+                <i class="bi <?= $sDef['icon'] ?> mr-0.5"></i> <?= $sDef['label'] ?>
+            </button>
+            <?php endforeach; ?>
+        </div>
+        <div class="border-t border-slate-100 rounded-b-2xl overflow-hidden no-print">
+            <button type="button" onclick="toggleNotes(this, <?= $v['id'] ?>)"
+                    class="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-left transition-colors
+                           <?= !empty($v['visit_notes']) ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' : 'bg-slate-50/80 text-slate-500 hover:bg-slate-100' ?>">
+                <i class="bi bi-pencil-square text-sm"></i>
+                <?php if (!empty($v['visit_notes'])): ?>
+                    <span class="truncate flex-1"><?= h(mb_strimwidth($v['visit_notes'], 0, 80, '…')) ?></span>
+                    <span class="shrink-0 px-2 py-0.5 bg-amber-200 text-amber-800 rounded-full text-[10px] font-bold">Note saved</span>
+                <?php else: ?>
+                    <span class="flex-1">Add quick note…</span>
+                <?php endif; ?>
+                <i class="bi bi-chevron-down text-xs shrink-0 note-chevron transition-transform"></i>
+            </button>
+            <div class="note-panel hidden px-4 pb-4 pt-3 bg-amber-50/60">
+                <textarea id="note-<?= $v['id'] ?>"
+                    class="w-full px-3 py-2.5 border border-amber-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent resize-none transition"
+                    rows="3"
+                    placeholder="Quick clinical observation — e.g. wound looks improved, patient reports pain 3/10…"
+                    ><?= h($v['visit_notes'] ?? '') ?></textarea>
+                <div class="flex items-center gap-2 mt-2">
+                    <button type="button" onclick="saveNote(<?= $v['id'] ?>, this)"
+                            class="px-4 py-2 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs font-bold rounded-xl transition-all shadow-sm">
+                        <i class="bi bi-floppy-fill mr-1"></i> Save Note
+                    </button>
+                    <span class="note-saved-msg hidden text-xs text-emerald-600 font-semibold">
+                        <i class="bi bi-check-circle-fill mr-0.5"></i> Saved!
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endforeach; // end per-MA visits ?>
+    </div><!-- /space-y-3 -->
+</div><!-- /ma-section -->
+<?php endforeach; // end foreach allMaVisits ?>
+
+<?php elseif (empty($visits)): ?>
 <div class="bg-white border border-slate-100 rounded-2xl shadow-sm p-12 text-center">
     <div class="w-16 h-16 bg-indigo-50 rounded-2xl grid place-items-center mx-auto mb-4">
         <i class="bi bi-calendar-x text-indigo-400 text-3xl"></i>
@@ -332,47 +547,37 @@ include __DIR__ . '/includes/header.php';
 <?php else: ?>
 <div class="space-y-3" id="visitList">
     <?php foreach ($visits as $idx => $v):
-        $sd   = $statusDefs[$v['status']];
+        $sd      = $statusDefs[$v['status']];
         $addr    = $v['patient_address'] ? rawurlencode($v['patient_address']) : '';
-        $mapsUrl = $addr ? 'https://www.google.com/maps/dir/?api=1&destination=' . $addr : '#';
-    ?>
+        $mapsUrl = $addr ? 'https://www.google.com/maps/dir/?api=1&destination=' . $addr : '#'; ?>
     <div class="bg-white border border-slate-100 rounded-2xl shadow-sm hover:shadow-md transition-shadow print-visit-card"
          id="visit-<?= $v['id'] ?>">
         <div class="flex items-start gap-4 p-4">
-
-            <!-- Order badge -->
             <div class="w-10 h-10 bg-indigo-100 text-indigo-700 font-extrabold text-sm rounded-xl grid place-items-center shrink-0">
                 <?= $idx + 1 ?>
             </div>
-
-            <!-- Info -->
             <div class="flex-1 min-w-0">
                 <div class="flex flex-wrap items-center gap-2 mb-1">
                     <a href="<?= BASE_URL ?>/patient_view.php?id=<?= $v['patient_id'] ?>"
                        class="font-bold text-slate-800 hover:text-indigo-600 transition-colors text-base">
                         <?= h($v['patient_name']) ?>
                     </a>
-                    <!-- Status badge -->
                     <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold <?= $sd['bg'] ?> <?= $sd['text'] ?>">
                         <span class="w-1.5 h-1.5 rounded-full <?= $sd['dot'] ?>"></span>
                         <?= $sd['label'] ?>
                     </span>
-                    <?php
-                    $vt = $v['visit_type'] ?? 'routine';
-                    $vtLabels = ['routine'=>'Routine','new_patient'=>'New Pt','wound_care'=>'Wound Care','awv'=>'AWV','ccm'=>'CCM','il'=>'IL Disc.'];
-                    ?>
+                    <?php $vt = $v['visit_type'] ?? 'routine';
+                    $vtLabels = ['routine'=>'Routine','new_patient'=>'New Pt','wound_care'=>'Wound Care','awv'=>'AWV','ccm'=>'CCM','il'=>'IL Disc.']; ?>
                     <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-700">
                         <?= h($vtLabels[$vt] ?? 'Routine') ?>
                     </span>
                 </div>
-
                 <?php if ($v['visit_time']): ?>
                 <div class="flex items-center gap-1.5 text-sm text-slate-500 mb-1">
                     <i class="bi bi-clock text-slate-400"></i>
                     <?= date('g:i A', strtotime($v['visit_time'])) ?>
                 </div>
                 <?php endif; ?>
-
                 <?php if ($v['patient_address']): ?>
                 <div class="flex items-start gap-1.5 text-sm text-slate-500 mb-1">
                     <i class="bi bi-geo-alt text-slate-400 mt-0.5 shrink-0"></i>
@@ -380,7 +585,6 @@ include __DIR__ . '/includes/header.php';
                        class="hover:text-blue-600 underline decoration-dotted"><?= h($v['patient_address']) ?></a>
                 </div>
                 <?php endif; ?>
-
                 <?php if ($v['patient_phone']): ?>
                 <div class="flex items-center gap-1.5 text-sm text-slate-500">
                     <i class="bi bi-telephone text-slate-400"></i>
@@ -388,26 +592,21 @@ include __DIR__ . '/includes/header.php';
                        class="hover:text-indigo-600"><?= h($v['patient_phone']) ?></a>
                 </div>
                 <?php endif; ?>
-
                 <?php if ($v['notes']): ?>
                 <div class="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
                     <i class="bi bi-sticky-fill mr-1"></i><?= h($v['notes']) ?>
                 </div>
                 <?php endif; ?>
             </div>
-
-            <!-- Actions -->
             <div class="flex flex-col gap-2 shrink-0 no-print">
                 <?php if ($v['status'] === 'pending'): ?>
                 <button onclick="startVisit(<?= $v['id'] ?>, <?= $v['patient_id'] ?>, this)"
-                        class="flex items-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95
-                               text-white rounded-xl text-xs font-bold shadow-sm transition-all">
+                        class="flex items-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-sm transition-all">
                     <i class="bi bi-play-fill text-sm"></i> Start Visit
                 </button>
                 <?php elseif ($v['status'] === 'en_route'): ?>
                 <a href="<?= BASE_URL ?>/patient_view.php?id=<?= $v['patient_id'] ?>&tab=forms&visit=<?= $v['id'] ?>"
-                   class="flex items-center gap-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-700
-                          text-white rounded-xl text-xs font-bold shadow-sm transition-all">
+                   class="flex items-center gap-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all">
                     <i class="bi bi-file-earmark-plus-fill text-sm"></i> Open Forms
                 </a>
                 <?php endif; ?>
@@ -423,8 +622,6 @@ include __DIR__ . '/includes/header.php';
                 </a>
             </div>
         </div>
-
-        <!-- Status update bar (MA action) -->
         <div class="border-t border-slate-100 px-4 py-3 flex flex-wrap gap-2 bg-slate-50/60 no-print">
             <span class="text-xs text-slate-500 font-medium self-center mr-1">Update:</span>
             <?php foreach ($statusDefs as $sKey => $sDef): ?>
@@ -438,14 +635,9 @@ include __DIR__ . '/includes/header.php';
             </button>
             <?php endforeach; ?>
         </div>
-
-        <!-- Quick Visit Notes -->
         <div class="border-t border-slate-100 rounded-b-2xl overflow-hidden no-print">
-            <!-- Toggle row -->
-            <button type="button"
-                    onclick="toggleNotes(this, <?= $v['id'] ?>)"
-                    class="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-semibold
-                           text-left transition-colors
+            <button type="button" onclick="toggleNotes(this, <?= $v['id'] ?>)"
+                    class="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-left transition-colors
                            <?= !empty($v['visit_notes']) ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' : 'bg-slate-50/80 text-slate-500 hover:bg-slate-100' ?>">
                 <i class="bi bi-pencil-square text-sm"></i>
                 <?php if (!empty($v['visit_notes'])): ?>
@@ -456,21 +648,15 @@ include __DIR__ . '/includes/header.php';
                 <?php endif; ?>
                 <i class="bi bi-chevron-down text-xs shrink-0 note-chevron transition-transform"></i>
             </button>
-            <!-- Expandable note area -->
             <div class="note-panel hidden px-4 pb-4 pt-3 bg-amber-50/60">
-                <textarea
-                    id="note-<?= $v['id'] ?>"
-                    class="w-full px-3 py-2.5 border border-amber-200 rounded-xl text-sm bg-white
-                           focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent
-                           resize-none transition"
+                <textarea id="note-<?= $v['id'] ?>"
+                    class="w-full px-3 py-2.5 border border-amber-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent resize-none transition"
                     rows="3"
                     placeholder="Quick clinical observation — e.g. wound looks improved, patient reports pain 3/10…"
                     ><?= h($v['visit_notes'] ?? '') ?></textarea>
                 <div class="flex items-center gap-2 mt-2">
-                    <button type="button"
-                            onclick="saveNote(<?= $v['id'] ?>, this)"
-                            class="px-4 py-2 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white
-                                   text-xs font-bold rounded-xl transition-all shadow-sm">
+                    <button type="button" onclick="saveNote(<?= $v['id'] ?>, this)"
+                            class="px-4 py-2 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs font-bold rounded-xl transition-all shadow-sm">
                         <i class="bi bi-floppy-fill mr-1"></i> Save Note
                     </button>
                     <span class="note-saved-msg hidden text-xs text-emerald-600 font-semibold">
@@ -480,9 +666,9 @@ include __DIR__ . '/includes/header.php';
             </div>
         </div>
     </div>
-    <?php endforeach; ?>
-</div>
-<?php endif; // visit list ?>
+    <?php endforeach; // single-MA visits ?>
+</div><!-- /visitList -->
+<?php endif; // viewAll / empty / single-MA ?>
 <?php endif; // end daily view ?>
 </div><!-- /screen-layout -->
 
