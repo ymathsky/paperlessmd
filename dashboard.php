@@ -108,6 +108,65 @@ if (isAdmin()) {
 }
 $weeklyStatsJson = json_encode($weeklyStats);
 
+// ── Analytics charts data ─────────────────────────────────────────────────────
+$chartData = [];
+if (isAdmin()) {
+    // 1. Visits per day — last 14 days (line chart)
+    $v14Stmt = $pdo->query("
+        SELECT DATE(visit_date) AS d, COUNT(*) AS cnt
+        FROM `schedule`
+        WHERE visit_date >= CURDATE() - INTERVAL 13 DAY
+          AND visit_date <= CURDATE()
+        GROUP BY DATE(visit_date)
+        ORDER BY d ASC
+    ");
+    $v14Rows = [];
+    foreach ($v14Stmt->fetchAll() as $r) $v14Rows[$r['d']] = (int)$r['cnt'];
+    $visitsPerDay = [];
+    for ($i = 13; $i >= 0; $i--) {
+        $d = date('Y-m-d', strtotime("-$i days"));
+        $visitsPerDay[] = ['label' => date('M j', strtotime($d)), 'count' => $v14Rows[$d] ?? 0];
+    }
+    $chartData['visitsPerDay'] = $visitsPerDay;
+
+    // 2. Forms by type — last 30 days (doughnut)
+    $ftStmt = $pdo->query("
+        SELECT form_type, COUNT(*) AS cnt
+        FROM form_submissions
+        WHERE created_at >= CURDATE() - INTERVAL 30 DAY
+        GROUP BY form_type
+        ORDER BY cnt DESC
+        LIMIT 8
+    ");
+    $chartData['formsByType'] = $ftStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // 3. Visit status breakdown — current month
+    $vsStmt = $pdo->query("
+        SELECT status, COUNT(*) AS cnt
+        FROM `schedule`
+        WHERE YEAR(visit_date)  = YEAR(CURDATE())
+          AND MONTH(visit_date) = MONTH(CURDATE())
+        GROUP BY status
+    ");
+    $chartData['visitStatus'] = $vsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // 4. MA productivity — completed visits this month
+    $maStmt = $pdo->query("
+        SELECT s.full_name AS ma_name, COUNT(sc.id) AS completed
+        FROM staff s
+        LEFT JOIN `schedule` sc ON sc.ma_id = s.id
+              AND sc.status = 'completed'
+              AND YEAR(sc.visit_date)  = YEAR(CURDATE())
+              AND MONTH(sc.visit_date) = MONTH(CURDATE())
+        WHERE s.active = 1 AND s.role IN ('ma','admin')
+        GROUP BY s.id, s.full_name
+        ORDER BY completed DESC
+        LIMIT 10
+    ");
+    $chartData['maProductivity'] = $maStmt->fetchAll(PDO::FETCH_ASSOC);
+}
+$chartDataJson = json_encode($chartData);
+
 // ── Right-sidebar data ────────────────────────────────────────────────────────
 
 // Activity feed: last 18 audit entries (admin sees all, others see own)
@@ -464,20 +523,85 @@ include __DIR__ . '/includes/header.php';
 <?php endif; ?>
 <?php endif; // canAccessClinical unsigned forms ?>
 
-<?php if (isAdmin() && !empty($weeklyStats)): ?>
-<!-- Weekly Stats Chart -->
+<?php if (isAdmin()): ?>
+<!-- ═══════════════ ANALYTICS SECTION ══════════════════════════════════════ -->
+<div class="mb-2">
+    <h3 class="text-sm font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+        <i class="bi bi-graph-up-arrow text-indigo-500"></i> Analytics
+        <span class="text-slate-400 font-normal normal-case tracking-normal">— <?= date('F Y') ?></span>
+    </h3>
+</div>
+
+<!-- Row 1: Visits trend (wide) + Form types (narrow) -->
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-5 mb-5">
+
+    <!-- Visits per day — last 14 days -->
+    <div class="xl:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h4 class="font-bold text-slate-700 flex items-center gap-2 text-sm">
+                <i class="bi bi-activity text-emerald-500"></i> Visits Scheduled — Last 14 Days
+            </h4>
+            <span class="text-xs text-slate-400">Daily total</span>
+        </div>
+        <div class="px-6 py-5">
+            <canvas id="chartVisitsLine" height="100"></canvas>
+        </div>
+    </div>
+
+    <!-- Forms by type — last 30 days -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-100">
+            <h4 class="font-bold text-slate-700 flex items-center gap-2 text-sm">
+                <i class="bi bi-pie-chart-fill text-violet-500"></i> Forms by Type
+            </h4>
+            <p class="text-xs text-slate-400 mt-0.5">Last 30 days</p>
+        </div>
+        <div class="px-4 py-4 flex flex-col items-center gap-3">
+            <canvas id="chartFormsDoughnut" style="max-height:180px;max-width:180px;"></canvas>
+            <div id="doughnutLegend" class="w-full space-y-1.5 text-xs"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Row 2: Visit status this month + MA productivity -->
+<div class="grid grid-cols-1 xl:grid-cols-2 gap-5 mb-7">
+
+    <!-- Visit status breakdown -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-100">
+            <h4 class="font-bold text-slate-700 flex items-center gap-2 text-sm">
+                <i class="bi bi-bar-chart-steps text-blue-500"></i> Visit Status — This Month
+            </h4>
+        </div>
+        <div class="px-6 py-5">
+            <canvas id="chartVisitStatus" height="140"></canvas>
+        </div>
+    </div>
+
+    <!-- MA productivity -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-slate-100">
+            <h4 class="font-bold text-slate-700 flex items-center gap-2 text-sm">
+                <i class="bi bi-people-fill text-indigo-500"></i> MA Productivity — This Month
+            </h4>
+            <p class="text-xs text-slate-400 mt-0.5">Completed visits</p>
+        </div>
+        <div class="px-6 py-5">
+            <canvas id="chartMaProductivity" height="140"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Old weekly form activity bar -->
+<?php if (!empty($weeklyStats)): ?>
 <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-7">
     <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-        <h3 class="font-bold text-slate-700 flex items-center gap-2">
-            <i class="bi bi-bar-chart-fill text-indigo-500"></i> Weekly Form Activity
-        </h3>
+        <h4 class="font-bold text-slate-700 flex items-center gap-2 text-sm">
+            <i class="bi bi-bar-chart-fill text-indigo-500"></i> Forms Submitted — This Week vs Last Week
+        </h4>
         <div class="flex items-center gap-4 text-xs text-slate-500">
-            <span class="flex items-center gap-1.5">
-                <span class="inline-block w-3 h-3 rounded-sm bg-indigo-500"></span> This week
-            </span>
-            <span class="flex items-center gap-1.5">
-                <span class="inline-block w-3 h-3 rounded-sm bg-slate-200"></span> Last week
-            </span>
+            <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded-sm bg-indigo-500"></span> This week</span>
+            <span class="flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded-sm bg-slate-200"></span> Last week</span>
         </div>
     </div>
     <div class="px-6 py-5">
@@ -485,6 +609,8 @@ include __DIR__ . '/includes/header.php';
     </div>
 </div>
 <?php endif; ?>
+
+<?php endif; // isAdmin analytics ?>
 
 <!-- Recent Forms -->
 <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -831,8 +957,9 @@ $extraJs = <<<'JS'
 JS;
 
 // Weekly stats chart JS (admin only)
-if (isAdmin() && !empty($weeklyStats)):
+if (isAdmin()):
 $extraJs .= '<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>';
+if (!empty($weeklyStats)):
 $weeklyJson = $weeklyStatsJson;
 $extraJs .= <<<WEEKJS
 <script>
@@ -899,6 +1026,231 @@ $extraJs .= <<<WEEKJS
 })();
 </script>
 WEEKJS;
+endif; // end !empty($weeklyStats)
+endif; // end isAdmin weekly chart
+
+// Analytics charts JS (admin only)
+if (isAdmin()):
+$chartJson  = $chartDataJson;
+$extraJs .= <<<CHARTJS
+<script>
+(function () {
+    var cd = {$chartJson};
+    if (!cd || !window.Chart) return;
+
+    var PALETTE = {
+        indigo:  'rgba(99,102,241,',
+        emerald: 'rgba(16,185,129,',
+        blue:    'rgba(59,130,246,',
+        violet:  'rgba(139,92,246,',
+        amber:   'rgba(245,158,11,',
+        rose:    'rgba(244,63,94,',
+        cyan:    'rgba(6,182,212,',
+        slate:   'rgba(148,163,184,',
+        teal:    'rgba(20,184,166,',
+        pink:    'rgba(236,72,153,',
+    };
+    var PIE_COLORS = Object.values(PALETTE).map(function(c){ return c + '0.85)'; });
+    var PIE_HOVER  = Object.values(PALETTE).map(function(c){ return c + '1)'; });
+
+    Chart.defaults.font.family = "'Inter', system-ui, sans-serif";
+
+    /* ── 1. Visits per day — line chart ─────────────────────────── */
+    (function(){
+        var el = document.getElementById('chartVisitsLine');
+        if (!el || !cd.visitsPerDay) return;
+        var labels = cd.visitsPerDay.map(function(d){ return d.label; });
+        var counts = cd.visitsPerDay.map(function(d){ return d.count; });
+        new Chart(el, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Visits',
+                    data: counts,
+                    borderColor: 'rgba(16,185,129,1)',
+                    backgroundColor: 'rgba(16,185,129,0.10)',
+                    borderWidth: 2.5,
+                    pointBackgroundColor: 'rgba(16,185,129,1)',
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                    fill: true,
+                    tension: 0.38,
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(c){ return ' ' + c.raw + ' visit' + (c.raw !== 1 ? 's' : ''); }
+                        }
+                    },
+                },
+                scales: {
+                    x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#94a3b8', maxRotation: 0 } },
+                    y: { beginAtZero: true, ticks: { precision: 0, font: { size: 10 }, color: '#94a3b8' }, grid: { color: 'rgba(148,163,184,0.12)' } },
+                },
+            },
+        });
+    })();
+
+    /* ── 2. Forms by type — doughnut ────────────────────────────── */
+    (function(){
+        var el = document.getElementById('chartFormsDoughnut');
+        if (!el || !cd.formsByType || !cd.formsByType.length) return;
+
+        var typeLabels = {
+            'vital_cs':'Visit Consent','new_patient':'New Patient','abn':'ABN',
+            'pf_signup':'PF Portal','ccm_consent':'CCM','cognitive_wellness':'Cognitive',
+            'medicare_awv':'AWV','il_disclosure':'IL Disclosure'
+        };
+        var labels = cd.formsByType.map(function(r){ return typeLabels[r.form_type] || r.form_type; });
+        var counts = cd.formsByType.map(function(r){ return parseInt(r.cnt); });
+        var total  = counts.reduce(function(a,b){ return a+b; }, 0);
+
+        new Chart(el, {
+            type: 'doughnut',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: counts,
+                    backgroundColor: PIE_COLORS.slice(0, labels.length),
+                    hoverBackgroundColor: PIE_HOVER.slice(0, labels.length),
+                    borderWidth: 2,
+                    borderColor: '#fff',
+                }],
+            },
+            options: {
+                responsive: true,
+                cutout: '62%',
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(c){
+                                var pct = total > 0 ? Math.round(c.raw / total * 100) : 0;
+                                return ' ' + c.raw + ' (' + pct + '%)';
+                            }
+                        }
+                    },
+                },
+            },
+        });
+
+        /* Custom legend */
+        var legendEl = document.getElementById('doughnutLegend');
+        if (legendEl) {
+            labels.forEach(function(lbl, i){
+                var pct = total > 0 ? Math.round(counts[i] / total * 100) : 0;
+                var row = document.createElement('div');
+                row.className = 'flex items-center justify-between gap-2';
+                row.innerHTML =
+                    '<span class="flex items-center gap-1.5 truncate">' +
+                      '<span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background:' + PIE_COLORS[i] + '"></span>' +
+                      '<span class="text-slate-600 truncate">' + lbl + '</span>' +
+                    '</span>' +
+                    '<span class="font-bold text-slate-700 flex-shrink-0">' + counts[i] + ' <span class="font-normal text-slate-400">(' + pct + '%)</span></span>';
+                legendEl.appendChild(row);
+            });
+        }
+    })();
+
+    /* ── 3. Visit status — horizontal bar ───────────────────────── */
+    (function(){
+        var el = document.getElementById('chartVisitStatus');
+        if (!el || !cd.visitStatus) return;
+        var statusCfg = {
+            'pending':   { label: 'Pending',   color: 'rgba(148,163,184,0.85)' },
+            'en_route':  { label: 'En Route',  color: 'rgba(59,130,246,0.85)'  },
+            'completed': { label: 'Completed', color: 'rgba(16,185,129,0.85)'  },
+            'missed':    { label: 'Missed',    color: 'rgba(244,63,94,0.85)'   },
+        };
+        var order  = ['completed','en_route','pending','missed'];
+        var labels = [], counts = [], colors = [];
+        order.forEach(function(k){
+            var row = cd.visitStatus.find(function(r){ return r.status === k; });
+            var cfg = statusCfg[k];
+            labels.push(cfg.label);
+            counts.push(row ? parseInt(row.cnt) : 0);
+            colors.push(cfg.color);
+        });
+        new Chart(el, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Visits',
+                    data: counts,
+                    backgroundColor: colors,
+                    borderRadius: 7,
+                    borderSkipped: false,
+                }],
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(c){ return ' ' + c.raw + ' visit' + (c.raw !== 1 ? 's' : ''); }
+                        }
+                    },
+                },
+                scales: {
+                    x: { beginAtZero: true, ticks: { precision: 0, font: { size: 10 }, color: '#94a3b8' }, grid: { color: 'rgba(148,163,184,0.12)' } },
+                    y: { grid: { display: false }, ticks: { font: { size: 11, weight: '600' }, color: '#475569' } },
+                },
+            },
+        });
+    })();
+
+    /* ── 4. MA productivity — bar chart ─────────────────────────── */
+    (function(){
+        var el = document.getElementById('chartMaProductivity');
+        if (!el || !cd.maProductivity || !cd.maProductivity.length) return;
+        var labels = cd.maProductivity.map(function(r){ return r.ma_name.split(' ')[0]; });
+        var counts = cd.maProductivity.map(function(r){ return parseInt(r.completed); });
+        var maxVal = Math.max.apply(null, counts);
+        var bgColors = counts.map(function(v){
+            return v === maxVal && maxVal > 0 ? 'rgba(99,102,241,0.85)' : 'rgba(99,102,241,0.40)';
+        });
+        new Chart(el, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Completed',
+                    data: counts,
+                    backgroundColor: bgColors,
+                    borderRadius: 7,
+                    borderSkipped: false,
+                }],
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(c){ return ' ' + c.raw + ' visit' + (c.raw !== 1 ? 's' : '') + ' completed'; }
+                        }
+                    },
+                },
+                scales: {
+                    x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#94a3b8', maxRotation: 0 } },
+                    y: { beginAtZero: true, ticks: { precision: 0, font: { size: 10 }, color: '#94a3b8' }, grid: { color: 'rgba(148,163,184,0.12)' } },
+                },
+            },
+        });
+    })();
+
+})();
+</script>
+CHARTJS;
 endif;
 
 // Admin Notes JS (only for admins — note: PHP is evaluated before heredoc content, so we append inline)
