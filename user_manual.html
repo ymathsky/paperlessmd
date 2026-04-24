@@ -176,8 +176,8 @@
   <div class="logo">Paperless<span>MD</span></div>
   <div class="subtitle">Electronic Health Record System &mdash; Complete User Manual</div>
   <div class="meta">
-    Beyond Wound Care Inc. &nbsp;·&nbsp; 1340 Remington Rd, STE P, Schaumburg IL 60173<br>
-    Version 1.0 &nbsp;·&nbsp; April 2026
+    Beyond Wound Care Inc. &amp; Visiting Medical Physician Inc.<br>
+    Version 2.0 &nbsp;&middot;&nbsp; April 2026
   </div>
 </div>
 
@@ -261,7 +261,7 @@
 <h1 class="section" id="s1"><span class="num">1</span> System Overview</h1>
 
 <p><strong>PaperlessMD</strong> is a browser-based Electronic Health Record (EHR) system built for
-<strong>Beyond Wound Care Inc.</strong> It replaces paper forms and clipboards with a mobile-friendly
+<strong>Beyond Wound Care Inc.</strong> and <strong>Visiting Medical Physician Inc.</strong> It replaces paper forms and clipboards with a mobile-friendly
 web application that works on any phone, tablet, or laptop — with offline support so field staff
 can continue working even when connectivity is temporarily lost.</p>
 
@@ -322,11 +322,16 @@ can continue working even when connectivity is temporarily lost.</p>
 <table>
   <tr><th>Item</th><th>Detail</th></tr>
   <tr><td>Production URL</td><td><code>https://docs.md-officesupport.com</code></td></tr>
-  <tr><td>Practice Name</td><td>Beyond Wound Care Inc.</td></tr>
-  <tr><td>Practice Address</td><td>1340 Remington Rd, STE P, Schaumburg, IL 60173</td></tr>
-  <tr><td>Practice Phone</td><td>847-873-8693</td></tr>
-  <tr><td>Practice Fax</td><td>847-873-8486</td></tr>
-  <tr><td>Support Email</td><td>Support@beyondwoundcare.com</td></tr>
+  <tr><td colspan="2" style="background:#f8fafc;font-weight:700;color:#334155;">Beyond Wound Care Inc.</td></tr>
+  <tr><td>Address</td><td>1340 Remington Rd, STE P, Schaumburg, IL 60173</td></tr>
+  <tr><td>Phone</td><td>847-873-8693</td></tr>
+  <tr><td>Fax</td><td>847-873-8486</td></tr>
+  <tr><td>Email</td><td>Support@beyondwoundcare.com</td></tr>
+  <tr><td colspan="2" style="background:#f0fdf4;font-weight:700;color:#14936d;">Visiting Medical Physician Inc.</td></tr>
+  <tr><td>Address</td><td>1340 Remington Rd, Suite M, Schaumburg, IL 60173</td></tr>
+  <tr><td>Phone</td><td>847.252.1858</td></tr>
+  <tr><td>Email</td><td>care@visitingmedicalphysician.com</td></tr>
+  <tr><td colspan="2" style="background:#f8fafc;font-weight:700;color:#334155;">System</td></tr>
   <tr><td>Browser Support</td><td>Chrome 90+, Edge 90+, Safari 14+, Firefox 90+</td></tr>
   <tr><td>Session Timeout</td><td>2 hours of inactivity (rolling)</td></tr>
 </table>
@@ -463,9 +468,19 @@ Click any visit to jump to the patient record. For the full schedule, click <str
 <ul class="steps">
   <li>On the Patients page, click <strong>Add Patient</strong> (top-right button).</li>
   <li>Fill in the required fields: <strong>First Name, Last Name, Date of Birth, Address</strong>.</li>
+  <li>Select the patient's <strong>Company</strong> from the dropdown:
+    <ul>
+      <li><strong>Beyond Wound Care Inc.</strong> — default for BWC patients</li>
+      <li><strong>Visiting Medical Physician Inc.</strong> — for VMP patients</li>
+    </ul>
+    This selection controls which practice branding (logo, address, phone) appears on all printed forms and PDFs for this patient.
+  </li>
   <li>Optionally add phone number, insurance info, and emergency contact.</li>
   <li>Click <strong>Save Patient</strong>. You are redirected to the new patient's record.</li>
 </ul>
+<div class="note">
+  <strong>Company branding:</strong> Once a patient's company is set, every form they sign — consent forms, CCM consent, wound care consent, PDF exports — will automatically display the correct practice logo, address, and contact information for that company. The company can be changed later via <strong>Edit Patient</strong>.
+</div>
 
 <h2 class="sub" id="s5c">5.3 Patient View — Tabs</h2>
 <p>Click any patient name to open their record. The record has five tabs:</p>
@@ -545,7 +560,7 @@ Changes take effect on the next form that is opened for this patient.</p>
   </div>
   <div class="form-card">
     <h3>❤️ CCM Consent</h3>
-    <p>Chronic Care Management enrollment consent. Required for CCM visit types.</p>
+    <p>Chronic Care Management enrollment consent. Required for CCM visit types. Provider name in all legal clauses automatically reflects the patient's assigned company (BWC or VMP).</p>
   </div>
   <div class="form-card">
     <h3>🧠 Cognitive Wellness Exam</h3>
@@ -561,7 +576,7 @@ Changes take effect on the next form that is opened for this patient.</p>
   </div>
   <div class="form-card">
     <h3>📄 Informed Consent &ndash; Wound Care</h3>
-    <p>Single-page version of the wound care informed consent matching the original BWC paper form. Patient Name and DOB are pre-filled. All nine consent sections are displayed as static read-only text. Patient or authorized representative signs at the bottom.</p>
+    <p>Single-page version of the wound care informed consent. Patient Name and DOB are pre-filled. All nine consent sections are displayed as static read-only text. Legal text (provider name, PHI clauses) automatically reflects the patient's assigned company. Patient or authorized representative signs at the bottom.</p>
   </div>
   <div class="form-card">
     <h3>&#x1F4F6; RPM Consent</h3>
@@ -1077,9 +1092,9 @@ the browser's Service Worker so you can continue working with limited or no conn
 </div><!-- /container -->
 
 <footer>
-  PaperlessMD &mdash; Beyond Wound Care Inc. &nbsp;|&nbsp;
-  847-873-8693 &nbsp;|&nbsp; Support@beyondwoundcare.com<br>
-  This document is confidential and intended for authorized Beyond Wound Care staff only.
+  PaperlessMD &mdash; Multi-Company EHR System &nbsp;|&nbsp;
+  Beyond Wound Care Inc. &nbsp;|&nbsp; Visiting Medical Physician Inc.<br>
+  This document is confidential and intended for authorized staff only.
 </footer>
 
 </body>
