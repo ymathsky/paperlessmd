@@ -20,16 +20,7 @@ $emergPhone       = vd($data, 'emergency_phone');
 </style>
 <div class="bwc-form">
     <!-- Practice Header -->
-    <div class="bwc-header">
-        <img src="<?= BASE_URL ?>/assets/img/logo.png" class="bwc-header-logo" alt="Beyond Wound Care Inc.">
-        <div class="bwc-header-text">
-            <p class="bwc-practice-name">Beyond Wound Care Inc.</p>
-            <p>1340 Remington RD, STE P, Schaumburg, IL 60173</p>
-            <p>Phone: 847-873-8693 &nbsp;&nbsp; Fax: 847-873-8486</p>
-            <p>Support@beyondwoundcare.com</p>
-            <p class="bwc-form-title">NEW PATIENT CONSENT FORM</p>
-        </div>
-    </div>
+    <?php $practiceFormTitle = 'NEW PATIENT CONSENT FORM'; include __DIR__ . '/../practice_header.php'; ?>
 
     <!-- Patient Info -->
     <div style="display:flex;justify-content:space-between;border-bottom:1px solid #000;padding-bottom:6pt;margin-bottom:10pt;font-size:10pt;">

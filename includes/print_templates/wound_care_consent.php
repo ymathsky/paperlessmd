@@ -19,15 +19,7 @@ function wcc_checked(array $fd, string $key): string {
 <div class="bwc-form">
 
     <!-- ── Practice Header ─────────────────────────────────────── -->
-    <div class="bwc-header">
-        <img src="<?= BASE_URL ?>/assets/img/logo.png" class="bwc-header-logo" alt="Beyond Wound Care Inc.">
-        <div class="bwc-header-text">
-            <p class="bwc-practice-name">Beyond Wound Care Inc.</p>
-            <p>1340 Remington RD, Ste P &nbsp; Schaumburg, IL 60173</p>
-            <p>Phone: 847.873.8693 &nbsp;&nbsp; Fax: 847.873.8486</p>
-            <p>Email: Support@beyondwoundcare.com</p>
-        </div>
-    </div>
+    <?php $practiceFormTitle = ''; include __DIR__ . '/../practice_header.php'; ?>
 
     <!-- ── Form Title ──────────────────────────────────────────── -->
     <p class="bwc-form-title" style="text-align:center;">INFORMED CONSENT FOR WOUND CARE TREATMENT</p>

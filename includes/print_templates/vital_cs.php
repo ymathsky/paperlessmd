@@ -69,16 +69,7 @@ $vtOptions = ['New', 'Follow Up', 'Sick', 'Post Hospital F/U'];
 ?>
 <div class="bwc-form">
     <!-- Practice Header -->
-    <div class="bwc-header">
-        <img src="<?= BASE_URL ?>/assets/img/logo.png" class="bwc-header-logo" alt="Beyond Wound Care Inc.">
-        <div class="bwc-header-text">
-            <p class="bwc-practice-name">Beyond Wound Care Inc.</p>
-            <p>1340 Remington RD, STE P, Schaumburg, IL 60173</p>
-            <p>Phone: 847-873-8693 &nbsp;&nbsp; Fax: 847-873-8486</p>
-            <p>Support@beyondwoundcare.com</p>
-            <p class="bwc-form-title">CONSENT FORM</p>
-        </div>
-    </div>
+    <?php $practiceFormTitle = 'CONSENT FORM'; include __DIR__ . '/../practice_header.php'; ?>
 
     <!-- Patient / Provider Lines -->
     <div class="bwc-patient-line" style="margin:6pt 0 2pt;">
@@ -99,7 +90,7 @@ $vtOptions = ['New', 'Follow Up', 'Sick', 'Post Hospital F/U'];
             <span style="display:block;border-bottom:1px solid #000;padding-bottom:1pt;"><?= $provider ?></span>
             <span style="display:block;font-size:8pt;color:#666;text-align:center;">(Provider)</span>
         </span>
-        &nbsp;from Beyond Wound Care Inc.
+        &nbsp;from <?= h($patient['company'] ?? 'Beyond Wound Care Inc.') ?>
     </div>
 
     <!-- Visit Type Row -->

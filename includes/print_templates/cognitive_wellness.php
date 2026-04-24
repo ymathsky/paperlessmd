@@ -40,16 +40,7 @@ if (!function_exists('yn2')) { function yn2(array $d, string $k): string {
 </style>
 <div class="bwc-form">
     <!-- Practice Header -->
-    <div class="bwc-header">
-        <img src="<?= BASE_URL ?>/assets/img/logo.png" class="bwc-header-logo" alt="Beyond Wound Care Inc.">
-        <div class="bwc-header-text">
-            <p class="bwc-practice-name">Beyond Wound Care Inc.</p>
-            <p>1340 Remington RD, Ste P &nbsp; Schaumburg, IL 60173</p>
-            <p>Phone: 847.873.8693 &nbsp;&nbsp; Fax: 847.873.8486</p>
-            <p>Email: Support@beyondwoundcare.com</p>
-            <p class="bwc-form-title">Cognitive Wellness Exam</p>
-        </div>
-    </div>
+    <?php $practiceFormTitle = 'Cognitive Wellness Exam'; include __DIR__ . '/../practice_header.php'; ?>
 
     <!-- Patient Info -->
     <div style="display:flex;justify-content:space-between;border-bottom:1px solid #000;padding-bottom:5pt;margin-bottom:10pt;font-size:10pt;">

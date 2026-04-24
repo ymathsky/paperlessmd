@@ -43,8 +43,19 @@ $purposeLabels = [
 
 /* ΓöÇΓöÇ Reusable output functions ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 
-function nppFormHeader(string $formTitle, string $ptName, string $ptDob, string $visitDate): void { ?>
+function nppFormHeader(string $formTitle, string $ptName, string $ptDob, string $visitDate, array $patient = []): void {
+    $_isVmp = (($patient['company'] ?? '') === 'Visiting Medical Physician Inc.');
+    $practiceFormTitle = $formTitle; ?>
 <div class="bwc-header">
+<?php if ($_isVmp): ?>
+    <img src="<?= BASE_URL ?>/assets/img/vmp_logo.png" class="bwc-header-logo" alt="Visiting Medical Physician Inc.">
+    <div class="bwc-header-text">
+        <p class="bwc-practice-name" style="color:#14936d;">Visiting Medical Physician Inc.</p>
+        <p>1340 Remington RD, Suite M &nbsp; Schaumburg, IL 60173</p>
+        <p>Phone: 847.252.1858</p>
+        <p>Email: care@visitingmedicalphysician.com</p>
+    </div>
+<?php else: ?>
     <img src="<?= BASE_URL ?>/assets/img/logo.png" class="bwc-header-logo" alt="Beyond Wound Care">
     <div class="bwc-header-text">
         <p class="bwc-practice-name"><?= h(PRACTICE_NAME) ?></p>
@@ -52,6 +63,7 @@ function nppFormHeader(string $formTitle, string $ptName, string $ptDob, string 
         <p>Phone: <?= h(PRACTICE_PHONE) ?> &nbsp;&nbsp; Fax: <?= h(PRACTICE_FAX) ?></p>
         <p>Email: <?= h(PRACTICE_EMAIL) ?></p>
     </div>
+<?php endif; ?>
 </div>
 <p style="text-align:center;font-size:12pt;font-weight:bold;text-transform:uppercase;letter-spacing:.06em;margin:4pt 0 2pt;">
     <?= h($formTitle) ?>
@@ -164,7 +176,7 @@ function nppFooter(string $formTitle, string $ptName, string $sigDate): void { ?
       /* FORM 1 &mdash; VISIT CONSENT / CS                                  */
       /* ============================================================ */ ?>
 <div class="bwc-form npp-doc">
-<?php nppFormHeader('Visit Consent / Clinical Summary (CS)', $ptName, $ptDob, $visitDate); ?>
+<?php nppFormHeader('Visit Consent / Clinical Summary (CS)', $ptName, $ptDob, $visitDate, $patient); ?>
 
 <div class="npp-g2" style="margin-bottom:6pt;">
     <div><span class="npp-lbl">Provider</span><span class="npp-fld"><?= _npp($fd,'provider_name') ?></span></div>
@@ -241,7 +253,7 @@ function nppFooter(string $formTitle, string $ptName, string $sigDate): void { ?
       /* FORM 2 &mdash; CCM CONSENT                                         */
       /* ============================================================ */ ?>
 <div class="bwc-form npp-doc">
-<?php nppFormHeader('Chronic Care Management (CCM) Consent', $ptName, $ptDob, $visitDate); ?>
+<?php nppFormHeader('Chronic Care Management (CCM) Consent', $ptName, $ptDob, $visitDate, $patient); ?>
 
 <p class="npp-body" style="margin-bottom:6pt;text-align:justify;">
     By signing this form, I consent to <strong><?= h(PRACTICE_NAME) ?></strong> providing Chronic Care Management (CCM) Services.
@@ -292,7 +304,7 @@ function nppFooter(string $formTitle, string $ptName, string $sigDate): void { ?
       /* FORM 3 &mdash; ABN                                                 */
       /* ============================================================ */ ?>
 <div class="bwc-form npp-doc">
-<?php nppFormHeader('Advance Beneficiary Notice of Non-Coverage (ABN) — Form CMS-R-131', $ptName, $ptDob, $visitDate); ?>
+<?php nppFormHeader('Advance Beneficiary Notice of Non-Coverage (ABN) — Form CMS-R-131', $ptName, $ptDob, $visitDate, $patient); ?>
 
 <div class="npp-g2" style="margin-bottom:6pt;">
     <div><span class="npp-lbl">A. Notifier</span><span class="npp-fld"><?= _npp($fd,'notifier', h(PRACTICE_NAME)) ?></span></div>
@@ -350,7 +362,7 @@ foreach ($abnOpts as $opt => $text): ?>
       /* FORM 4 &mdash; INFORMED CONSENT FOR WOUND CARE                     */
       /* ============================================================ */ ?>
 <div class="bwc-form npp-doc" style="font-size:7.8pt;">
-<?php nppFormHeader('Informed Consent for Wound Care Treatment', $ptName, $ptDob, $visitDate); ?>
+<?php nppFormHeader('Informed Consent for Wound Care Treatment', $ptName, $ptDob, $visitDate, $patient); ?>
 
 <div class="npp-g2" style="margin-bottom:3pt;">
     <div><span class="npp-lbl">Patient Name</span><span class="npp-fld"><?= _npp($fd,'wc_patient_name', $ptName) ?></span></div>
@@ -406,7 +418,7 @@ foreach ($abnOpts as $opt => $text): ?>
       /* FORM 5 &mdash; PHI AUTHORIZATION (IL DHS)                          */
       /* ============================================================ */ ?>
 <div class="bwc-form npp-doc">
-<?php nppFormHeader('Authorization to Disclose / Obtain PHI — Illinois DHS', $ptName, $ptDob, $visitDate); ?>
+<?php nppFormHeader('Authorization to Disclose / Obtain PHI — Illinois DHS', $ptName, $ptDob, $visitDate, $patient); ?>
 
 <p class="npp-body" style="margin-bottom:5pt;">
     I authorize <strong><?= h(PRACTICE_NAME) ?></strong> to
@@ -453,7 +465,7 @@ foreach ($abnOpts as $opt => $text): ?>
       /* FORM 6 &mdash; PATIENT FUSION PORTAL CONSENT                       */
       /* ============================================================ */ ?>
 <div class="bwc-form npp-doc">
-<?php nppFormHeader('Patient Fusion Portal — Consent Form', $ptName, $ptDob, $visitDate); ?>
+<?php nppFormHeader('Patient Fusion Portal — Consent Form', $ptName, $ptDob, $visitDate, $patient); ?>
 
 <p class="npp-body" style="margin-bottom:6pt;text-align:justify;">
     I acknowledge that I have read and fully understand this consent form. I have been given the risks and benefits of Patient Fusion and understand the risks associated with online communications between our office and patients. By signing this form and providing an e-mail address, I hereby give my informed consent to participate in Patient Fusion. By declining and not providing an email, my signature indicates that I am informed about Patient Fusion being offered to me, but I do not wish to participate.
