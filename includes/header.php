@@ -120,7 +120,8 @@ if (!isBilling()) {
             <span class="text-[10px] font-bold uppercase tracking-widest text-blue-400/70">Admin</span>
         </div>
         <?php foreach ([
-            ['href' => '/admin/schedule_manage.php', 'key' => 'schedule_manage', 'icon' => 'bi-calendar-week-fill',   'label' => 'Manage Schedule'],
+            ['href' => '/admin/schedule_manage.php',  'key' => 'schedule_manage',  'icon' => 'bi-calendar-week-fill', 'label' => 'Manage Schedule'],
+            ['href' => '/admin/recurring_schedule.php','key' => 'recurring_schedule','icon' => 'bi-arrow-repeat',      'label' => 'Recurring Schedule'],
             ['href' => '/admin/users.php',           'key' => 'users',           'icon' => 'bi-gear-fill',            'label' => 'Manage Staff'],
             ['href' => '/admin/audit_log.php',       'key' => 'audit_log',       'icon' => 'bi-shield-lock-fill',     'label' => 'Audit Log'],
             ['href' => '/admin/settings.php',        'key' => 'settings',        'icon' => 'bi-sliders2-vertical',    'label' => 'Settings'],

@@ -72,6 +72,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'reord
     exit;
 }
 
+// Ensure recurring_rule_id column exists (idempotent)
+try { $pdo->exec("ALTER TABLE `schedule` ADD COLUMN `recurring_rule_id` INT NULL"); } catch (PDOException $e) {}
+
 // Fetch all MAs
 $allMas = $pdo->query("SELECT id, full_name FROM staff WHERE active=1 ORDER BY full_name")->fetchAll();
 
@@ -80,7 +83,7 @@ $allPatients = $pdo->query("SELECT id, CONCAT(first_name,' ',last_name) AS name 
 
 // Fetch schedule grouped by MA
 $schedStmt = $pdo->prepare("
-    SELECT sc.*, 
+    SELECT sc.*,
            CONCAT(p.first_name,' ',p.last_name) AS patient_name,
            p.address AS patient_address,
            s.full_name AS ma_name
@@ -150,6 +153,10 @@ include __DIR__ . '/../includes/header.php';
         <a href="<?= BASE_URL ?>/schedule.php?date=<?= $date ?>"
            class="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-colors">
             <i class="bi bi-eye-fill text-indigo-400"></i> View
+        </a>
+        <a href="<?= BASE_URL ?>/admin/recurring_schedule.php"
+           class="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-colors">
+            <i class="bi bi-arrow-repeat text-indigo-400"></i> Recurring
         </a>
     </div>
 </div>
@@ -311,6 +318,11 @@ include __DIR__ . '/../includes/header.php';
                     $vtLabel  = $vtLabels[$v['visit_type'] ?? 'routine'] ?? 'Routine';
                     ?>
                     <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-700"><?= h($vtLabel) ?></span>
+                    <?php if (!empty($v['recurring_rule_id'])): ?>
+                    <span class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-600">
+                        <i class="bi bi-arrow-repeat text-xs"></i> Recurring
+                    </span>
+                    <?php endif; ?>
                 </div>
                 <?php if ($v['patient_address']): ?>
                 <div class="text-xs text-slate-400 mt-0.5 truncate"><?= h($v['patient_address']) ?></div>
