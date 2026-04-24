@@ -203,10 +203,17 @@ include __DIR__ . '/includes/header.php';
         <div class="space-y-4" style="font-family:Arial,sans-serif;font-size:11px;">
             <!-- Practice header fallback -->
             <div style="text-align:center;margin-bottom:16px;">
-                <p style="font-size:18px;font-weight:bold;margin:0;">Beyond Wound Care Inc.</p>
-                <p style="margin:2px 0;">1340 Remington RD, Ste P &nbsp; Schaumburg, IL 60173</p>
-                <p style="margin:2px 0;">Phone: 847.873.8693 &nbsp;&nbsp; Fax: 847.873.8486</p>
-                <p style="margin:2px 0;">Email: Support@beyondwoundcare.com</p>
+                <?php if (($patient['company'] ?? '') === 'Visiting Medical Physician Inc.'): ?>
+                    <p style="font-size:18px;font-weight:bold;margin:0;color:#14936d;">Visiting Medical Physician Inc.</p>
+                    <p style="margin:2px 0;">1340 Remington RD, Suite M &nbsp; Schaumburg, IL 60173</p>
+                    <p style="margin:2px 0;">Phone: 847.252.1858</p>
+                    <p style="margin:2px 0;">Email: care@visitingmedicalphysician.com</p>
+                <?php else: ?>
+                    <p style="font-size:18px;font-weight:bold;margin:0;">Beyond Wound Care Inc.</p>
+                    <p style="margin:2px 0;">1340 Remington RD, Ste P &nbsp; Schaumburg, IL 60173</p>
+                    <p style="margin:2px 0;">Phone: 847.873.8693 &nbsp;&nbsp; Fax: 847.873.8486</p>
+                    <p style="margin:2px 0;">Email: Support@beyondwoundcare.com</p>
+                <?php endif; ?>
             </div>
             <?php foreach ($data as $key => $value):
                 if (in_array($key, ['csrf_token','patient_id','form_type'], true)) continue;

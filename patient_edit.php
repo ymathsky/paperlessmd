@@ -45,6 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'phone'         => trim($_POST['phone']       ?? ''),
         'email'         => trim($_POST['email']       ?? ''),
         'address'       => trim($_POST['address']     ?? ''),
+        'company'       => trim($_POST['company']     ?? 'Beyond Wound Care Inc.'),
         'insurance'     => trim($_POST['insurance']   ?? ''),
         'pcp'           => trim($_POST['pcp']         ?? ''),
         'status'        => $newStatus,
@@ -54,12 +55,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'First and last name are required.';
     } else {
         $stmt = $pdo->prepare("UPDATE patients
-            SET first_name=?, last_name=?, dob=?, phone=?, email=?, address=?, insurance=?, pcp=?,
+            SET first_name=?, last_name=?, dob=?, phone=?, email=?, address=?, company=?, insurance=?, pcp=?,
                 status=?, discharged_at=?
             WHERE id=?");
         $stmt->execute([
             $vals['first_name'], $vals['last_name'], $vals['dob'] ?: null,
-            $vals['phone'], $vals['email'], $vals['address'],
+            $vals['phone'], $vals['email'], $vals['address'], $vals['company'],
             $vals['insurance'], $vals['pcp'],
             $vals['status'], $vals['discharged_at'],
             $id
@@ -150,11 +151,22 @@ include __DIR__ . '/includes/header.php';
                     </div>
                 </div>
 
-                <div class="mb-4">
-                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Email Address</label>
-                    <input type="email" name="email" value="<?= h($vals['email']) ?>"
-                           class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
-                                  focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Email Address</label>
+                        <input type="email" name="email" value="<?= h($vals['email']) ?>"
+                               class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
+                                      focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Company</label>
+                        <select name="company"
+                                class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
+                                       focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition">
+                            <option value="Beyond Wound Care Inc." <?= ($vals['company'] ?? 'Beyond Wound Care Inc.') === 'Beyond Wound Care Inc.' ? 'selected' : '' ?>>Beyond Wound Care Inc.</option>
+                            <option value="Visiting Medical Physician Inc." <?= ($vals['company'] ?? '') === 'Visiting Medical Physician Inc.' ? 'selected' : '' ?>>Visiting Medical Physician Inc.</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="mb-4">
