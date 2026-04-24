@@ -6,6 +6,15 @@ $_esignCount = 0;
 if (!isBilling()) {
     $_esignCount = (int)$pdo->query("SELECT COUNT(*) FROM form_submissions WHERE status IN ('signed','uploaded') AND (provider_signature IS NULL OR provider_signature = '')")->fetchColumn();
 }
+// Notification data
+$_pendingUpload = 0;
+$_oldDrafts     = 0;
+if (!isBilling()) {
+    try {
+        $_pendingUpload = (int)$pdo->query("SELECT COUNT(*) FROM form_submissions WHERE status = 'signed'")->fetchColumn();
+        $_oldDrafts     = (int)$pdo->query("SELECT COUNT(*) FROM form_submissions WHERE status = 'draft' AND created_at < DATE_SUB(NOW(), INTERVAL 24 HOUR)")->fetchColumn();
+    } catch (PDOException $e) {}
+}
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -90,6 +99,11 @@ if (!isBilling()) {
             }
         } catch (PDOException $e) { /* messages table not yet migrated */ }
 
+        $_totalNotifCount = ($_unreadMessages  > 0 ? 1 : 0)
+                          + ($_pendingUpload  > 0 ? 1 : 0)
+                          + ($_esignCount     > 0 ? 1 : 0)
+                          + ($_oldDrafts      > 0 ? 1 : 0);
+
         $navItems = [
             ['href' => '/dashboard.php', 'key' => 'dashboard', 'icon' => 'bi-speedometer2',    'label' => 'Dashboard'],
             ['href' => '/patients.php',  'key' => 'patients',  'icon' => 'bi-people-fill',     'label' => 'Patients'],
@@ -97,7 +111,16 @@ if (!isBilling()) {
             ['href' => '/esign_queue.php','key'=> 'esign',     'icon' => 'bi-pen-fill',        'label' => 'Sign Queue', 'billingHide' => true, 'badge' => $_esignCount, 'badgeCls' => 'bg-violet-500'],
             ['href' => '/messages.php',  'key' => 'messages',  'icon' => 'bi-chat-dots-fill',  'label' => 'Messages',   'badge' => $_unreadMessages, 'badgeCls' => 'bg-emerald-500'],
         ];
-        foreach ($navItems as $n):
+        ?>
+        <!-- Search trigger -->
+        <button data-search-trigger
+                class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
+                       text-blue-200 hover:bg-white/10 hover:text-white transition-all duration-150 w-full text-left mb-1">
+            <i class="bi bi-search text-base w-5 shrink-0 text-center"></i>
+            <span class="flex-1">Search</span>
+            <kbd class="text-[9px] text-blue-400/70 bg-white/10 px-1.5 py-0.5 rounded leading-none font-mono">Ctrl K</kbd>
+        </button>
+        <?php foreach ($navItems as $n):
             if (!empty($n['billingHide']) && isBilling()) continue;
             $active = ($activeNav ?? '') === $n['key'];
         ?>
@@ -113,6 +136,14 @@ if (!isBilling()) {
             <?php endif; ?>
         </a>
         <?php endforeach; ?>
+        <!-- Notifications bell -->
+        <button data-notif-trigger
+                class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium
+                       text-blue-200 hover:bg-white/10 hover:text-white transition-all duration-150 w-full text-left mt-0.5">
+            <i class="bi bi-bell-fill text-base w-5 shrink-0 text-center"></i>
+            <span class="flex-1">Notifications</span>
+            <span id="notifBadge" class="hidden bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none min-w-[18px] text-center">0</span>
+        </button>
 
         <?php if (isAdmin()): ?>
         <!-- Admin section divider -->
@@ -180,9 +211,22 @@ if (!isBilling()) {
         </div>
         <span class="text-white font-bold text-sm"><?= APP_NAME ?></span>
     </a>
-    <button id="mBtn" class="bg-white/15 hover:bg-white/25 text-white p-2 rounded-xl transition-colors">
-        <i class="bi bi-list text-xl leading-none"></i>
-    </button>
+    <div class="flex items-center gap-1">
+        <button data-search-trigger
+                class="bg-white/15 hover:bg-white/25 text-white p-2 rounded-xl transition-colors"
+                title="Search (Ctrl+K)">
+            <i class="bi bi-search text-lg leading-none"></i>
+        </button>
+        <button data-notif-trigger
+                class="relative bg-white/15 hover:bg-white/25 text-white p-2 rounded-xl transition-colors"
+                title="Notifications">
+            <i class="bi bi-bell-fill text-lg leading-none"></i>
+            <span id="notifBadgeMobile" class="hidden absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center leading-none">0</span>
+        </button>
+        <button id="mBtn" class="bg-white/15 hover:bg-white/25 text-white p-2 rounded-xl transition-colors">
+            <i class="bi bi-list text-xl leading-none"></i>
+        </button>
+    </div>
 </header>
 
 <!-- Sidebar backdrop (mobile) -->
