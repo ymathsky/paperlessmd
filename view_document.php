@@ -59,8 +59,8 @@ $patient = [
     'last_name'  => $doc['last_name'],
     'dob'        => $doc['dob'],
     'insurance'  => $doc['insurance'],
-    'company'    => $doc['company'] ?? '',
-    'phone'      => '',
+    'company'    => $data['company'] ?? ($doc['company'] ?? ''),
+    'phone'      => '',,
     'address'    => '',
     'email'      => '',
 ];

@@ -130,6 +130,7 @@ include __DIR__ . '/../includes/header.php';
         <input type="hidden" id="wiz-form-key"  value="vital_cs_<?= $patient_id ?>">
 
         <div class="px-6 pb-2">
+        <?php include __DIR__ . '/../includes/form_company_selector.php'; ?>
 
         <!-- â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•— -->
         <!-- â•‘  STEP 1 &mdash; Visit Info             â•‘ -->

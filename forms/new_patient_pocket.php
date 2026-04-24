@@ -122,6 +122,7 @@ include __DIR__ . '/../includes/header.php';
         <input type="hidden" id="wiz-form-key"  value="new_patient_pocket_<?= $patient_id ?>">
 
         <div class="px-6 pb-2">
+        <?php include __DIR__ . '/../includes/form_company_selector.php'; ?>
 
         <!-- ═══════════════════════════════════════════════════════ -->
         <!-- STEP 0 — Visit Info (CS)                               -->

@@ -115,6 +115,7 @@ function sectionHeader($num, $title, $icon='bi-circle-fill', $color='sky') {
         <input type="hidden" id="wiz-form-key" value="medicare_awv_<?= $patient_id ?>">
 
         <div class="px-6 pb-2">
+        <?php include __DIR__ . '/../includes/form_company_selector.php'; ?>
 
             <!-- Step 0: Demographics & Lifestyle -->
             <div class="wiz-step space-y-8 py-4" data-step="0" data-title="Demographics &amp; Lifestyle" data-icon="bi-person-badge">

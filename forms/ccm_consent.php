@@ -9,7 +9,7 @@ $pStmt = $pdo->prepare("SELECT * FROM patients WHERE id = ?");
 $pStmt->execute([$patient_id]);
 $patient = $pStmt->fetch();
 if (!$patient) { header('Location: ' . BASE_URL . '/patients.php'); exit; }
-$_coName = ($patient['company'] ?? '') === 'Visiting Medical Physician Inc.' ? 'Visiting Medical Physician Inc.' : 'Beyond Wound Care Inc.';
+$_coName = 'Beyond Wound Care Inc.';
 $_coUC   = strtoupper($_coName);
 
 // One-signature rule: redirect to existing signed form if already signed today
@@ -61,6 +61,7 @@ include __DIR__ . '/../includes/header.php';
         <input type="hidden" id="wiz-form-key" value="ccm_consent_<?= $patient_id ?>">
 
         <div class="px-6 pb-2">
+        <?php include __DIR__ . '/../includes/form_company_selector.php'; ?>
 
             <!-- Step 0: About CCM -->
             <div class="wiz-step space-y-6 py-4" data-step="0" data-title="About CCM" data-icon="bi-heart-pulse">
@@ -75,7 +76,7 @@ include __DIR__ . '/../includes/header.php';
             <!-- Agreement Text -->
             <div class="bg-slate-50 border border-slate-200 rounded-xl p-5 text-sm text-slate-700 space-y-3 leading-relaxed">
                 <p>
-                    By signing this Agreement, you consent to <strong><?= h($_coName) ?></strong> (referred to as "Provider"),
+                    By signing this Agreement, you consent to <strong class="co-name-display">Beyond Wound Care Inc.</strong> (referred to as "Provider"),
                     providing chronic care management services (referred to as "CCM Services") to you as more fully described below.
                 </p>
                 <p>
@@ -147,7 +148,7 @@ include __DIR__ . '/../includes/header.php';
                     </li>
                     <li class="flex items-start gap-2">
                         <i class="bi bi-info-circle flex-shrink-0 mt-0.5"></i>
-                        You have the right to stop CCM Services at any time by revoking this Agreement effective at the end of the then-current month. You may revoke this agreement verbally or in writing to <strong><?= h($_coName) ?></strong>.
+                        You have the right to stop CCM Services at any time by revoking this Agreement effective at the end of the then-current month. You may revoke this agreement verbally or in writing to <strong class="co-name-display">Beyond Wound Care Inc.</strong>.
                     </li>
                 </ul>
             </div>

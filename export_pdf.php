@@ -244,6 +244,9 @@ if (!function_exists('vdArr')) {
     <?php foreach ($forms as $idx => $f):
         $fd    = $formDefs[$f['form_type']] ?? ['label' => $f['form_type'], 'color' => '#475569'];
         $data  = json_decode($f['form_data'] ?? '{}', true) ?: [];
+        // Company is stored per-form in form_data; override patient row so all
+        // print templates and practice_header.php pick up the correct branding.
+        $patient['company'] = $data['company'] ?? $patient['company'];
         $stLbl = $statusLabel[$f['status']] ?? 'Draft';
         $stBg  = ['draft' => 'bg-slate-100 text-slate-600', 'signed' => 'bg-blue-100 text-blue-700', 'uploaded' => 'bg-emerald-100 text-emerald-700'][$f['status']] ?? 'bg-slate-100 text-slate-600';
         $isLast = $idx === count($forms) - 1;

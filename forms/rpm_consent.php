@@ -50,6 +50,7 @@ include __DIR__ . '/../includes/header.php';
         <input type="hidden" name="form_type"  value="rpm_consent">
 
         <div class="px-6 py-6 space-y-6">
+        <?php include __DIR__ . '/../includes/form_company_selector.php'; ?>
 
             <!-- Patient name -->
             <div class="max-w-sm">

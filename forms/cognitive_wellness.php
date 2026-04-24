@@ -102,6 +102,7 @@ include __DIR__ . '/../includes/header.php';
         <input type="hidden" id="wiz-form-key" value="cognitive_wellness_<?= $patient_id ?>">
 
         <div class="px-6 pb-2">
+        <?php include __DIR__ . '/../includes/form_company_selector.php'; ?>
 
             <!-- Step 0: Patient Exam -->
             <div class="wiz-step space-y-6 py-4" data-step="0" data-title="Patient Exam" data-icon="bi-person-bounding-box">

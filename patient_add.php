@@ -8,7 +8,7 @@ $pageTitle = 'Add Patient';
 $activeNav = 'patients';
 
 $error = '';
-$vals  = ['first_name'=>'','last_name'=>'','dob'=>'','phone'=>'','email'=>'','address'=>'','company'=>'Beyond Wound Care Inc.','insurance'=>'','pcp'=>''];
+$vals  = ['first_name'=>'','last_name'=>'','dob'=>'','phone'=>'','email'=>'','address'=>'','insurance'=>'','pcp'=>''];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     verifyCsrf();
@@ -19,7 +19,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'phone'      => trim($_POST['phone']       ?? ''),
         'email'      => trim($_POST['email']       ?? ''),
         'address'    => trim($_POST['address']     ?? ''),
-        'company'    => trim($_POST['company']     ?? 'Beyond Wound Care Inc.'),
         'insurance'  => trim($_POST['insurance']   ?? ''),
         'pcp'        => trim($_POST['pcp']         ?? ''),
     ];
@@ -27,9 +26,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'First and last name are required.';
     } else {
         $stmt = $pdo->prepare("INSERT INTO patients
-            (first_name, last_name, dob, phone, email, address, company, insurance, pcp, created_at)
-            VALUES (?,?,?,?,?,?,?,?,?,NOW())");
-        $stmt->execute(array_values($vals));
+            (first_name, last_name, dob, phone, email, address, insurance, pcp, created_at)
+            VALUES (?,?,?,?,?,?,?,?,NOW())");
+        $stmt->execute([$vals['first_name'], $vals['last_name'], $vals['dob'], $vals['phone'], $vals['email'], $vals['address'], $vals['insurance'], $vals['pcp']]);
         $id = $pdo->lastInsertId();
         auditLog($pdo, 'patient_add', 'patient', (int)$id, $vals['first_name'] . ' ' . $vals['last_name']);
         header('Location: ' . BASE_URL . '/patient_view.php?id=' . $id . '&msg=created');
@@ -116,13 +115,11 @@ include __DIR__ . '/includes/header.php';
                                placeholder="patient@email.com">
                     </div>
                     <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Company</label>
-                        <select name="company"
-                                class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
-                                       focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition">
-                            <option value="Beyond Wound Care Inc." <?= $vals['company'] === 'Beyond Wound Care Inc.' ? 'selected' : '' ?>>Beyond Wound Care Inc.</option>
-                            <option value="Visiting Medical Physician Inc." <?= $vals['company'] === 'Visiting Medical Physician Inc.' ? 'selected' : '' ?>>Visiting Medical Physician Inc.</option>
-                        </select>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Phone</label>
+                        <input type="tel" name="phone" value="<?= h($vals['phone']) ?>"
+                               class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
+                                      focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition"
+                               placeholder="(555) 555-5555">
                     </div>
                 </div>
 

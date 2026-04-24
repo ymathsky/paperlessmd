@@ -59,6 +59,7 @@ include __DIR__ . '/../includes/header.php';
         <input type="hidden" id="wiz-form-key" value="pf_signup_<?= $patient_id ?>">
 
         <div class="px-6 pb-2">
+        <?php include __DIR__ . '/../includes/form_company_selector.php'; ?>
 
             <!-- Step 0: Consent & Decision -->
             <div class="wiz-step space-y-6 py-4" data-step="0" data-title="Consent &amp; Decision" data-icon="bi-globe">
