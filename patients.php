@@ -54,6 +54,34 @@ $cs->execute($countParams);
 $total = (int)$cs->fetchColumn();
 $pages = (int)ceil($total / $perPage);
 
+/* ── Analytics (always across ALL patients, not filtered) ─── */
+$analytics = $pdo->query("
+    SELECT
+        p.company,
+        COUNT(*)                                                            AS total,
+        SUM(p.status = 'active')                                           AS active,
+        SUM(p.status = 'inactive')                                         AS inactive,
+        SUM(p.status = 'discharged')                                       AS discharged,
+        COUNT(DISTINCT fs.id)                                              AS forms,
+        SUM(fs.status = 'signed')                                          AS pending_upload,
+        COUNT(DISTINCT wp.id)                                              AS photos
+    FROM patients p
+    LEFT JOIN form_submissions fs ON fs.patient_id = p.id
+    LEFT JOIN wound_photos wp     ON wp.patient_id = p.id
+    GROUP BY p.company
+")->fetchAll(PDO::FETCH_GROUP | PDO::FETCH_UNIQUE);
+
+// Normalise so both companies always have a row
+$companies = [
+    'Beyond Wound Care Inc.'          => ['label'=>'Beyond Wound Care',       'color'=>'blue',  'icon'=>'bi-hospital'],
+    'Visiting Medical Physician Inc.' => ['label'=>'Visiting Medical Physician','color'=>'teal', 'icon'=>'bi-heart-pulse'],
+];
+foreach ($companies as $name => $_) {
+    if (!isset($analytics[$name])) {
+        $analytics[$name] = ['total'=>0,'active'=>0,'inactive'=>0,'discharged'=>0,'forms'=>0,'pending_upload'=>0,'photos'=>0];
+    }
+}
+
 include __DIR__ . '/includes/header.php';
 ?>
 
@@ -67,6 +95,75 @@ include __DIR__ . '/includes/header.php';
        class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-all shadow-sm hover:shadow-md active:scale-95">
         <i class="bi bi-person-plus-fill"></i> Add Patient
     </a>
+</div>
+
+<!-- ── Analytics ─────────────────────────────────────────── -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-6">
+<?php
+$colorMap = [
+    'blue' => ['card'=>'border-blue-200 bg-blue-50/40',  'title'=>'text-blue-800',  'icon'=>'bg-blue-600',  'badge_active'=>'bg-blue-100 text-blue-700',   'badge_inactive'=>'bg-amber-100 text-amber-700',   'badge_dis'=>'bg-red-100 text-red-700',   'stat'=>'text-blue-700',  'bar'=>'bg-blue-500',  'pending'=>'bg-amber-100 text-amber-700', 'photos'=>'bg-violet-100 text-violet-700'],
+    'teal' => ['card'=>'border-teal-200 bg-teal-50/40',  'title'=>'text-teal-800',  'icon'=>'bg-teal-600',  'badge_active'=>'bg-teal-100 text-teal-700',   'badge_inactive'=>'bg-amber-100 text-amber-700',   'badge_dis'=>'bg-red-100 text-red-700',   'stat'=>'text-teal-700',  'bar'=>'bg-teal-500',  'pending'=>'bg-amber-100 text-amber-700', 'photos'=>'bg-violet-100 text-violet-700'],
+];
+foreach ($companies as $coName => $coCfg):
+    $row = $analytics[$coName];
+    $c   = $colorMap[$coCfg['color']];
+    $activeRatio = $row['total'] > 0 ? round(($row['active'] / $row['total']) * 100) : 0;
+?>
+<div class="bg-white rounded-2xl border <?= $c['card'] ?> shadow-sm p-5">
+    <!-- Company header -->
+    <div class="flex items-center gap-3 mb-4 pb-3 border-b border-slate-100">
+        <div class="w-9 h-9 rounded-xl <?= $c['icon'] ?> grid place-items-center text-white flex-shrink-0 shadow-sm">
+            <i class="bi <?= $coCfg['icon'] ?> text-base"></i>
+        </div>
+        <div>
+            <p class="font-bold <?= $c['title'] ?> text-sm leading-tight"><?= $coCfg['label'] ?></p>
+            <p class="text-xs text-slate-400"><?= $coName ?></p>
+        </div>
+        <span class="ml-auto text-2xl font-extrabold <?= $c['stat'] ?>"><?= $row['total'] ?></span>
+    </div>
+
+    <!-- Status breakdown -->
+    <div class="flex gap-2 flex-wrap mb-4">
+        <a href="<?= BASE_URL ?>/patients.php?status=active" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold <?= $c['badge_active'] ?> hover:opacity-80 transition">
+            <i class="bi bi-circle-fill text-[8px]"></i> <?= $row['active'] ?> Active
+        </a>
+        <a href="<?= BASE_URL ?>/patients.php?status=inactive" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold <?= $c['badge_inactive'] ?> hover:opacity-80 transition">
+            <i class="bi bi-circle-fill text-[8px]"></i> <?= $row['inactive'] ?> Inactive
+        </a>
+        <a href="<?= BASE_URL ?>/patients.php?status=discharged" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold <?= $c['badge_dis'] ?> hover:opacity-80 transition">
+            <i class="bi bi-circle-fill text-[8px]"></i> <?= $row['discharged'] ?> Discharged
+        </a>
+    </div>
+
+    <!-- Activity bar -->
+    <?php if ($row['total'] > 0): ?>
+    <div class="mb-4">
+        <div class="flex justify-between text-xs text-slate-500 mb-1">
+            <span>Active rate</span><span><?= $activeRatio ?>%</span>
+        </div>
+        <div class="w-full bg-slate-100 rounded-full h-2">
+            <div class="<?= $c['bar'] ?> h-2 rounded-full transition-all" style="width:<?= $activeRatio ?>%"></div>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <!-- Forms / Photos / Pending -->
+    <div class="grid grid-cols-3 gap-3">
+        <div class="bg-slate-50 rounded-xl p-3 text-center border border-slate-100">
+            <p class="text-xl font-extrabold text-slate-700"><?= number_format($row['forms']) ?></p>
+            <p class="text-xs text-slate-400 mt-0.5">Total Forms</p>
+        </div>
+        <div class="bg-slate-50 rounded-xl p-3 text-center border border-slate-100">
+            <p class="text-xl font-extrabold <?= $row['pending_upload'] > 0 ? 'text-amber-600' : 'text-slate-700' ?>"><?= $row['pending_upload'] ?></p>
+            <p class="text-xs text-slate-400 mt-0.5">Pending Upload</p>
+        </div>
+        <div class="bg-slate-50 rounded-xl p-3 text-center border border-slate-100">
+            <p class="text-xl font-extrabold text-violet-600"><?= number_format($row['photos']) ?></p>
+            <p class="text-xs text-slate-400 mt-0.5">Photos</p>
+        </div>
+    </div>
+</div>
+<?php endforeach; ?>
 </div>
 
 <!-- Search + Filter Bar -->
