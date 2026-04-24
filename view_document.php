@@ -8,7 +8,7 @@ $id = (int)($_GET['id'] ?? 0);
 if (!$id) { header('Location: ' . BASE_URL . '/dashboard.php'); exit; }
 
 $stmt = $pdo->prepare("
-    SELECT fs.*, p.first_name, p.last_name, p.dob, p.insurance, s.full_name AS ma_name
+    SELECT fs.*, p.first_name, p.last_name, p.dob, p.insurance, p.company, s.full_name AS ma_name
     FROM form_submissions fs
     JOIN patients p ON p.id = fs.patient_id
     LEFT JOIN staff s ON s.id = fs.ma_id
@@ -59,6 +59,7 @@ $patient = [
     'last_name'  => $doc['last_name'],
     'dob'        => $doc['dob'],
     'insurance'  => $doc['insurance'],
+    'company'    => $doc['company'] ?? '',
     'phone'      => '',
     'address'    => '',
     'email'      => '',
