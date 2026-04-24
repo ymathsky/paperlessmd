@@ -1,592 +1,163 @@
 <?php
-// ── Error safety net: catches fatal errors try/catch can't reach ──────────────
 register_shutdown_function(function () {
     $err = error_get_last();
     if ($err && ($err['type'] & (E_ERROR | E_PARSE | E_CORE_ERROR | E_COMPILE_ERROR | E_USER_ERROR))) {
         while (ob_get_level() > 0) ob_end_clean();
         if (!headers_sent()) {
             http_response_code(500);
-            header('Content-Type: application/json; charset=utf-8');
+            header("Content-Type: application/json; charset=utf-8");
         }
-        echo json_encode([
-            'ok'     => false,
-            'error'  => 'Fatal PHP error',
-            '_debug' => $err['message'] . ' in ' . basename($err['file']) . ':' . $err['line'],
-        ]);
+        echo json_encode(["ok"=>false, "error"=>"Fatal PHP error", "_debug"=>$err["message"]]);
     }
 });
 
-ini_set('display_errors', '0');
+ini_set("display_errors", "0");
 error_reporting(E_ALL & ~E_NOTICE & ~E_DEPRECATED);
 
-// Buffer includes so any stray die()/warning output is captured
 ob_start();
-require_once __DIR__ . '/../includes/auth.php';
-require_once __DIR__ . '/../includes/db.php';
-require_once __DIR__ . '/../includes/audit.php';
-ob_end_clean(); // discard any buffered output from includes
+require_once __DIR__ . "/../includes/auth.php";
+require_once __DIR__ . "/../includes/db.php";
+require_once __DIR__ . "/../includes/audit.php";
+ob_end_clean();
 
 requireLogin();
 
-$me     = (int)$_SESSION['user_id'];
-$action = $_GET['action'] ?? ($_POST['action'] ?? '');
+$me = (int)$_SESSION["user_id"];
+$action = $_GET["action"] ?? ($_POST["action"] ?? "");
 
-// Download served as binary — must bypass JSON header
-if ($action === 'download') {
-    handleDownload();
+if ($action === "download") {
+    $id = (int)$_GET["file_id"];
+    $stmt = $pdo->prepare("SELECT a.*, m.to_user_id, m.from_user_id FROM message_attachments a JOIN messages m ON m.id = a.message_id WHERE a.id = ?");
+    $stmt->execute([$id]);
+    $file = $stmt->fetch();
+    if (!$file) { http_response_code(404); exit("Not found."); }
+    
+    $isAdmin = ($_SESSION["role"] ?? "") === "admin";
+    $canSee = $isAdmin || $file["from_user_id"] == $me || $file["to_user_id"] === null || $file["to_user_id"] == $me;
+    if (!$canSee) { http_response_code(403); exit("Denied."); }
+
+    $path = __DIR__ . "/../uploads/messages/" . $file["stored_name"];
+    if (!file_exists($path)) { http_response_code(404); exit("Disk false."); }
+
+    header("Content-Type: " . ($file["mime_type"] ?: "application/octet-stream"));
+    header("Content-Disposition: inline; filename=\"" . addslashes($file["original_name"]) . "\"");
+    header("Content-Length: " . filesize($path));
+    readfile($path);
     exit;
 }
 
-header('Content-Type: application/json; charset=utf-8');
-header('Cache-Control: no-store, no-cache, must-revalidate');
-header('Pragma: no-cache');
+header("Content-Type: application/json; charset=utf-8");
+header("Cache-Control: no-store, no-cache, must-revalidate");
 
 try {
-    switch ($action) {
-        case 'list':          handleList();         break;
-        case 'thread':        handleThread();       break;
-        case 'send':          handleSend();         break;
-        case 'users':         handleUsers();        break;
-        case 'unread_count':  handleUnreadCount();  break;
-        case 'delete':        handleDelete();       break;
-        default:
-            http_response_code(400);
-            echo json_encode(['ok' => false, 'error' => 'Unknown action']);
-    }
-} catch (PDOException $e) {
-    while (ob_get_level()) ob_end_clean();
-    http_response_code(503);
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['ok' => false, 'error' => 'Database error', '_debug' => $e->getMessage()]);
-} catch (\Throwable $e) {
-    while (ob_get_level()) ob_end_clean();
-    error_log('messages API: ' . $e->getMessage());
-    http_response_code(500);
-    header('Content-Type: application/json; charset=utf-8');
-    echo json_encode(['ok' => false, 'error' => 'Server error', '_debug' => $e->getMessage()]);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// LIST  — thread roots visible to current user, newest-activity first
-// 4 simple queries merged in PHP — no complex GROUP BY, no named params
-// ─────────────────────────────────────────────────────────────────────────────
-function handleList(): void
-{
-    global $pdo, $me;
-
-    // ── 1. Root messages visible to me ────────────────────────────────────────
-    $isAdmin = ($_SESSION['role'] ?? '') === 'admin';
-
-    if ($isAdmin) {
-        // Admins see all conversations
-        $stmt = $pdo->prepare("
-            SELECT m.id, m.subject, m.from_user_id, m.to_user_id, m.created_at,
-                   sf.full_name                        AS from_name,
-                   sf.role                             AS from_role,
-                   COALESCE(st.full_name, 'All Staff') AS to_name
-            FROM   messages m
-            JOIN   staff sf ON sf.id = m.from_user_id
-            LEFT   JOIN staff st ON st.id = m.to_user_id
-            WHERE  m.parent_id IS NULL
-            ORDER  BY m.created_at DESC
-            LIMIT  200
-        ");
-        $stmt->execute([]);
-    } else {
-        $stmt = $pdo->prepare("
-            SELECT m.id, m.subject, m.from_user_id, m.to_user_id, m.created_at,
-                   sf.full_name                        AS from_name,
-                   sf.role                             AS from_role,
-                   COALESCE(st.full_name, 'All Staff') AS to_name
-            FROM   messages m
-            JOIN   staff sf ON sf.id = m.from_user_id
-            LEFT   JOIN staff st ON st.id = m.to_user_id
-            WHERE  m.parent_id IS NULL
-              AND  (m.from_user_id = ? OR m.to_user_id = ? OR m.to_user_id IS NULL)
-            ORDER  BY m.created_at DESC
-            LIMIT  200
-        ");
-        $stmt->execute([$me, $me]);
-    }
-    $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    if (empty($rows)) {
-        echo json_encode(['ok' => true, 'conversations' => []]);
-        return;
-    }
-
-    $rootIds = array_map('intval', array_column($rows, 'id'));
-    $ph      = implode(',', array_fill(0, count($rootIds), '?'));
-
-    // ── 2. Last activity per thread (GROUP BY only the grouped column) ─────────
-    $actStmt = $pdo->prepare("
-        SELECT COALESCE(parent_id, id) AS root_id,
-               MAX(created_at)         AS last_activity
-        FROM   messages
-        WHERE  COALESCE(parent_id, id) IN ($ph)
-        GROUP  BY COALESCE(parent_id, id)
-    ");
-    $actStmt->execute($rootIds);
-    $actMap = [];
-    foreach ($actStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
-        $actMap[(int)$r['root_id']] = $r['last_activity'];
-    }
-
-    // ── 3. Latest body preview per thread (ORDER BY + PHP first-seen dedup) ───
-    $bodyStmt = $pdo->prepare("
-        SELECT COALESCE(parent_id, id) AS root_id,
-               LEFT(body, 120)         AS snippet,
-               created_at
-        FROM   messages
-        WHERE  COALESCE(parent_id, id) IN ($ph)
-        ORDER  BY created_at DESC
-    ");
-    $bodyStmt->execute($rootIds);
-    $bodyMap = [];
-    foreach ($bodyStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
-        $rid = (int)$r['root_id'];
-        if (!isset($bodyMap[$rid])) $bodyMap[$rid] = $r['snippet'];
-    }
-
-    // ── 4. Unread count per thread (GROUP BY only the grouped column) ─────────
-    $unreadStmt = $pdo->prepare("
-        SELECT COALESCE(m.parent_id, m.id) AS root_id,
-               COUNT(*)                    AS unread_count
-        FROM   messages m
-        LEFT   JOIN message_reads mr
-                    ON  mr.message_id = m.id
-                    AND mr.user_id    = ?
-        WHERE  m.from_user_id != ?
-          AND  mr.id IS NULL
-          AND  COALESCE(m.parent_id, m.id) IN ($ph)
-        GROUP  BY COALESCE(m.parent_id, m.id)
-    ");
-    $unreadStmt->execute(array_merge([$me, $me], $rootIds));
-    $unreadMap = [];
-    foreach ($unreadStmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
-        $unreadMap[(int)$r['root_id']] = (int)$r['unread_count'];
-    }
-
-    // ── 5. Merge and sort by last activity ────────────────────────────────────
-    foreach ($rows as &$row) {
-        $rid                  = (int)$row['id'];
-        $row['last_activity'] = $actMap[$rid] ?? $row['created_at'];
-        $row['last_body']     = $bodyMap[$rid] ?? '';
-        $row['unread_count']  = $unreadMap[$rid] ?? 0;
-    }
-    unset($row);
-
-    usort($rows, fn($a, $b) => strcmp($b['last_activity'], $a['last_activity']));
-
-    echo json_encode(['ok' => true, 'conversations' => $rows]);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// THREAD  — full message thread (root + replies), marks messages read
-// ─────────────────────────────────────────────────────────────────────────────
-function handleThread(): void
-{
-    global $pdo, $me;
-
-    $rootId = (int)($_GET['id'] ?? 0);
-    if (!$rootId) {
-        http_response_code(400);
-        echo json_encode(['ok' => false, 'error' => 'Missing id']);
-        return;
-    }
-
-    $stmt = $pdo->prepare("SELECT * FROM messages WHERE id = ? AND parent_id IS NULL");
-    $stmt->execute([$rootId]);
-    $root = $stmt->fetch();
-
-    if (!$root) {
-        http_response_code(404);
-        echo json_encode(['ok' => false, 'error' => 'Not found']);
-        return;
-    }
-
-    // Access: I sent it, it was sent to me, broadcast, or admin
-    $canSee = (int)$root['from_user_id'] === $me
-           || (int)$root['to_user_id']   === $me
-           || $root['to_user_id']        === null
-           || isAdmin();
-
-    if (!$canSee) {
-        http_response_code(403);
-        echo json_encode(['ok' => false, 'error' => 'Forbidden']);
-        return;
-    }
-
-    // All messages in thread
-    $stmt = $pdo->prepare("
-        SELECT m.*, s.full_name AS from_name, s.role AS from_role
-        FROM   messages m
-        JOIN   staff s ON s.id = m.from_user_id
-        WHERE  m.id = ? OR m.parent_id = ?
-        ORDER  BY m.created_at ASC
-    ");
-    $stmt->execute([$rootId, $rootId]);
-    $messages = $stmt->fetchAll();
-
-    if (!$messages) {
-        echo json_encode(['ok' => true, 'messages' => [], 'root' => $root]);
-        return;
-    }
-
-    // Attachments
-    $ids = array_column($messages, 'id');
-    $ph  = implode(',', array_fill(0, count($ids), '?'));
-    $attStmt = $pdo->prepare(
-        "SELECT * FROM message_attachments WHERE message_id IN ($ph) ORDER BY created_at ASC"
-    );
-    $attStmt->execute($ids);
-    $attMap = [];
-    foreach ($attStmt->fetchAll() as $a) {
-        $attMap[(int)$a['message_id']][] = $a;
-    }
-
-    // Mark read + attach data
-    $markRead = $pdo->prepare(
-        "INSERT IGNORE INTO message_reads (message_id, user_id) VALUES (?, ?)"
-    );
-    foreach ($messages as &$msg) {
-        $msg['attachments'] = $attMap[(int)$msg['id']] ?? [];
-        if ((int)$msg['from_user_id'] !== $me) {
-            try { $markRead->execute([$msg['id'], $me]); } catch (PDOException $e) { /* ignore */ }
+    if ($action === "sync") {
+        $activeChat = $_GET["active_chat"] ?? ""; 
+        $lastMsgId = (int)($_GET["last_msg_id"] ?? 0);
+        
+        $response = ["ok" => true, "chats" => [], "messages" => []];
+        
+        $sql = "SELECT u.id, u.full_name, u.role,
+               (SELECT m.body FROM messages m WHERE ((m.from_user_id = ? AND m.to_user_id = u.id) OR (m.from_user_id = u.id AND m.to_user_id = ?)) ORDER BY m.created_at DESC LIMIT 1) as latest_body,
+               (SELECT m.created_at FROM messages m WHERE ((m.from_user_id = ? AND m.to_user_id = u.id) OR (m.from_user_id = u.id AND m.to_user_id = ?)) ORDER BY m.created_at DESC LIMIT 1) as latest_time,
+               (SELECT COUNT(*) FROM messages m WHERE m.from_user_id = u.id AND m.to_user_id = ? AND NOT EXISTS (SELECT 1 FROM message_reads mr WHERE mr.message_id = m.id AND mr.user_id = ?)) as unreads
+            FROM staff u WHERE u.active = 1 AND u.id != ? ORDER BY u.full_name ASC";
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute([$me, $me, $me, $me, $me, $me, $me]);
+        $users = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        $sqlAll = "SELECT (SELECT m.body FROM messages m WHERE m.to_user_id IS NULL ORDER BY m.created_at DESC LIMIT 1) as latest_body,
+               (SELECT m.created_at FROM messages m WHERE m.to_user_id IS NULL ORDER BY m.created_at DESC LIMIT 1) as latest_time,
+               (SELECT COUNT(*) FROM messages m WHERE m.to_user_id IS NULL AND m.from_user_id != ? AND NOT EXISTS (SELECT 1 FROM message_reads mr WHERE mr.message_id = m.id AND mr.user_id = ?)) as unreads";
+        $stmtAll = $pdo->prepare($sqlAll);
+        $stmtAll->execute([$me, $me]);
+        $allStaff = $stmtAll->fetch(PDO::FETCH_ASSOC);
+        
+        $chats = [];
+        $chats[] = ["id" => "all", "name" => "All Staff", "role" => "Broadcast", "latest_body" => $allStaff["latest_body"], "latest_time" => $allStaff["latest_time"], "unreads" => (int)$allStaff["unreads"]];
+        
+        foreach ($users as $u) {
+            $chats[] = ["id" => (string)$u["id"], "name" => $u["full_name"], "role" => $u["role"], "latest_body" => $u["latest_body"], "latest_time" => $u["latest_time"], "unreads" => (int)$u["unreads"]];
         }
-    }
-    unset($msg);
+        
+        usort($chats, function($a, $b) {
+            $tA = empty($a["latest_time"]) ? 0 : strtotime($a["latest_time"]);
+            $tB = empty($b["latest_time"]) ? 0 : strtotime($b["latest_time"]);
+            return $tB <=> $tA;
+        });
+        
+        $response["chats"] = $chats;
+        
+        if ($activeChat !== "") {
+            $chatParams = [];
+            if ($activeChat === "all") {
+                $where = "m.to_user_id IS NULL";
+                $pdo->prepare("INSERT IGNORE INTO message_reads (message_id, user_id) SELECT id, ? FROM messages m WHERE m.to_user_id IS NULL AND m.from_user_id != ?")->execute([$me, $me]);
+            } else {
+                $otherId = (int)$activeChat;
+                $where = "((m.from_user_id = ? AND m.to_user_id = ?) OR (m.from_user_id = ? AND m.to_user_id = ?))";
+                $chatParams = [$me, $otherId, $otherId, $me];
+                $pdo->prepare("INSERT IGNORE INTO message_reads (message_id, user_id) SELECT id, ? FROM messages m WHERE m.from_user_id = ? AND m.to_user_id = ?")->execute([$me, $otherId, $me]);
+            }
 
-    echo json_encode(['ok' => true, 'messages' => $messages, 'root' => $root]);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// SEND  — new root message or reply; optional file attachment
-// ─────────────────────────────────────────────────────────────────────────────
-function handleSend(): void
-{
-    global $pdo, $me;
-
-    if (!verifyCsrf($_POST['csrf_token'] ?? '')) {
-        http_response_code(403);
-        echo json_encode(['ok' => false, 'error' => 'Invalid CSRF token']);
-        return;
-    }
-
-    $body     = trim($_POST['body']      ?? '');
-    $subject  = trim($_POST['subject']   ?? '');
-    $toRaw    = trim($_POST['to']        ?? '');
-    $parentId = !empty($_POST['parent_id']) ? (int)$_POST['parent_id'] : null;
-    $hasFile  = !empty($_FILES['files']['name'][0]) || !empty($_FILES['file']['name']);
-
-    // Body is optional when a file is attached
-    if ($body === '' && !$hasFile) {
-        http_response_code(422);
-        echo json_encode(['ok' => false, 'error' => 'Please write a message or attach a file']);
-        return;
-    }
-
-    // Resolve to_user_id (null = all-staff broadcast)
-    $toUserId = null;
-    if ($toRaw !== '' && $toRaw !== 'all') {
-        $toUserId = (int)$toRaw;
-        $chk = $pdo->prepare("SELECT id FROM staff WHERE id = ? AND active = 1");
-        $chk->execute([$toUserId]);
-        if (!$chk->fetch()) {
-            http_response_code(422);
-            echo json_encode(['ok' => false, 'error' => 'Invalid recipient']);
-            return;
+            if ($lastMsgId > 0) {
+                $msgSql = "SELECT m.*, u.full_name as from_name FROM messages m LEFT JOIN staff u ON u.id = m.from_user_id WHERE $where AND m.id > ? ORDER BY m.created_at ASC";
+                $chatParams[] = $lastMsgId;
+            } else {
+                $msgSql = "SELECT * FROM (SELECT m.*, u.full_name as from_name FROM messages m LEFT JOIN staff u ON u.id = m.from_user_id WHERE $where ORDER BY m.created_at DESC LIMIT 50) sub ORDER BY created_at ASC";
+            }
+            
+            $stmt = $pdo->prepare($msgSql);
+            $stmt->execute($chatParams);
+            $msgs = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            if ($msgs) {
+                $msgIds = array_column($msgs, "id");
+                $inQuery = implode(",", array_fill(0, count($msgIds), "?"));
+                $attStmt = $pdo->prepare("SELECT * FROM message_attachments WHERE message_id IN ($inQuery)");
+                $attStmt->execute($msgIds);
+                $atts = $attStmt->fetchAll(PDO::FETCH_ASSOC);
+                $attsByMsg = [];
+                foreach ($atts as $a) $attsByMsg[$a["message_id"]][] = $a;
+                
+                foreach ($msgs as &$m) {
+                    $m["attachments"] = $attsByMsg[$m["id"]] ?? [];
+                }
+            }
+            $response["messages"] = $msgs;
         }
+        echo json_encode($response); exit;
     }
-
-    // Ensure parent_id points to root (not a reply of a reply)
-    if ($parentId) {
-        $par = $pdo->prepare("SELECT parent_id FROM messages WHERE id = ?");
-        $par->execute([$parentId]);
-        $parRow = $par->fetch();
-        if ($parRow && $parRow['parent_id']) {
-            $parentId = (int)$parRow['parent_id'];
-        }
-    }
-
-    // Insert message
-    $ins = $pdo->prepare(
-        "INSERT INTO messages (from_user_id, to_user_id, subject, body, parent_id) VALUES (?, ?, ?, ?, ?)"
-    );
-    $ins->execute([$me, $toUserId, $subject, $body, $parentId]);
-    $msgId = (int)$pdo->lastInsertId();
-
-    // Mark read by sender immediately
-    try {
-        $pdo->prepare("INSERT IGNORE INTO message_reads (message_id, user_id) VALUES (?, ?)")
-            ->execute([$msgId, $me]);
-    } catch (PDOException $e) { /* ignore */ }
-
-    // Optional file attachments (supports files[] array from multi-file input)
-    $uploadDir = __DIR__ . '/../uploads/message_files';
-
-    // Ensure upload directory exists with security .htaccess
-    if (!is_dir($uploadDir)) {
-        mkdir($uploadDir, 0755, true);
-        file_put_contents($uploadDir . '/.htaccess',
-            "Options -Indexes\nphp_flag engine off\n<FilesMatch \"\\.(php|phtml|php3|php4|php5|cgi|pl|py)$\">\n  Deny from all\n</FilesMatch>\n");
-    }
-
-    // Normalise $_FILES into a flat array of individual files
-    $uploads = [];
-    if (!empty($_FILES['files']['name'])) {
-        // multi-file: files[]
-        foreach ($_FILES['files']['name'] as $i => $name) {
-            $uploads[] = [
-                'name'     => $name,
-                'tmp_name' => $_FILES['files']['tmp_name'][$i],
-                'error'    => $_FILES['files']['error'][$i],
-                'size'     => $_FILES['files']['size'][$i],
-            ];
-        }
-    } elseif (!empty($_FILES['file']['name'])) {
-        // legacy single file: file
-        $uploads[] = $_FILES['file'];
-    }
-
-    if (empty($uploads)) {
-        auditLog($pdo, 'message_send', 'message', $msgId, $subject ?: '(reply)');
-        echo json_encode(['ok' => true, 'message_id' => $msgId]);
-        return;
-    }
-
-    $maxBytes = 25 * 1024 * 1024;
-
-    // MIME → canonical safe extension map (prevents ext spoofing)
-    $mimeExtMap = [
-        'image/jpeg'  => 'jpg',  'image/png'  => 'png',  'image/gif'  => 'gif',
-        'image/webp'  => 'webp', 'application/pdf' => 'pdf',
-        'application/msword' => 'doc',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx',
-        'application/vnd.ms-excel' => 'xls',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' => 'xlsx',
-        'text/plain'  => 'txt',  'text/csv'   => 'csv',
-        'application/zip' => 'zip', 'application/x-zip-compressed' => 'zip',
-    ];
-
-    $finfo = extension_loaded('fileinfo') ? finfo_open(FILEINFO_MIME_TYPE) : null;
-    $insAtt = $pdo->prepare("
-        INSERT INTO message_attachments (message_id, original_name, stored_name, file_size, mime_type)
-        VALUES (?, ?, ?, ?, ?)
-    ");
-
-    // Ensure table exists
-    try { $pdo->query("SELECT 1 FROM message_attachments LIMIT 1"); }
-    catch (PDOException $e) {
-        $pdo->exec("CREATE TABLE IF NOT EXISTS message_attachments (
-            id INT AUTO_INCREMENT PRIMARY KEY, message_id INT NOT NULL,
-            original_name VARCHAR(255) NOT NULL, stored_name VARCHAR(255) NOT NULL,
-            file_size INT UNSIGNED NOT NULL DEFAULT 0, mime_type VARCHAR(100) NOT NULL DEFAULT '',
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP, INDEX idx_msg (message_id)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-    }
-
-    $errors = [];
-    foreach ($uploads as $file) {
-        $errCode = $file['error'];
-        if ($errCode !== UPLOAD_ERR_OK) {
-            $errors[] = match($errCode) {
-                UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE => '"' . $file['name'] . '" is too large (server limit: ' . ini_get('upload_max_filesize') . ')',
-                UPLOAD_ERR_PARTIAL    => '"' . $file['name'] . '" upload was interrupted.',
-                UPLOAD_ERR_NO_TMP_DIR => 'Server has no temp directory.',
-                UPLOAD_ERR_CANT_WRITE => 'Server cannot write to disk.',
-                default               => '"' . $file['name'] . '" upload error ' . $errCode,
-            };
-            continue;
-        }
-
-        if ($file['size'] > $maxBytes) {
-            $errors[] = '"' . $file['name'] . '" exceeds 25 MB limit.';
-            continue;
-        }
-
-        $mime = $finfo ? finfo_file($finfo, $file['tmp_name']) : 'application/octet-stream';
-
-        if (!isset($mimeExtMap[$mime])) {
-            $errors[] = '"' . $file['name'] . '" has an unsupported file type (' . $mime . ').';
-            continue;
-        }
-
-        // Use MIME-derived extension, not the user-supplied one (security)
-        $safeExt = $mimeExtMap[$mime];
-        $stored  = 'msg_' . $msgId . '_' . bin2hex(random_bytes(6)) . '.' . $safeExt;
-        $dest    = $uploadDir . '/' . $stored;
-
-        if (!move_uploaded_file($file['tmp_name'], $dest)) {
-            $errors[] = '"' . $file['name'] . '" could not be saved.';
-            continue;
-        }
-
-        $insAtt->execute([$msgId, $file['name'], $stored, $file['size'], $mime]);
-    }
-
-    if ($finfo) finfo_close($finfo);
-
-    if (!empty($errors) && count($errors) === count($uploads)) {
-        // All files failed — report errors but message was already saved
-        auditLog($pdo, 'message_send', 'message', $msgId, $subject ?: '(reply)');
-        echo json_encode(['ok' => false, 'error' => implode("\n", $errors), 'message_id' => $msgId]);
-        return;
-    }
-
-    auditLog($pdo, 'message_send', 'message', $msgId, $subject ?: '(reply)');
-    $resp = ['ok' => true, 'message_id' => $msgId];
-    if (!empty($errors)) $resp['warnings'] = $errors; // partial success
-    echo json_encode($resp);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// USERS  — all active staff for compose recipient picker
-// ─────────────────────────────────────────────────────────────────────────────
-function handleUsers(): void
-{
-    global $pdo;
-    $stmt = $pdo->query(
-        "SELECT id, full_name, role FROM staff WHERE active = 1 ORDER BY full_name ASC"
-    );
-    echo json_encode(['ok' => true, 'users' => $stmt->fetchAll()]);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// UNREAD_COUNT  — for the nav badge (polled periodically)
-// ─────────────────────────────────────────────────────────────────────────────
-function handleUnreadCount(): void
-{
-    global $pdo, $me;
-    $stmt = $pdo->prepare("
-        SELECT COUNT(*) FROM messages m
-        WHERE  (m.to_user_id = ? OR m.to_user_id IS NULL)
-          AND  m.from_user_id != ?
-          AND  NOT EXISTS (
-              SELECT 1 FROM message_reads mr
-              WHERE mr.message_id = m.id AND mr.user_id = ?
-          )
-    ");
-    $stmt->execute([$me, $me, $me]);
-    echo json_encode(['ok' => true, 'count' => (int)$stmt->fetchColumn()]);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// DELETE  — sender or admin can delete; deletes whole thread if root
-// ─────────────────────────────────────────────────────────────────────────────
-function handleDelete(): void
-{
-    global $pdo, $me;
-
-    $input = json_decode(file_get_contents('php://input'), true) ?? [];
-    $csrf  = $input['csrf_token'] ?? ($_POST['csrf_token'] ?? '');
-
-    if (!verifyCsrf($csrf)) {
-        http_response_code(403);
-        echo json_encode(['ok' => false, 'error' => 'Invalid CSRF token']);
-        return;
-    }
-
-    $msgId = (int)($input['message_id'] ?? 0);
-    if (!$msgId) {
-        http_response_code(400);
-        echo json_encode(['ok' => false, 'error' => 'Missing message_id']);
-        return;
-    }
-
-    $stmt = $pdo->prepare("SELECT * FROM messages WHERE id = ?");
-    $stmt->execute([$msgId]);
-    $msg = $stmt->fetch();
-
-    if (!$msg) {
-        http_response_code(404);
-        echo json_encode(['ok' => false, 'error' => 'Not found']);
-        return;
-    }
-
-    if ((int)$msg['from_user_id'] !== $me && !isAdmin()) {
-        http_response_code(403);
-        echo json_encode(['ok' => false, 'error' => 'Forbidden']);
-        return;
-    }
-
-    // If deleting root, collect all replies too
-    $ids = [$msgId];
-    if (!$msg['parent_id']) {
-        $replies = $pdo->prepare("SELECT id FROM messages WHERE parent_id = ?");
-        $replies->execute([$msgId]);
-        foreach ($replies->fetchAll() as $r) {
-            $ids[] = (int)$r['id'];
-        }
-    }
-
-    foreach ($ids as $id) {
-        $atts = $pdo->prepare(
-            "SELECT stored_name FROM message_attachments WHERE message_id = ?"
-        );
-        $atts->execute([$id]);
-        foreach ($atts->fetchAll() as $a) {
-            $f = __DIR__ . '/../uploads/message_files/' . basename($a['stored_name']);
-            if (file_exists($f)) {
-                unlink($f);
+    
+    if ($action === "send") {
+        $to = $_POST["to"] ?? "";
+        $body = trim($_POST["body"] ?? "");
+        
+        if (empty($body) && empty($_FILES["attachments"]["name"][0])) { echo json_encode(["ok"=>false, "error"=>"Empty msg"]); exit; }
+        
+        $toId = ($to === "all") ? null : (int)$to;
+        $stmt = $pdo->prepare("INSERT INTO messages (from_user_id, to_user_id, subject, body, created_at) VALUES (?, ?, '', ?, NOW())");
+        $stmt->execute([$me, $toId, $body]);
+        $msgId = $pdo->lastInsertId();
+        
+        $pdo->prepare("INSERT INTO message_reads (message_id, user_id) VALUES (?, ?)")->execute([$msgId, $me]);
+        
+        if (!empty($_FILES["attachments"]["name"][0])) {
+            $dir = __DIR__ . "/../uploads/messages";
+            if (!is_dir($dir)) mkdir($dir, 0777, true);
+            foreach ($_FILES["attachments"]["name"] as $idx => $name) {
+                if ($_FILES["attachments"]["error"][$idx] === UPLOAD_ERR_OK) {
+                    $tmp = $_FILES["attachments"]["tmp_name"][$idx];
+                    $size = $_FILES["attachments"]["size"][$idx];
+                    $mime = $_FILES["attachments"]["type"][$idx] ?: "application/octet-stream";
+                    $ext = strtolower(pathinfo($name, PATHINFO_EXTENSION));
+                    $stored = date("YmdHis")."_".bin2hex(random_bytes(4)).($ext?".".$ext:"");
+                    if (move_uploaded_file($tmp, "$dir/$stored")) {
+                        $s = $pdo->prepare("INSERT INTO message_attachments (message_id, original_name, stored_name, file_size, mime_type) VALUES (?,?,?,?,?)");
+                        $s->execute([$msgId, $name, $stored, $size, $mime]);
+                    }
+                }
             }
         }
-        $pdo->prepare("DELETE FROM message_attachments WHERE message_id = ?")->execute([$id]);
-        $pdo->prepare("DELETE FROM message_reads       WHERE message_id = ?")->execute([$id]);
-        $pdo->prepare("DELETE FROM messages             WHERE id = ?")->execute([$id]);
+        echo json_encode(["ok"=>true, "msg_id"=>$msgId]); exit;
     }
-
-    auditLog($pdo, 'message_delete', 'message', $msgId, 'deleted');
-
-    echo json_encode(['ok' => true]);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// DOWNLOAD  — serve attachment as binary download
-// ─────────────────────────────────────────────────────────────────────────────
-function handleDownload(): void
-{
-    global $pdo, $me;
-
-    $attId = (int)($_GET['id'] ?? 0);
-    if (!$attId) {
-        http_response_code(400);
-        exit('Bad request');
-    }
-
-    $stmt = $pdo->prepare("
-        SELECT ma.*, m.from_user_id, m.to_user_id
-        FROM   message_attachments ma
-        JOIN   messages m ON m.id = ma.message_id
-        WHERE  ma.id = ?
-    ");
-    $stmt->execute([$attId]);
-    $att = $stmt->fetch();
-
-    if (!$att) {
-        http_response_code(404);
-        exit('Not found');
-    }
-
-    $canAccess = (int)$att['from_user_id'] === $me
-              || (int)$att['to_user_id']   === $me
-              || $att['to_user_id']        === null
-              || isAdmin();
-
-    if (!$canAccess) {
-        http_response_code(403);
-        exit('Forbidden');
-    }
-
-    $file = __DIR__ . '/../uploads/message_files/' . basename($att['stored_name']);
-    if (!file_exists($file)) {
-        http_response_code(404);
-        exit('File not found');
-    }
-
-    header('Content-Type: '        . $att['mime_type'], true);
-    header('Content-Disposition: attachment; filename="' . rawurlencode($att['original_name']) . '"');
-    header('Content-Length: '      . filesize($file));
-    header('Cache-Control: private, no-cache');
-    readfile($file);
-}
+} catch (PDOException $e) { echo json_encode(["ok"=>false, "error"=>"DB Error"]); }
