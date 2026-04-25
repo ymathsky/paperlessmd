@@ -60,7 +60,7 @@ $patient = [
     'dob'        => $doc['dob'],
     'insurance'  => $doc['insurance'],
     'company'    => $data['company'] ?? ($doc['company'] ?? ''),
-    'phone'      => '',,
+    'phone'      => '',
     'address'    => '',
     'email'      => '',
 ];
