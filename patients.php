@@ -255,7 +255,11 @@ foreach ($companies as $coName => $coCfg):
                         </a>
                     </td>
                     <td class="px-4 py-4 text-slate-600 hidden sm:table-cell">
-                        <?= $p['dob'] ? date('M j, Y', strtotime($p['dob'])) : '—' ?>
+                        <?php if ($p['dob']):
+                            $ptAge = (int)(new DateTime($p['dob']))->diff(new DateTime('today'))->y;
+                        ?>
+                        <?= date('M j, Y', strtotime($p['dob'])) ?> <span class="text-slate-400 text-xs">(<?= $ptAge ?> yrs)</span>
+                        <?php else: ?>—<?php endif; ?>
                     </td>
                     <td class="px-4 py-4 text-slate-600 hidden md:table-cell"><?= h($p['phone'] ?: '—') ?></td>
                     <td class="px-4 py-4">

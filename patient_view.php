@@ -1146,11 +1146,16 @@ function completeVisit(visitId) {
                     </span>
                 </h2>
                 <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-sm text-slate-500">
-                    <?php if ($patient['dob']): ?>
-                    <span><i class="bi bi-calendar3 mr-1"></i><?= date('M j, Y', strtotime($patient['dob'])) ?></span>
+                    <?php if ($patient['dob']):
+                        $ptAge = (int)(new DateTime($patient['dob']))->diff(new DateTime('today'))->y;
+                    ?>
+                    <span><i class="bi bi-calendar3 mr-1"></i><?= date('M j, Y', strtotime($patient['dob'])) ?> &middot; <strong class="text-slate-700"><?= $ptAge ?> yrs</strong></span>
                     <?php endif; ?>
                     <?php if ($patient['phone']): ?>
                     <span><i class="bi bi-telephone mr-1"></i><?= h($patient['phone']) ?></span>
+                    <?php endif; ?>
+                    <?php if ($patient['company'] && $patient['company'] !== 'Beyond Wound Care Inc.'): ?>
+                    <span class="text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md"><i class="bi bi-building mr-1"></i><?= h($patient['company']) ?></span>
                     <?php endif; ?>
                     <?php if ($patient['insurance']): ?>
                     <span><i class="bi bi-shield-plus mr-1"></i><?= h($patient['insurance']) ?></span>
