@@ -30,13 +30,32 @@ if ($statusFilter !== 'all') {
     $params[] = $statusFilter;
 }
 
+// MA filter — non-admin users only see their own assigned patients
+$maFilter = '';
+if (!isAdmin()) {
+    $where[]  = 'p.assigned_ma = ?';
+    $params[] = (int)$_SESSION['user_id'];
+} elseif (isset($_GET['ma']) && (int)$_GET['ma'] > 0) {
+    $maFilter = (int)$_GET['ma'];
+    $where[]  = 'p.assigned_ma = ?';
+    $params[] = $maFilter;
+}
+
+// Load staff list for admin MA filter dropdown
+$staffList = [];
+if (isAdmin()) {
+    $staffList = $pdo->query("SELECT id, full_name, role FROM staff WHERE active=1 ORDER BY full_name")->fetchAll();
+}
+
 $sql = "
     SELECT p.*,
            COUNT(DISTINCT fs.id) AS form_count,
-           COUNT(DISTINCT wp.id) AS photo_count
+           COUNT(DISTINCT wp.id) AS photo_count,
+           ma.full_name AS assigned_ma_name
     FROM patients p
     LEFT JOIN form_submissions fs ON fs.patient_id = p.id
     LEFT JOIN wound_photos wp     ON wp.patient_id = p.id
+    LEFT JOIN staff ma            ON ma.id = p.assigned_ma
     WHERE " . implode(' AND ', $where) . "
     GROUP BY p.id
     ORDER BY p.last_name, p.first_name
@@ -168,8 +187,8 @@ foreach ($companies as $coName => $coCfg):
 
 <!-- Search + Filter Bar -->
 <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 mb-5">
-    <form method="GET" class="flex flex-col sm:flex-row gap-3">
-        <div class="relative flex-1">
+    <form method="GET" class="flex flex-col sm:flex-row gap-3 flex-wrap">
+        <div class="relative flex-1 min-w-[180px]">
             <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400 pointer-events-none">
                 <i class="bi bi-search text-base"></i>
             </span>
@@ -178,8 +197,23 @@ foreach ($companies as $coName => $coCfg):
                           focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition bg-slate-50"
                    placeholder="Search by name, phone, or DOB...">
         </div>
+        <?php if (isAdmin() && !empty($staffList)): ?>
+        <div>
+            <select name="ma"
+                    class="h-full px-3 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
+                           focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+                <option value="">All Staff</option>
+                <?php foreach ($staffList as $sf): ?>
+                <option value="<?= $sf['id'] ?>" <?= ((int)$maFilter === (int)$sf['id']) ? 'selected' : '' ?>>
+                    <?= h($sf['full_name']) ?> (<?= h($sf['role']) ?>)
+                </option>
+                <?php endforeach; ?>
+            </select>
+        </div>
+        <?php endif; ?>
         <div class="flex gap-2 flex-wrap">
             <?php
+            $maPart = isAdmin() && $maFilter ? '&ma='.(int)$maFilter : '';
             $statusBtns = [
                 'active'     => ['label'=>'Active',     'color'=>'bg-emerald-600 text-white shadow', 'inactive'=>'bg-slate-100 text-slate-700 hover:bg-slate-200'],
                 'inactive'   => ['label'=>'Inactive',   'color'=>'bg-amber-500 text-white shadow',   'inactive'=>'bg-slate-100 text-slate-700 hover:bg-slate-200'],
@@ -188,13 +222,13 @@ foreach ($companies as $coName => $coCfg):
             ];
             foreach ($statusBtns as $sv => $cfg):
                 $cls = ($statusFilter === $sv) ? $cfg['color'] : $cfg['inactive'];
-                $href = BASE_URL . '/patients.php?status=' . $sv . ($q ? '&q='.urlencode($q) : '') . ($filter ? '&filter='.$filter : '');
+                $href = BASE_URL . '/patients.php?status=' . $sv . ($q ? '&q='.urlencode($q) : '') . ($filter ? '&filter='.$filter : '') . $maPart;
             ?>
             <a href="<?= $href ?>" class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all <?= $cls ?>">
                 <?= $cfg['label'] ?>
             </a>
             <?php endforeach; ?>
-            <a href="<?= BASE_URL ?>/patients.php?status=<?= $statusFilter ?>&filter=pending<?= $q ? '&q=' . urlencode($q) : '' ?>"
+            <a href="<?= BASE_URL ?>/patients.php?status=<?= $statusFilter ?>&filter=pending<?= $q ? '&q=' . urlencode($q) : '' ?><?= $maPart ?>"
                class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all
                       <?= $filter === 'pending' ? 'bg-amber-500 text-white shadow' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' ?>">
                 <i class="bi bi-cloud-arrow-up"></i> Pending Upload
@@ -204,6 +238,8 @@ foreach ($companies as $coName => $coCfg):
                 Search
             </button>
         </div>
+        <input type="hidden" name="status" value="<?= h($statusFilter) ?>">
+        <?php if ($filter): ?><input type="hidden" name="filter" value="<?= h($filter) ?>"><?php endif; ?>
     </form>
 </div>
 
@@ -223,6 +259,9 @@ foreach ($companies as $coName => $coCfg):
                     <th class="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wide">Patient</th>
                     <th class="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wide hidden sm:table-cell">DOB</th>
                     <th class="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wide hidden md:table-cell">Phone</th>
+                    <?php if (isAdmin()): ?>
+                    <th class="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Assigned MA</th>
+                    <?php endif; ?>
                     <th class="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wide">Status</th>
                     <th class="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wide text-center">Forms</th>
                     <th class="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wide text-center hidden sm:table-cell">Photos</th>
@@ -262,6 +301,17 @@ foreach ($companies as $coName => $coCfg):
                         <?php else: ?>—<?php endif; ?>
                     </td>
                     <td class="px-4 py-4 text-slate-600 hidden md:table-cell"><?= h($p['phone'] ?: '—') ?></td>
+                    <?php if (isAdmin()): ?>
+                    <td class="px-4 py-4 text-slate-600 hidden lg:table-cell">
+                        <?php if (!empty($p['assigned_ma_name'])): ?>
+                        <span class="inline-flex items-center gap-1 text-xs font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">
+                            <i class="bi bi-person-fill"></i> <?= h($p['assigned_ma_name']) ?>
+                        </span>
+                        <?php else: ?>
+                        <span class="text-slate-300 text-sm">—</span>
+                        <?php endif; ?>
+                    </td>
+                    <?php endif; ?>
                     <td class="px-4 py-4">
                         <?php
                         $stMap = [

@@ -8,7 +8,7 @@ requireLogin();
 $id = (int)($_GET['id'] ?? 0);
 if (!$id) { header('Location: ' . BASE_URL . '/patients.php'); exit; }
 
-$stmt = $pdo->prepare("SELECT * FROM patients WHERE id = ?");
+$stmt = $pdo->prepare("SELECT p.*, ma.full_name AS assigned_ma_name FROM patients p LEFT JOIN staff ma ON ma.id = p.assigned_ma WHERE p.id = ?");
 $stmt->execute([$id]);
 $patient = $stmt->fetch();
 if (!$patient) { header('Location: ' . BASE_URL . '/patients.php'); exit; }
@@ -1159,6 +1159,9 @@ function completeVisit(visitId) {
                     <?php endif; ?>
                     <?php if ($patient['insurance']): ?>
                     <span><i class="bi bi-shield-plus mr-1"></i><?= h($patient['insurance']) ?></span>
+                    <?php endif; ?>
+                    <?php if (!empty($patient['assigned_ma_name'])): ?>
+                    <span class="text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md"><i class="bi bi-person-badge mr-1"></i><?= h($patient['assigned_ma_name']) ?></span>
                     <?php endif; ?>
                 </div>
             </div>

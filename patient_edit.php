@@ -12,6 +12,9 @@ $patient->execute([$id]);
 $patient = $patient->fetch();
 if (!$patient) { header('Location: ' . BASE_URL . '/patients.php'); exit; }
 
+// Load staff for MA assignment dropdown
+$maStaff = $pdo->query("SELECT id, full_name, role FROM staff WHERE active=1 ORDER BY full_name")->fetchAll();
+
 $pageTitle = 'Edit ' . $patient['first_name'] . ' ' . $patient['last_name'];
 $activeNav = 'patients';
 
@@ -49,19 +52,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'pcp'           => trim($_POST['pcp']         ?? ''),
         'status'        => $newStatus,
         'discharged_at' => $newDischargedAt,
+        'assigned_ma'   => isAdmin() ? ((int)($_POST['assigned_ma'] ?? 0) ?: null) : ($patient['assigned_ma'] ?: null),
     ];
     if (!$vals['first_name'] || !$vals['last_name']) {
         $error = 'First and last name are required.';
     } else {
         $stmt = $pdo->prepare("UPDATE patients
             SET first_name=?, last_name=?, dob=?, phone=?, email=?, address=?, insurance=?, pcp=?,
-                status=?, discharged_at=?
+                status=?, discharged_at=?, assigned_ma=?
             WHERE id=?");
         $stmt->execute([
             $vals['first_name'], $vals['last_name'], $vals['dob'] ?: null,
             $vals['phone'], $vals['email'], $vals['address'],
             $vals['insurance'], $vals['pcp'],
             $vals['status'], $vals['discharged_at'],
+            $vals['assigned_ma'],
             $id
         ]);
         auditLog($pdo, 'patient_edit', 'patient', $id, $vals['first_name'] . ' ' . $vals['last_name']);
@@ -172,7 +177,7 @@ include __DIR__ . '/includes/header.php';
                                   focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition">
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                     <div>
                         <label class="block text-sm font-semibold text-slate-700 mb-1.5">Insurance</label>
                         <input type="text" name="insurance" value="<?= h($vals['insurance']) ?>"
@@ -185,6 +190,34 @@ include __DIR__ . '/includes/header.php';
                                class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
                                       focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition">
                     </div>
+                </div>
+
+                <!-- Assigned MA -->
+                <div class="mb-6">
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">
+                        <i class="bi bi-person-badge mr-1"></i> Assigned MA
+                    </label>
+                    <?php if (isAdmin()): ?>
+                    <select name="assigned_ma"
+                            class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
+                                   focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition">
+                        <option value="">— Unassigned —</option>
+                        <?php foreach ($maStaff as $sf): ?>
+                        <option value="<?= $sf['id'] ?>" <?= ((int)($vals['assigned_ma'] ?? 0) === (int)$sf['id']) ? 'selected' : '' ?>>
+                            <?= h($sf['full_name']) ?> (<?= h($sf['role']) ?>)
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <?php else: ?>
+                    <?php
+                        $myName = '';
+                        foreach ($maStaff as $sf) { if ((int)$sf['id'] === (int)($vals['assigned_ma'] ?? 0)) { $myName = $sf['full_name']; break; } }
+                        if (!$myName) foreach ($maStaff as $sf) { if ((int)$sf['id'] === (int)$_SESSION['user_id']) { $myName = $sf['full_name']; break; } }
+                    ?>
+                    <div class="px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50 text-slate-700">
+                        <i class="bi bi-person-fill mr-1 text-blue-500"></i> <?= h($myName) ?>
+                    </div>
+                    <?php endif; ?>
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
