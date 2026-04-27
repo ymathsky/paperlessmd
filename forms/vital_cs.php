@@ -46,13 +46,12 @@ try {
         FROM patient_medications
         WHERE patient_id = ? AND status = 'active'
         ORDER BY sort_order ASC, added_at ASC
-        LIMIT 6
     ");
     $medsStmt->execute([$patient_id]);
     $activeMeds = $medsStmt->fetchAll();
 } catch (PDOException $e) { /* table not yet migrated &mdash; fall back to empty */ }
 
-// Build exactly 6 rows: pre-filled from master list first, then empty
+// All active meds pre-filled, then at least 2 empty rows for new entries
 $medRows = [];
 foreach ($activeMeds as $m) {
     $medRows[] = [
@@ -62,7 +61,8 @@ foreach ($activeMeds as $m) {
         'med_type' => 'Refill',   // existing active meds default to Refill
     ];
 }
-while (count($medRows) < 6) {
+$emptyTarget = max(count($activeMeds) + 2, 6);
+while (count($medRows) < $emptyTarget) {
     $medRows[] = ['med_id' => 0, 'med_name' => '', 'med_freq' => '', 'med_type' => ''];
 }
 
@@ -127,6 +127,7 @@ include __DIR__ . '/../includes/header.php';
         <input type="hidden" name="csrf_token"  value="<?= csrfToken() ?>">
         <input type="hidden" name="patient_id"  value="<?= $patient_id ?>">
         <input type="hidden" name="form_type"   value="vital_cs">
+        <input type="hidden" name="med_count"   value="<?= count($medRows) ?>">
         <input type="hidden" id="wiz-form-key"  value="vital_cs_<?= $patient_id ?>">
 
         <div class="px-6 pb-2">

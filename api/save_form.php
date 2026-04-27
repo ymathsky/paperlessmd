@@ -47,7 +47,7 @@ if (!isAdmin()) {
 }
 
 // Collect form fields (exclude meta)
-$excludeKeys = ['csrf_token', 'patient_id', 'form_type', 'patient_signature', 'ma_signature', 'poa_name', 'poa_relationship'];
+$excludeKeys = ['csrf_token', 'patient_id', 'form_type', 'patient_signature', 'ma_signature', 'poa_name', 'poa_relationship', 'med_count'];
 $formData    = [];
 foreach ($_POST as $key => $value) {
     if (!in_array($key, $excludeKeys, true)) {
@@ -124,9 +124,11 @@ auditLog($pdo, 'form_create', 'form', (int)$newId, $formType, 'patient_id=' . $p
 
 // ── Medication reconciliation for Visit Consent forms ─────────────────────
 if ($formType === 'vital_cs' || $formType === 'new_patient_pocket') {
-    $staffId = (int)$_SESSION['user_id'];
+    $staffId  = (int)$_SESSION['user_id'];
+    // Use submitted med_count (dynamic rows), cap at 30 for safety
+    $medCount = min(30, max(6, (int)($formData['med_count'] ?? 6)));
     try {
-        for ($i = 1; $i <= 6; $i++) {
+        for ($i = 1; $i <= $medCount; $i++) {
             $medId   = (int)($formData["med_id_$i"] ?? 0);
             $medName = trim($formData["med_name_$i"] ?? '');
             $medType = trim($formData["med_type_$i"] ?? '');

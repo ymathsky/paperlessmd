@@ -42,7 +42,7 @@ try {
         SELECT id, med_name, med_frequency
         FROM patient_medications
         WHERE patient_id = ? AND status = 'active'
-        ORDER BY sort_order ASC, added_at ASC LIMIT 6
+        ORDER BY sort_order ASC, added_at ASC
     ");
     $medsStmt->execute([$patient_id]);
     $activeMeds = $medsStmt->fetchAll();
@@ -52,7 +52,8 @@ $medRows = [];
 foreach ($activeMeds as $m) {
     $medRows[] = ['med_id' => $m['id'], 'med_name' => $m['med_name'], 'med_freq' => $m['med_frequency'], 'med_type' => 'Refill'];
 }
-while (count($medRows) < 6) {
+$emptyTarget = max(count($activeMeds) + 2, 6);
+while (count($medRows) < $emptyTarget) {
     $medRows[] = ['med_id' => 0, 'med_name' => '', 'med_freq' => '', 'med_type' => ''];
 }
 
@@ -119,6 +120,7 @@ include __DIR__ . '/../includes/header.php';
         <input type="hidden" name="csrf_token"  value="<?= csrfToken() ?>">
         <input type="hidden" name="patient_id"  value="<?= $patient_id ?>">
         <input type="hidden" name="form_type"   value="new_patient_pocket">
+        <input type="hidden" name="med_count"   value="<?= count($medRows) ?>">
         <input type="hidden" id="wiz-form-key"  value="new_patient_pocket_<?= $patient_id ?>">
 
         <div class="px-6 pb-2">
