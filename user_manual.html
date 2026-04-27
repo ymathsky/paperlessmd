@@ -177,7 +177,7 @@
   <div class="subtitle">Electronic Health Record System &mdash; Complete User Manual</div>
   <div class="meta">
     Beyond Wound Care Inc. &amp; Visiting Medical Physician Inc.<br>
-    Version 2.0 &nbsp;&middot;&nbsp; April 2026
+    Version 2.1 &nbsp;&middot;&nbsp; April 2026
   </div>
 </div>
 
@@ -207,6 +207,7 @@
         <li><a href="#s5d">Medications</a></li>
         <li><a href="#s5e">Wound Measurements</a></li>
         <li><a href="#s5f">Wound Photos</a></li>
+        <li><a href="#s5g">Assigned MA</a></li>
       </ul>
     </li>
     <li><a href="#s6">Forms</a>
@@ -218,6 +219,7 @@
         <li><a href="#s6e">Signing &amp; Submitting</a></li>
         <li><a href="#s6f">Form Statuses</a></li>
         <li><a href="#s6g">Exporting as PDF</a></li>
+        <li><a href="#s6h">Form Access Gate (Schedule Requirement)</a></li>
       </ul>
     </li>
     <li><a href="#s7">Visit Types &amp; Required Forms Checklist</a></li>
@@ -238,6 +240,7 @@
     </li>
     <li><a href="#s10">Admin — Staff Management</a></li>
     <li><a href="#s11">Admin — Audit Log</a></li>
+    <li><a href="#s11b">e-Sign Queue (Provider Countersignatures)</a></li>
     <li><a href="#s12">Messages</a>
       <ul class="sub">
         <li><a href="#s12a">Conversation List</a></li>
@@ -395,12 +398,13 @@ if they were saved within the last 24 hours.</p>
     <th><span class="badge badge-billing">Billing</span></th>
   </tr>
   <tr><td>Dashboard</td><td>Full stats + all drafts</td><td>Own schedule + drafts</td><td>Billing stats only</td></tr>
-  <tr><td>Patient List</td><td>✅ Full</td><td>✅ Full</td><td>✅ Forms tab only</td></tr>
+  <tr><td>Patient List</td><td>✅ All patients (MA filter dropdown)</td><td>✅ Own assigned patients only</td><td>✅ Forms tab only</td></tr>
+  <tr><td>Assign MA to patient</td><td>✅ Pick any active staff member</td><td>✅ Auto-assigned to self</td><td>❌</td></tr>
   <tr><td>Patient → Forms tab</td><td>✅</td><td>✅</td><td>✅ (clinical fields hidden)</td></tr>
   <tr><td>Patient → Photos tab</td><td>✅</td><td>✅</td><td>❌</td></tr>
   <tr><td>Patient → Medications tab</td><td>✅</td><td>✅</td><td>❌</td></tr>
   <tr><td>Patient → Wounds tab</td><td>✅</td><td>✅</td><td>❌</td></tr>
-  <tr><td>Fill / submit forms</td><td>✅</td><td>✅</td><td>❌ (view only)</td></tr>
+  <tr><td>Fill / submit forms</td><td>✅ (can bypass schedule gate)</td><td>✅ (visit must be scheduled today; intake forms always open)</td><td>❌ (view only)</td></tr>
   <tr><td>Export PDF</td><td>✅</td><td>✅</td><td>✅</td></tr>
   <tr><td>Schedule (daily view)</td><td>✅ All MAs</td><td>✅ Own only</td><td>❌</td></tr>
   <tr><td>Manage Schedule</td><td>✅</td><td>❌</td><td>❌</td></tr>
@@ -457,11 +461,12 @@ Click any visit to jump to the patient record. For the full schedule, click <str
 <h1 class="section" id="s5"><span class="num">5</span> Patients</h1>
 
 <h2 class="sub" id="s5a">5.1 Patient List</h2>
-<p>Click <strong>Patients</strong> in the nav bar. The list shows all patients, 20 per page.</p>
+<p>Click <strong>Patients</strong> in the nav bar. The list shows patients 20 per page.</p>
 <ul>
   <li><strong>Search:</strong> Type in the search box to filter by first name, last name, phone number, or date of birth.</li>
+  <li><strong>MA Filtering:</strong> <span class="badge badge-ma">MA</span> users see <em>only patients assigned to them</em>. <span class="badge badge-admin">Admin</span> users see all patients and have an <strong>MA filter dropdown</strong> to narrow the list to one MA's caseload.</li>
   <li><strong>All / Pending Upload tabs:</strong> "Pending Upload" shows only patients who have at least one signed form not yet uploaded.</li>
-  <li>Each patient row shows a count of their forms and photos.</li>
+  <li>Each patient row shows a count of their forms and photos, plus the assigned MA's name (admin view).</li>
 </ul>
 
 <h2 class="sub" id="s5b">5.2 Adding a Patient</h2>
@@ -475,6 +480,7 @@ Click any visit to jump to the patient record. For the full schedule, click <str
     </ul>
     This selection controls which practice branding (logo, address, phone) appears on all printed forms and PDFs for this patient.
   </li>
+  <li><strong>Assign MA:</strong> <span class="badge badge-admin">Admin</span> selects the responsible Medical Assistant from the dropdown. <span class="badge badge-ma">MA</span> users are automatically assigned to themselves — no dropdown shown.</li>
   <li>Optionally add phone number, insurance info, and emergency contact.</li>
   <li>Click <strong>Save Patient</strong>. You are redirected to the new patient's record.</li>
 </ul>
@@ -499,6 +505,7 @@ Click any visit to jump to the patient record. For the full schedule, click <str
 <h3 class="sub">Last Visit Summary Card</h3>
 <p>At the top of the patient record (above the tabs) a summary strip shows the most recent visit:
 last visit date, the MA who attended, a vitals snapshot (BP / HR / O₂), and the number of forms submitted.</p>
+<p>The patient header also displays an <strong>Assigned MA badge</strong> (blue, with a person icon) showing the staff member currently responsible for this patient.</p>
 
 <h3 class="sub">Required Forms Checklist</h3>
 <p>On the <strong>Forms</strong> tab, a checklist shows which forms are required for the current visit type.
@@ -508,12 +515,21 @@ link to open and complete them immediately.</p>
 <h2 class="sub" id="s5d">5.4 Medications</h2>
 <p>The <strong>Medications</strong> tab shows two sections:</p>
 <ul>
-  <li><strong>Active Medications</strong> — shown in sorted order. These are auto-filled into the
-    Visit Consent form's medication list when the form is opened.</li>
+  <li><strong>Active Medications</strong> — shown in sorted order. These are <strong>automatically pre-filled</strong> into the
+    Visit Consent form and New Patient Pocket form's medication list when the form is opened.
+    The form shows a blue banner confirming the pre-fill: <em>"Pre-filled from last visit — medications carried over — update as needed."</em></li>
   <li><strong>Discontinued</strong> — historical list, ordered by the date discontinued.</li>
 </ul>
 <p>To add, edit, or discontinue a medication, use the controls on the Medications tab.
 Changes take effect on the next form that is opened for this patient.</p>
+<p><strong>Medication reconciliation on form save:</strong> Every time a Visit Consent or New Patient Pocket form is submitted, the medication list is reconciled against the patient's master record:</p>
+<ul>
+  <li>Rows marked <strong>New</strong> are added to the active medication list.</li>
+  <li>Rows marked <strong>Refill</strong> (default for pre-filled meds) update the name/frequency if changed.</li>
+  <li>Rows marked <strong>D/C</strong> (Discontinue) move the medication to the Discontinued list.</li>
+  <li>Empty rows are ignored.</li>
+  <li>There is no row limit — all active medications are shown, with two extra blank rows for new additions.</li>
+</ul>
 
 <h2 class="sub" id="s5e">5.5 Wound Measurements</h2>
 <p>On the <strong>Wounds</strong> tab you can:</p>
@@ -533,6 +549,19 @@ Changes take effect on the next form that is opened for this patient.</p>
   <li>New photos are added via the <strong>Wound Care Photos</strong> form (see Forms section).</li>
 </ul>
 
+<h2 class="sub" id="s5g">5.7 Assigned MA</h2>
+<p>Every patient has one <strong>Assigned MA</strong> — the Medical Assistant responsible for their ongoing care.</p>
+<ul>
+  <li>Displayed as a blue badge in the patient header on the patient record page.</li>
+  <li>Admin can set or change the assigned MA from the <strong>Add Patient</strong> or <strong>Edit Patient</strong> pages.</li>
+  <li>When an MA creates a patient, they are automatically assigned as the MA.</li>
+  <li>MA users only see their own assigned patients in the patient list; they cannot view patients assigned to other staff.</li>
+  <li>Admin users see all patients and can filter the list by MA using the MA dropdown on the Patients page.</li>
+</ul>
+<div class="note">
+  <strong>Reassigning a patient:</strong> Go to the patient record, click <strong>Edit Patient</strong> (admin only), and select a different MA from the <em>Assigned MA</em> dropdown. The new MA will immediately see the patient in their list.
+</div>
+
 
 <!-- ═══════════════════════════════════════════════
      6. FORMS
@@ -540,6 +569,10 @@ Changes take effect on the next form that is opened for this patient.</p>
 <h1 class="section" id="s6"><span class="num">6</span> Forms</h1>
 
 <h2 class="sub" id="s6a">6.1 Available Forms</h2>
+
+<div class="warn">
+  <strong>&#x1F512; Schedule Requirement:</strong> Most visit forms can only be opened and submitted when the patient has a visit scheduled for <em>today</em>. If no visit is scheduled, the form tile panel shows a <em>"No visit scheduled for today"</em> overlay. Admins can always open forms regardless of the schedule. See <a href="#s6h">Section 6.8</a> for details.
+</div>
 
 <div class="form-grid">
   <div class="form-card">
@@ -584,12 +617,16 @@ Changes take effect on the next form that is opened for this patient.</p>
   </div>
   <div class="form-card" style="border-color:#6366f1;">
     <h3>&#x1F4C2; New Patient Pocket <span style="font-size:0.7em;background:#e0e7ff;color:#4338ca;padding:2px 8px;border-radius:12px;vertical-align:middle;">NEW</span></h3>
-    <p>Combined 9-step wizard that merges six forms into a single signing session: Visit Consent (CS), CCM Consent, ABN (CMS-R-131), Informed Consent for Wound Care, IL DHS PHI Authorization, and Patient Fusion Portal Consent. The patient, MA, and provider each sign only once on the final signature page. Medication reconciliation runs on save (same as standalone Visit Consent). Ideal for new patient intake.</p>
+    <p>Combined 9-step wizard that merges six forms into a single signing session: Visit Consent (CS), CCM Consent, ABN (CMS-R-131), Informed Consent for Wound Care, IL DHS PHI Authorization, and Patient Fusion Portal Consent. The patient, MA, and provider each sign only once on the final signature page. The provider signs <strong>inline on the form</strong> (no separate countersignature step needed). Medication reconciliation runs on save (same as standalone Visit Consent). This is an <strong>intake form</strong> — it does not require a visit to be scheduled today and is always accessible from the patient record.</p>
   </div>
 </div>
 
 <div class="note">
   <strong>Note:</strong> All forms are blocked for the <strong>Billing</strong> role. Billing users can only view already-submitted forms.
+</div>
+
+<div class="note">
+  <strong>Intake vs Visit forms:</strong> Three forms — <em>New Patient Consent</em>, <em>New Patient Pocket</em>, and <em>PF Portal Consent</em> — are classified as <strong>intake forms</strong>. They are always accessible from the patient record even if no visit is scheduled today, because new patients may not yet have a visit entry. All other forms require a scheduled visit.
 </div>
 
 <h2 class="sub" id="s6b">6.2 Completing a Form</h2>
@@ -644,6 +681,19 @@ to the device's local storage (browser storage — <em>not</em> sent to the serv
   <li>Click <strong>Submit Form</strong>. The form is saved with status <span class="badge badge-green">Signed</span>.</li>
 </ul>
 
+<h3 class="sub">MA Signature</h3>
+<p>All forms also include an <strong>MA Signature</strong> pad. The Medical Assistant completing the form must draw their signature in the MA section before submitting.</p>
+
+<h3 class="sub">Provider Signature</h3>
+<p>Provider (physician / NP) signature is handled in two ways depending on the form:</p>
+<div class="tbl-wrap">
+<table>
+  <tr><th>Form</th><th>Provider Signs</th></tr>
+  <tr><td><strong>New Patient Pocket</strong></td><td>Inline on the final page of the form (Step 9). Provider draws their signature <em>before</em> the MA clicks Submit. The signed document immediately shows the provider signature when viewed.</td></tr>
+  <tr><td><strong>All other signed forms</strong></td><td>After submission, via the <strong>e-Sign Queue</strong> (Admin &rarr; e-Sign Queue). The provider opens the document and adds a countersignature there.</td></tr>
+</table>
+</div>
+
 <h2 class="sub" id="s6f">6.6 Form Statuses</h2>
 <div class="tbl-wrap">
 <table>
@@ -663,6 +713,18 @@ to the device's local storage (browser storage — <em>not</em> sent to the serv
     <em>Export PDF</em> link next to a completed visit.</li>
 </ul>
 <div class="note">Every export is recorded in the Audit Log.</div>
+
+<h2 class="sub" id="s6h">6.8 Form Access Gate (Schedule Requirement)</h2>
+<p>To ensure forms are only filled during an actual clinical visit, PaperlessMD enforces a <strong>schedule gate</strong>:</p>
+<ul>
+  <li>When no visit is scheduled for the patient <em>today</em>, the form tile panel on the patient record shows an amber <em>"No visit scheduled for today"</em> overlay. The tiles are visible but greyed out and non-clickable.</li>
+  <li>Below the overlay, <strong>intake forms</strong> (New Patient Consent, New Patient Pocket, PF Portal Consent) are always shown as fully clickable tiles with a label <em>"Intake forms (no visit required)"</em>.</li>
+  <li><span class="badge badge-admin">Admin</span> users bypass the gate entirely and can open any form at any time. A blue note is shown: <em>"Admin override — no visit scheduled today, but you can still start forms."</em></li>
+  <li>The gate is also enforced server-side — attempting to submit a visit form without a scheduled visit (e.g., by direct URL) returns an error, even for MA users.</li>
+</ul>
+<div class="tip">
+  <strong>💡 Tip:</strong> To unlock forms for a patient, go to <strong>Admin &rarr; Manage Schedule</strong> and add a visit for today. Forms unlock immediately once the visit is saved.
+</div>
 
 
 <!-- ═══════════════════════════════════════════════
@@ -893,6 +955,48 @@ newest first, 50 records per page.</p>
 
 
 <!-- ═══════════════════════════════════════════════
+     11b. E-SIGN QUEUE
+═══════════════════════════════════════════════ -->
+<h1 class="section" id="s11b"><span class="num">11.5</span> e-Sign Queue — Provider Countersignatures</h1>
+
+<p>Accessible via <strong>Admin &rarr; e-Sign Queue</strong> (also shown as a badge count in the nav bar).
+This queue lists all forms that have been signed by the patient and MA but are still awaiting a
+<strong>provider (physician / NP) countersignature</strong>.</p>
+
+<div class="note">
+  <strong>Exception:</strong> The <em>New Patient Pocket</em> form collects the provider signature inline
+  during the signing session (Step 9). Those forms do <em>not</em> appear in the e-Sign Queue.
+</div>
+
+<h2 class="sub">11.5.1 Viewing the Queue</h2>
+<ul>
+  <li>The queue shows all signed/uploaded forms where the provider signature is still missing.</li>
+  <li>Forms can be filtered by <strong>Form Type</strong> and <strong>Date Range</strong>.</li>
+  <li>A badge count in the navigation bar shows the total pending.</li>
+</ul>
+
+<h2 class="sub">11.5.2 Adding a Provider Countersignature</h2>
+<ul class="steps">
+  <li>Click any row in the queue (or click a form's View link) to open <strong>View Document</strong>.</li>
+  <li>Scroll to the <strong>Provider / Clinician Countersignature</strong> panel at the bottom of the page.</li>
+  <li>Enter the <strong>Provider Name</strong> (printed).</li>
+  <li>Draw the provider signature in the signature canvas.</li>
+  <li>Click <strong>Save Provider Signature</strong>. The signature is saved and the form is removed from the queue.</li>
+</ul>
+
+<div class="tip">
+  <strong>💡 Tip:</strong> The countersignature panel only appears if the document has not yet been countersigned. Once saved, the document shows the provider name and signature image permanently.
+</div>
+
+<h2 class="sub">11.5.3 After Countersigning</h2>
+<ul>
+  <li>The document view shows a purple <em>Provider Countersignature</em> card with the provider's name and signature image.</li>
+  <li>The form disappears from the e-Sign Queue.</li>
+  <li>The PDF export includes the provider signature in the printed output.</li>
+</ul>
+
+
+<!-- ═══════════════════════════════════════════════
      13. OFFLINE MODE (PWA)
 ═══════════════════════════════════════════════ -->
 <h1 class="section" id="s13"><span class="num">13</span> Offline Mode (PWA)</h1>
@@ -960,6 +1064,21 @@ the browser's Service Worker so you can continue working with limited or no conn
 <div class="tbl-wrap">
 <table>
   <tr><th>Problem</th><th>Likely Cause</th><th>Solution</th></tr>
+  <tr>
+    <td>Form tiles show "No visit scheduled for today" overlay</td>
+    <td>No visit is scheduled for this patient today (schedule gate)</td>
+    <td>Ask admin to add a visit in <strong>Admin &rarr; Manage Schedule</strong>. Intake forms (New Patient Consent, New Patient Pocket, PF Portal Consent) are always accessible below the overlay.</td>
+  </tr>
+  <tr>
+    <td>Provider countersignature panel appears even though provider already signed</td>
+    <td>Provider signature was not saved to the DB column (old record)</td>
+    <td>Use the countersignature panel on the View Document page to re-sign. Going forward, New Patient Pocket captures provider signature inline during submission and this issue will not recur.</td>
+  </tr>
+  <tr>
+    <td>Patient not appearing in MA's patient list</td>
+    <td>Patient is assigned to a different MA</td>
+    <td>Admin can reassign the patient via <strong>Edit Patient &rarr; Assigned MA</strong>. MAs only see patients assigned to themselves.</td>
+  </tr>
   <tr>
     <td>Login says "Invalid username or password"</td>
     <td>Wrong credentials or account deactivated</td>
