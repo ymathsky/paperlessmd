@@ -47,13 +47,24 @@ if (!isBilling()) {
         ];
     } catch (PDOException $e) {}
 
-    // 3. E-sign queue
+    // 3. E-sign queue (MA sees only their own forms)
     try {
-        $n = (int)$pdo->query("
-            SELECT COUNT(*) FROM form_submissions
-            WHERE status IN ('signed','uploaded')
-              AND (provider_signature IS NULL OR provider_signature = '')
-        ")->fetchColumn();
+        if (isAdmin()) {
+            $n = (int)$pdo->query("
+                SELECT COUNT(*) FROM form_submissions
+                WHERE status IN ('signed','uploaded')
+                  AND (provider_signature IS NULL OR provider_signature = '')
+            ")->fetchColumn();
+        } else {
+            $esignStmt = $pdo->prepare("
+                SELECT COUNT(*) FROM form_submissions
+                WHERE status IN ('signed','uploaded')
+                  AND (provider_signature IS NULL OR provider_signature = '')
+                  AND ma_id = ?
+            ");
+            $esignStmt->execute([$uid]);
+            $n = (int)$esignStmt->fetchColumn();
+        }
         if ($n > 0) $notifs[] = [
             'type'  => 'esign',
             'icon'  => 'bi-pen-fill',

@@ -56,13 +56,15 @@ $stmt->execute($params);
 $forms = $stmt->fetchAll();
 
 /* ── Per-type counts (for filter badges) ────────────────────────────── */
-$cntRows = $pdo->query("
-    SELECT form_type, COUNT(*) AS cnt
-    FROM form_submissions
-    WHERE status IN ('signed','uploaded')
-      AND (provider_signature IS NULL OR provider_signature = '')
-    GROUP BY form_type
-")->fetchAll();
+$cntBase  = "status IN ('signed','uploaded') AND (provider_signature IS NULL OR provider_signature = '')";
+$cntParams = [];
+if (!isAdmin()) {
+    $cntBase  .= ' AND ma_id = ?';
+    $cntParams[] = (int)$_SESSION['user_id'];
+}
+$cntStmt = $pdo->prepare("SELECT form_type, COUNT(*) AS cnt FROM form_submissions WHERE $cntBase GROUP BY form_type");
+$cntStmt->execute($cntParams);
+$cntRows = $cntStmt->fetchAll();
 $countByType = [];
 $totalCount  = 0;
 foreach ($cntRows as $row) {
