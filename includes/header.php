@@ -155,6 +155,7 @@ if (!isBilling()) {
             ['href' => '/admin/recurring_schedule.php','key' => 'recurring_schedule','icon' => 'bi-arrow-repeat',      'label' => 'Recurring Schedule'],
             ['href' => '/admin/ma_productivity.php', 'key' => 'ma_report',         'icon' => 'bi-graph-up-arrow',     'label' => 'Productivity Report'],
             ['href' => '/admin/users.php',           'key' => 'users',           'icon' => 'bi-gear-fill',            'label' => 'Manage Staff'],
+            ['href' => '/admin/roles.php',            'key' => 'roles',           'icon' => 'bi-person-badge-fill',    'label' => 'Roles & Permissions'],
             ['href' => '/admin/audit_log.php',       'key' => 'audit_log',       'icon' => 'bi-shield-lock-fill',     'label' => 'Audit Log'],
             ['href' => '/admin/settings.php',        'key' => 'settings',        'icon' => 'bi-sliders2-vertical',    'label' => 'Settings'],
         ] as $n):

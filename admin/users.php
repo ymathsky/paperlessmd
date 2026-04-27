@@ -26,11 +26,18 @@ include __DIR__ . '/../includes/header.php';
         <h2 class="text-2xl font-extrabold text-slate-800">Manage Staff</h2>
         <p class="text-slate-500 text-sm mt-0.5"><?= count($staff) ?> staff member<?= count($staff) !== 1 ? 's' : '' ?></p>
     </div>
-    <a href="<?= BASE_URL ?>/admin/manage_user.php"
-       class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold
-              px-5 py-2.5 rounded-xl transition-all shadow-sm hover:shadow-md active:scale-95 text-sm">
-        <i class="bi bi-person-plus-fill"></i> Add Staff Member
-    </a>
+    <div class="flex items-center gap-2 flex-wrap">
+        <a href="<?= BASE_URL ?>/admin/roles.php"
+           class="inline-flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold
+                  px-4 py-2.5 rounded-xl transition-all text-sm">
+            <i class="bi bi-person-badge-fill"></i> Roles &amp; Permissions
+        </a>
+        <a href="<?= BASE_URL ?>/admin/manage_user.php"
+           class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold
+                  px-5 py-2.5 rounded-xl transition-all shadow-sm hover:shadow-md active:scale-95 text-sm">
+            <i class="bi bi-person-plus-fill"></i> Add Staff Member
+        </a>
+    </div>
 </div>
 
 <?php if ($msg === 'updated'): ?>
