@@ -121,6 +121,21 @@ try {
     $woundMeasurements = [];
 }
 
+// ── Today's visit check (gates form access for non-admins) ───────────────────
+$hasVisitToday = false;
+try {
+    $todayStmt = $pdo->prepare("
+        SELECT id FROM `schedule`
+        WHERE patient_id = ? AND visit_date = CURDATE() AND status != 'missed'
+        LIMIT 1
+    ");
+    $todayStmt->execute([$id]);
+    $hasVisitToday = (bool)$todayStmt->fetchColumn();
+} catch (PDOException $e) { $hasVisitToday = false; }
+
+// Admins can always start forms
+$canStartForms = isAdmin() || $hasVisitToday;
+
 // ── Last Visit Summary data ───────────────────────────────────────────────────
 $lastVisit = null;
 try {
@@ -1434,6 +1449,40 @@ $allDone  = count(array_diff($required, $completedForms)) === 0;
 <?php if (canAccessClinical()): ?>
 <div class="mb-6">
     <h3 class="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3">Start a Form</h3>
+
+    <?php if (!$canStartForms): ?>
+    <!-- No visit today — locked state -->
+    <div class="relative rounded-2xl overflow-hidden">
+        <!-- Dim overlay -->
+        <div class="absolute inset-0 bg-white/80 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center gap-2 rounded-2xl">
+            <div class="flex items-center gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-5 py-3 shadow-sm">
+                <i class="bi bi-calendar-x text-amber-500 text-xl shrink-0"></i>
+                <div>
+                    <p class="text-sm font-bold text-amber-800">No visit scheduled for today</p>
+                    <p class="text-xs text-amber-600 mt-0.5">Add a visit on the <a href="<?= BASE_URL ?>/schedule.php" class="underline hover:text-amber-800">Schedule</a> to unlock forms.</p>
+                </div>
+            </div>
+        </div>
+        <!-- Greyed-out tiles (decorative, pointer-events blocked) -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 pointer-events-none select-none opacity-40">
+            <?php foreach ($formDefs as $type => $def): ?>
+            <div class="flex flex-col items-center gap-2.5 p-4 bg-white rounded-2xl border-2 border-slate-100">
+                <div class="w-12 h-12 <?= $def['bg'] ?> rounded-xl grid place-items-center">
+                    <i class="bi <?= $def['icon'] ?> <?= $def['text'] ?> text-xl"></i>
+                </div>
+                <span class="text-xs font-semibold text-slate-700 text-center leading-snug"><?= $def['label'] ?></span>
+            </div>
+            <?php endforeach; ?>
+        </div>
+    </div>
+
+    <?php else: ?>
+    <!-- Visit exists today — normal tiles -->
+    <?php if (isAdmin() && !$hasVisitToday): ?>
+    <div class="flex items-center gap-2 text-xs text-blue-600 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 mb-3">
+        <i class="bi bi-shield-check shrink-0"></i> Admin override — no visit scheduled today, but you can still start forms.
+    </div>
+    <?php endif; ?>
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <?php foreach ($formDefs as $type => $def): ?>
         <a href="<?= BASE_URL ?>/forms/<?= $type ?>.php?patient_id=<?= $id ?>"
@@ -1446,14 +1495,23 @@ $allDone  = count(array_diff($required, $completedForms)) === 0;
         </a>
         <?php endforeach; ?>
     </div>
+    <?php endif; ?>
 </div>
 
 <!-- Wound Care link -->
+<?php if ($canStartForms): ?>
 <a href="<?= BASE_URL ?>/forms/wound_care.php?patient_id=<?= $id ?>"
    class="inline-flex items-center gap-2 mb-6 px-5 py-3 bg-violet-600 hover:bg-violet-700 text-white
           font-semibold rounded-xl transition-all shadow-sm hover:shadow-md active:scale-95 text-sm">
     <i class="bi bi-camera-fill"></i> Add Wound Photos
 </a>
+<?php else: ?>
+<button disabled
+        class="inline-flex items-center gap-2 mb-6 px-5 py-3 bg-slate-200 text-slate-400 cursor-not-allowed
+               font-semibold rounded-xl text-sm">
+    <i class="bi bi-camera-fill"></i> Add Wound Photos
+</button>
+<?php endif; ?>
 <?php endif; // canAccessClinical form tiles ?>
 
 <!-- Tab Nav -->

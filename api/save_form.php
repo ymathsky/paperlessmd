@@ -32,6 +32,20 @@ if (!$chk->fetch()) {
     die('Patient not found.');
 }
 
+// Non-admin: require a scheduled visit today for this patient
+if (!isAdmin()) {
+    $schedChk = $pdo->prepare("
+        SELECT id FROM `schedule`
+        WHERE patient_id = ? AND visit_date = CURDATE() AND status != 'missed'
+        LIMIT 1
+    ");
+    $schedChk->execute([$patientId]);
+    if (!$schedChk->fetchColumn()) {
+        http_response_code(403);
+        die('No visit scheduled for this patient today. Add a visit on the Schedule page first.');
+    }
+}
+
 // Collect form fields (exclude meta)
 $excludeKeys = ['csrf_token', 'patient_id', 'form_type', 'patient_signature', 'ma_signature', 'poa_name', 'poa_relationship'];
 $formData    = [];
