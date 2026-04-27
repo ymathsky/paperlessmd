@@ -4,7 +4,13 @@ header('Content-Type: text/html; charset=UTF-8');
 // Build esign count once (used in sidebar)
 $_esignCount = 0;
 if (!isBilling()) {
-    $_esignCount = (int)$pdo->query("SELECT COUNT(*) FROM form_submissions WHERE status IN ('signed','uploaded') AND (provider_signature IS NULL OR provider_signature = '')")->fetchColumn();
+    if (isAdmin()) {
+        $_esignCount = (int)$pdo->query("SELECT COUNT(*) FROM form_submissions WHERE status IN ('signed','uploaded') AND (provider_signature IS NULL OR provider_signature = '')")->fetchColumn();
+    } else {
+        $__esignStmt = $pdo->prepare("SELECT COUNT(*) FROM form_submissions WHERE status IN ('signed','uploaded') AND (provider_signature IS NULL OR provider_signature = '') AND ma_id = ?");
+        $__esignStmt->execute([$_SESSION['user_id']]);
+        $_esignCount = (int)$__esignStmt->fetchColumn();
+    }
 }
 // Notification data
 $_pendingUpload = 0;
