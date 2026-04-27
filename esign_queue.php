@@ -22,6 +22,12 @@ $dateFilter = in_array($_GET['date'] ?? '', $allowedDates, true) ? $_GET['date']
 $where  = ["fs.status IN ('signed','uploaded')", "(fs.provider_signature IS NULL OR fs.provider_signature = '')"];
 $params = [];
 
+// Non-admin users only see forms they collected
+if (!isAdmin()) {
+    $where[] = 'fs.ma_id = ?';
+    $params[] = (int)$_SESSION['user_id'];
+}
+
 if ($typeFilter !== 'all') {
     $where[] = 'fs.form_type = ?';
     $params[] = $typeFilter;
@@ -36,7 +42,9 @@ $sql = "
     SELECT fs.id, fs.form_type, fs.status, fs.created_at,
            p.id AS patient_id,
            CONCAT(p.first_name,' ',p.last_name) AS patient_name,
-           s.full_name AS ma_name
+           s.full_name AS ma_name,
+           s.id AS ma_id_val,
+           fs.ma_id
     FROM form_submissions fs
     JOIN patients p ON p.id = fs.patient_id
     LEFT JOIN staff s ON s.id = fs.ma_id
@@ -228,8 +236,15 @@ include __DIR__ . '/includes/header.php';
                     </td>
 
                     <!-- MA -->
-                    <td class="px-5 py-3.5 text-slate-500 text-sm">
-                        <?= $row['ma_name'] ? htmlspecialchars($row['ma_name'], ENT_QUOTES, 'UTF-8') : '<span class="text-slate-300">—</span>' ?>
+                    <td class="px-5 py-3.5">
+                        <?php if ($row['ma_name']): ?>
+                        <div class="font-medium text-slate-700"><?= htmlspecialchars($row['ma_name'], ENT_QUOTES, 'UTF-8') ?></div>
+                        <div class="text-xs text-slate-400 mt-0.5">
+                            <i class="bi bi-clock mr-1"></i>Assigned <?= date('M j, Y g:i A', strtotime($row['created_at'])) ?>
+                        </div>
+                        <?php else: ?>
+                        <span class="text-slate-300">—</span>
+                        <?php endif; ?>
                     </td>
 
                     <!-- Status -->
