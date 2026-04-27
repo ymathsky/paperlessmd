@@ -1451,7 +1451,7 @@ $allDone  = count(array_diff($required, $completedForms)) === 0;
     <h3 class="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3">Start a Form</h3>
 
     <?php if (!$canStartForms): ?>
-    <!-- No visit today — locked state -->
+    <!-- No visit today — most forms locked, intake forms still accessible -->
     <div class="relative rounded-2xl overflow-hidden">
         <!-- Dim overlay -->
         <div class="absolute inset-0 bg-white/80 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center gap-2 rounded-2xl">
@@ -1459,7 +1459,7 @@ $allDone  = count(array_diff($required, $completedForms)) === 0;
                 <i class="bi bi-calendar-x text-amber-500 text-xl shrink-0"></i>
                 <div>
                     <p class="text-sm font-bold text-amber-800">No visit scheduled for today</p>
-                    <p class="text-xs text-amber-600 mt-0.5">Add a visit on the <a href="<?= BASE_URL ?>/schedule.php" class="underline hover:text-amber-800">Schedule</a> to unlock forms.</p>
+                    <p class="text-xs text-amber-600 mt-0.5">Add a visit on the <a href="<?= BASE_URL ?>/schedule.php" class="underline hover:text-amber-800">Schedule</a> to unlock visit forms.</p>
                 </div>
             </div>
         </div>
@@ -1475,6 +1475,25 @@ $allDone  = count(array_diff($required, $completedForms)) === 0;
             <?php endforeach; ?>
         </div>
     </div>
+    <!-- Intake forms always available (no visit needed) -->
+    <?php $intakeDefs = array_intersect_key($formDefs, array_flip(['new_patient', 'new_patient_pocket', 'pf_signup'])); ?>
+    <?php if (!empty($intakeDefs)): ?>
+    <div class="mt-3">
+        <p class="text-xs text-slate-400 font-medium mb-2 uppercase tracking-wide">Intake forms (no visit required)</p>
+        <div class="flex flex-wrap gap-3">
+            <?php foreach ($intakeDefs as $type => $def): ?>
+            <a href="<?= BASE_URL ?>/forms/<?= $type ?>.php?patient_id=<?= $id ?>"
+               class="flex flex-col items-center gap-2 p-4 bg-white rounded-2xl border-2 border-blue-100
+                      hover:border-blue-300 hover:shadow-md transition-all group cursor-pointer w-36">
+                <div class="w-12 h-12 <?= $def['bg'] ?> rounded-xl grid place-items-center group-hover:scale-105 transition-transform">
+                    <i class="bi <?= $def['icon'] ?> <?= $def['text'] ?> text-xl"></i>
+                </div>
+                <span class="text-xs font-semibold text-slate-700 text-center leading-snug"><?= $def['label'] ?></span>
+            </a>
+            <?php endforeach; ?>
+        </div>
+    </div>
+    <?php endif; ?>
 
     <?php else: ?>
     <!-- Visit exists today — normal tiles -->

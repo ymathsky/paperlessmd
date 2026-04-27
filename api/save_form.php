@@ -33,7 +33,9 @@ if (!$chk->fetch()) {
 }
 
 // Non-admin: require a scheduled visit today for this patient
-if (!isAdmin()) {
+// (exempt intake forms — new patients won't have a visit on schedule yet)
+$intakeForms = ['new_patient', 'new_patient_pocket', 'pf_signup'];
+if (!isAdmin() && !in_array($formType, $intakeForms, true)) {
     $schedChk = $pdo->prepare("
         SELECT id FROM `schedule`
         WHERE patient_id = ? AND visit_date = CURDATE() AND status != 'missed'
@@ -125,8 +127,8 @@ auditLog($pdo, 'form_create', 'form', (int)$newId, $formType, 'patient_id=' . $p
 // ── Medication reconciliation for Visit Consent forms ─────────────────────
 if ($formType === 'vital_cs' || $formType === 'new_patient_pocket') {
     $staffId  = (int)$_SESSION['user_id'];
-    // Use submitted med_count (dynamic rows), cap at 30 for safety
-    $medCount = min(30, max(6, (int)($formData['med_count'] ?? 6)));
+    // Use submitted med_count (dynamic rows), read from $_POST since it's excluded from $formData; cap at 30
+    $medCount = min(30, max(6, (int)($_POST['med_count'] ?? 6)));
     try {
         for ($i = 1; $i <= $medCount; $i++) {
             $medId   = (int)($formData["med_id_$i"] ?? 0);
