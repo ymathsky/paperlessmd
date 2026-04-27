@@ -63,6 +63,8 @@ if ($maSig && !preg_match('/^data:image\/png;base64,[A-Za-z0-9+\/=]+$/', $maSig)
 }
 
 // Validate and require provider_signature for new_patient_pocket
+$providerSig       = null;
+$providerPrintName = null;
 if ($formType === 'new_patient_pocket') {
     $providerSig = $formData['provider_signature'] ?? '';
     if ($providerSig && !preg_match('/^data:image\/png;base64,[A-Za-z0-9+\/=]+$/', $providerSig)) {
@@ -73,6 +75,7 @@ if ($formType === 'new_patient_pocket') {
         http_response_code(400);
         die('Provider signature is required.');
     }
+    $providerPrintName = trim($formData['provider_print_name'] ?? '') ?: null;
 }
 
 // Require both signatures
@@ -104,8 +107,8 @@ if ($signature) {
 
 $stmt   = $pdo->prepare("
     INSERT INTO form_submissions
-        (patient_id, form_type, form_data, patient_signature, ma_signature, poa_name, poa_relationship, ma_id, status, signed_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+        (patient_id, form_type, form_data, patient_signature, ma_signature, poa_name, poa_relationship, ma_id, status, signed_at, provider_signature, provider_name)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?)
 ");
 $stmt->execute([
     $patientId,
@@ -117,6 +120,8 @@ $stmt->execute([
     $poaRel    ?: null,
     $_SESSION['user_id'],
     $status,
+    $providerSig       ?: null,
+    $providerPrintName ?: null,
 ]);
 
 $newId = $pdo->lastInsertId();
