@@ -395,15 +395,80 @@
 
     // Standard beforeinstallprompt (Chrome / Android / Edge)
     var _deferredInstallPrompt = null;
+    var ANDROID_DISMISS_KEY = 'pwa_android_dismissed';
+
+    function androidPromptDismissed() {
+        try {
+            var val = localStorage.getItem(ANDROID_DISMISS_KEY);
+            if (!val) return false;
+            return (Date.now() - parseInt(val, 10)) < 7 * 24 * 60 * 60 * 1000; // 7 days
+        } catch (e) { return false; }
+    }
+
+    function showAndroidBanner() {
+        if (!_deferredInstallPrompt) return;
+        if (androidPromptDismissed()) return;
+        // Only show bottom banner on mobile viewports; desktop uses sidebar button
+        if (window.innerWidth >= 768) return;
+
+        var existing = document.getElementById('pwa-android-banner');
+        if (existing) return;
+
+        // Re-use same slide-up style injected for iOS banner
+        if (!document.getElementById('pwa-ios-style')) {
+            var st = document.createElement('style');
+            st.id = 'pwa-ios-style';
+            st.textContent = '@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}';
+            document.head.appendChild(st);
+        }
+
+        var banner = document.createElement('div');
+        banner.id = 'pwa-android-banner';
+        banner.style.cssText = [
+            'position:fixed', 'bottom:0', 'left:0', 'right:0', 'z-index:9999',
+            'background:#1e3a8a', 'color:#fff', 'padding:14px 16px',
+            'display:flex', 'align-items:center', 'gap:12px',
+            'box-shadow:0 -4px 24px rgba(0,0,0,0.25)',
+            'font-family:system-ui,sans-serif', 'font-size:14px',
+            'animation:slideUp .3s ease'
+        ].join(';');
+
+        banner.innerHTML =
+            '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:.9"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg>' +
+            '<div style="flex:1;line-height:1.45">' +
+              '<strong style="display:block;font-size:15px">Install PaperlessMD</strong>' +
+              'Add to your home screen for quick access' +
+            '</div>' +
+            '<button id="pwa-android-install" style="background:#3b82f6;border:none;border-radius:8px;color:#fff;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0">Install</button>' +
+            '<button id="pwa-android-dismiss" style="background:rgba(255,255,255,0.15);border:none;border-radius:8px;color:#fff;padding:8px 10px;font-size:13px;cursor:pointer;flex-shrink:0;margin-left:4px">✕</button>';
+
+        document.body.appendChild(banner);
+
+        document.getElementById('pwa-android-install').addEventListener('click', function () {
+            if (!_deferredInstallPrompt) return;
+            _deferredInstallPrompt.prompt();
+            _deferredInstallPrompt.userChoice.then(function () {
+                _deferredInstallPrompt = null;
+                banner.remove();
+            });
+        });
+
+        document.getElementById('pwa-android-dismiss').addEventListener('click', function () {
+            try { localStorage.setItem(ANDROID_DISMISS_KEY, String(Date.now())); } catch(e) {}
+            banner.style.transform = 'translateY(100%)';
+            banner.style.transition = 'transform .3s ease';
+            setTimeout(function () { banner.remove(); }, 320);
+        });
+    }
 
     function wireInstallPrompt() {
         window.addEventListener('beforeinstallprompt', function (e) {
             e.preventDefault();
             _deferredInstallPrompt = e;
 
-            // Show an install button in the sidebar/nav if present
+            // Desktop: show Install App button in the sidebar
             var btn = document.getElementById('pwa-install-btn');
-            if (btn) {
+            if (btn && window.innerWidth >= 768) {
                 btn.style.display = '';
                 btn.addEventListener('click', function () {
                     if (!_deferredInstallPrompt) return;
@@ -414,12 +479,17 @@
                     });
                 });
             }
+
+            // Mobile (Android): show bottom banner
+            showAndroidBanner();
         });
 
         window.addEventListener('appinstalled', function () {
             _deferredInstallPrompt = null;
             var btn = document.getElementById('pwa-install-btn');
             if (btn) btn.style.display = 'none';
+            var banner = document.getElementById('pwa-android-banner');
+            if (banner) banner.remove();
         });
     }
 
