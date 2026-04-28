@@ -186,6 +186,14 @@ $vtOptions = ['New', 'Follow Up', 'Sick', 'Post Hospital F/U'];
         </tbody>
     </table>
 
+    <?php if (!empty($data['med_handwriting'])): ?>
+    <div style="margin-top:6pt;">
+        <p style="font-size:8pt;color:#666;margin-bottom:3pt;">Handwritten Medication Notes:</p>
+        <img src="<?= h($data['med_handwriting']) ?>" alt="Handwritten medications"
+             style="max-width:100%;border:1px solid #e2e8f0;border-radius:4px;background:#fff;">
+    </div>
+    <?php endif; ?>
+
     <!-- Signatures -->
     <div class="bwc-sigs">
         <div class="bwc-sig-row">

@@ -442,6 +442,16 @@ include __DIR__ . '/../includes/header.php';
                 Set type to <strong class="text-red-600">D/C</strong> to discontinue &mdash;
                 <strong class="text-emerald-600">New</strong> rows are added to the master list on save.
             </p>
+
+            <!-- Handwriting pad (tablet stylus) -->
+            <?php
+            $hwFieldName   = 'med_handwriting';
+            $hwFieldId     = 'medHandwritingData';
+            $hwLabel       = 'Handwrite Medications (stylus / draw)';
+            $hwPlaceholder = 'Write medication names, doses &amp; frequencies with your stylus or finger&hellip;';
+            $hwExisting    = '';
+            include __DIR__ . '/../includes/handwriting_pad.php';
+            ?>
         </div><!-- /step 3 -->
 
 

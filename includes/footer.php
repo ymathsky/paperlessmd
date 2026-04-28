@@ -269,6 +269,7 @@
 <script src="<?= BASE_URL ?>/assets/js/signature_pad.min.js"></script>
 <script src="<?= BASE_URL ?>/assets/js/app.js?v=2"></script>
 <script src="<?= BASE_URL ?>/assets/js/form-wizard.js"></script>
+<script src="<?= BASE_URL ?>/assets/js/handwriting.js"></script>
 <script>
 window._pdBase = '<?= BASE_URL ?>';
 window._pdCompany = '<?= htmlspecialchars(($patient['company'] ?? PRACTICE_NAME), ENT_QUOTES, 'UTF-8') ?>';

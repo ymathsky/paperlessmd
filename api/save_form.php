@@ -62,6 +62,13 @@ if ($maSig && !preg_match('/^data:image\/png;base64,[A-Za-z0-9+\/=]+$/', $maSig)
     $maSig = '';
 }
 
+// Validate med_handwriting if provided (strip if invalid)
+if (!empty($formData['med_handwriting'])) {
+    if (!preg_match('/^data:image\/png;base64,[A-Za-z0-9+\/=]+$/', $formData['med_handwriting'])) {
+        unset($formData['med_handwriting']);
+    }
+}
+
 // Validate and require provider_signature for new_patient_pocket
 $providerSig       = null;
 $providerPrintName = null;
