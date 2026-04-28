@@ -12,16 +12,22 @@
     "categories": ["medical", "health"],
     "icons": [
         {
-            "src": "/pd/assets/img/pwa-icon.svg",
-            "sizes": "any",
-            "type": "image/svg+xml",
+            "src": "/pd/assets/img/apple-touch-icon.png",
+            "sizes": "180x180",
+            "type": "image/png",
             "purpose": "any"
+        },
+        {
+            "src": "/pd/assets/img/apple-touch-icon.png",
+            "sizes": "180x180",
+            "type": "image/png",
+            "purpose": "maskable"
         },
         {
             "src": "/pd/assets/img/pwa-icon.svg",
             "sizes": "any",
             "type": "image/svg+xml",
-            "purpose": "maskable"
+            "purpose": "any"
         }
     ]
 }

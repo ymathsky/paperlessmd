@@ -205,6 +205,12 @@ if (!isBilling()) {
             <i class="bi bi-box-arrow-right text-base w-5 shrink-0 text-center"></i>
             <span>Sign Out</span>
         </a>
+        <!-- PWA install button — shown by JS only on supporting browsers (Chrome/Edge/Android) -->
+        <button id="pwa-install-btn" style="display:none"
+                class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-blue-200 hover:bg-white/10 hover:text-white transition-all duration-150 w-full text-left">
+            <i class="bi bi-download text-base w-5 shrink-0 text-center"></i>
+            <span>Install App</span>
+        </button>
     </div>
 </aside>
 

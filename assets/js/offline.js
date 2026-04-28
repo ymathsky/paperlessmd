@@ -329,6 +329,100 @@
         });
     }
 
+    /* ── PWA Install Prompt ─────────────────────────────────────── */
+    // Storage key for dismissal
+    var IOS_DISMISS_KEY = 'pwa_ios_dismissed';
+
+    function isIosSafari() {
+        var ua = navigator.userAgent;
+        // iOS device (iPhone/iPad/iPod) NOT already installed as PWA
+        return /iphone|ipad|ipod/i.test(ua) &&
+               /safari/i.test(ua) &&
+               !/crios|fxios|opios|chrome/i.test(ua) &&
+               !('standalone' in navigator && navigator.standalone);
+    }
+
+    function iosPromptDismissed() {
+        try {
+            var val = localStorage.getItem(IOS_DISMISS_KEY);
+            if (!val) return false;
+            return (Date.now() - parseInt(val, 10)) < 7 * 24 * 60 * 60 * 1000; // 7 days
+        } catch (e) { return false; }
+    }
+
+    function showIosBanner() {
+        if (!isIosSafari() || iosPromptDismissed()) return;
+
+        var banner = document.createElement('div');
+        banner.id = 'pwa-ios-banner';
+        banner.style.cssText = [
+            'position:fixed', 'bottom:0', 'left:0', 'right:0', 'z-index:9999',
+            'background:#1e3a8a', 'color:#fff', 'padding:14px 16px',
+            'display:flex', 'align-items:center', 'gap:12px',
+            'box-shadow:0 -4px 24px rgba(0,0,0,0.25)',
+            'font-family:system-ui,sans-serif', 'font-size:14px',
+            'animation:slideUp .3s ease'
+        ].join(';');
+
+        // Add slide-up keyframe once
+        if (!document.getElementById('pwa-ios-style')) {
+            var st = document.createElement('style');
+            st.id = 'pwa-ios-style';
+            st.textContent = '@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}';
+            document.head.appendChild(st);
+        }
+
+        // iOS share icon SVG (matches the real Safari Share button)
+        var shareIcon = '<svg width="20" height="20" viewBox="0 0 50 50" fill="currentColor" style="flex-shrink:0;opacity:.9"><path d="M30.3 10l-4.8-4.8v26.3h-1V5.2L19.7 10l-.7-.7L25 3.3l6 5.9z"/><path d="M35 16H15c-2.8 0-5 2.2-5 5v16c0 2.8 2.2 5 5 5h20c2.8 0 5-2.2 5-5V21c0-2.8-2.2-5-5-5zm4 21c0 2.2-1.8 4-4 4H15c-2.2 0-4-1.8-4-4V21c0-2.2 1.8-4 4-4h20c2.2 0 4 1.8 4 4v16z"/></svg>';
+
+        banner.innerHTML = shareIcon +
+            '<div style="flex:1;line-height:1.45">' +
+              '<strong style="display:block;font-size:15px">Install PaperlessMD</strong>' +
+              'Tap <svg width="16" height="16" viewBox="0 0 50 50" fill="currentColor" style="vertical-align:middle;margin:0 2px"><path d="M30.3 10l-4.8-4.8v26.3h-1V5.2L19.7 10l-.7-.7L25 3.3l6 5.9z"/><path d="M35 16H15c-2.8 0-5 2.2-5 5v16c0 2.8 2.2 5 5 5h20c2.8 0 5-2.2 5-5V21c0-2.8-2.2-5-5-5zm4 21c0 2.2-1.8 4-4 4H15c-2.2 0-4-1.8-4-4V21c0-2.2 1.8-4 4-4h20c2.2 0 4 1.8 4 4v16z"/></svg>' +
+              ' then <strong>"Add to Home Screen"</strong>' +
+            '</div>' +
+            '<button id="pwa-ios-dismiss" style="background:rgba(255,255,255,0.15);border:none;border-radius:8px;color:#fff;padding:8px 14px;font-size:13px;cursor:pointer;flex-shrink:0">Later</button>';
+
+        document.body.appendChild(banner);
+
+        document.getElementById('pwa-ios-dismiss').addEventListener('click', function () {
+            try { localStorage.setItem(IOS_DISMISS_KEY, String(Date.now())); } catch(e) {}
+            banner.style.transform = 'translateY(100%)';
+            banner.style.transition = 'transform .3s ease';
+            setTimeout(function () { banner.remove(); }, 320);
+        });
+    }
+
+    // Standard beforeinstallprompt (Chrome / Android / Edge)
+    var _deferredInstallPrompt = null;
+
+    function wireInstallPrompt() {
+        window.addEventListener('beforeinstallprompt', function (e) {
+            e.preventDefault();
+            _deferredInstallPrompt = e;
+
+            // Show an install button in the sidebar/nav if present
+            var btn = document.getElementById('pwa-install-btn');
+            if (btn) {
+                btn.style.display = '';
+                btn.addEventListener('click', function () {
+                    if (!_deferredInstallPrompt) return;
+                    _deferredInstallPrompt.prompt();
+                    _deferredInstallPrompt.userChoice.then(function () {
+                        _deferredInstallPrompt = null;
+                        btn.style.display = 'none';
+                    });
+                });
+            }
+        });
+
+        window.addEventListener('appinstalled', function () {
+            _deferredInstallPrompt = null;
+            var btn = document.getElementById('pwa-install-btn');
+            if (btn) btn.style.display = 'none';
+        });
+    }
+
     /* ── Init ───────────────────────────────────────────────────── */
     function init() {
         setOfflineUI(!navigator.onLine);
@@ -336,6 +430,8 @@
         wireFormIntercept();
         wireSyncButton();
         registerSW();
+        wireInstallPrompt();
+        showIosBanner();
 
         window.addEventListener('online', function () {
             setOfflineUI(false);
