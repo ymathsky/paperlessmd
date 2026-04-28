@@ -74,6 +74,7 @@ include __DIR__ . '/../includes/header.php';
                     <div>
                         <label class="block text-sm font-semibold text-slate-700 mb-1.5">MA Name</label>
                         <input type="text" name="ma_name" value="<?= h($_SESSION['full_name'] ?? '') ?>"
+                               required data-label="MA Name"
                                class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
                                       focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition focus:bg-white">
                     </div>
@@ -89,6 +90,7 @@ include __DIR__ . '/../includes/header.php';
                     <label class="flex items-center gap-3 p-3.5 border border-slate-200 rounded-xl cursor-pointer
                                   hover:border-blue-300 hover:bg-blue-50/50 transition-colors has-[:checked]:border-blue-400 has-[:checked]:bg-blue-50">
                         <input type="checkbox" name="consent_treatment" value="1"
+                               required data-label="Consent to Treatment"
                                class="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-400">
                         <span class="text-sm font-medium text-slate-700">I consent to treatment as described above.</span>
                     </label>
@@ -103,6 +105,7 @@ include __DIR__ . '/../includes/header.php';
                     <label class="flex items-center gap-3 p-3.5 border border-slate-200 rounded-xl cursor-pointer
                                   hover:border-blue-300 hover:bg-blue-50/50 transition-colors has-[:checked]:border-blue-400 has-[:checked]:bg-blue-50">
                         <input type="checkbox" name="consent_hipaa" value="1"
+                               required data-label="HIPAA Privacy Notice"
                                class="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-400">
                         <span class="text-sm font-medium text-slate-700">I have received and reviewed the HIPAA Notice of Privacy Practices.</span>
                     </label>
@@ -117,6 +120,7 @@ include __DIR__ . '/../includes/header.php';
                     <label class="flex items-center gap-3 p-3.5 border border-slate-200 rounded-xl cursor-pointer
                                   hover:border-blue-300 hover:bg-blue-50/50 transition-colors has-[:checked]:border-blue-400 has-[:checked]:bg-blue-50">
                         <input type="checkbox" name="consent_financial" value="1"
+                               required data-label="Financial Responsibility"
                                class="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-400">
                         <span class="text-sm font-medium text-slate-700">I accept financial responsibility for all charges.</span>
                     </label>
@@ -133,6 +137,7 @@ include __DIR__ . '/../includes/header.php';
                     <div class="sm:col-span-1">
                         <label class="block text-xs font-semibold text-slate-600 mb-1.5">Name</label>
                         <input type="text" name="emergency_name"
+                               required data-label="Emergency Contact Name"
                                class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
                                       focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition focus:bg-white"
                                placeholder="Full name">
@@ -147,6 +152,7 @@ include __DIR__ . '/../includes/header.php';
                     <div>
                         <label class="block text-xs font-semibold text-slate-600 mb-1.5">Phone</label>
                         <input type="tel" name="emergency_phone"
+                               required data-label="Emergency Contact Phone"
                                class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
                                       focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition focus:bg-white"
                                placeholder="(555) 555-5555">

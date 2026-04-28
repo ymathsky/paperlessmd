@@ -104,6 +104,7 @@ include __DIR__ . '/../includes/header.php';
                     <div class="grid grid-cols-1 sm:grid-cols-3">
                         <div class="p-4 sm:border-r border-slate-200">
                             <textarea name="service_description" rows="4"
+                                      required data-label="Service / Item Description"
                                       class="w-full text-sm bg-transparent border-0 focus:outline-none resize-none text-slate-700"
                                       placeholder="Medicare covers 80% of home visit for wound care. If secondary insurance is available, will bill 20% to secondary insurance."
                                       >Medicare covers 80% of home visit for wound care.
@@ -111,6 +112,7 @@ If secondary insurance is available will bill 20% to secondary insurance.</texta
                         </div>
                         <div class="p-4 sm:border-r border-slate-200">
                             <textarea name="reason_not_paid" rows="4"
+                                      required data-label="Reason Medicare May Not Pay"
                                       class="w-full text-sm bg-transparent border-0 focus:outline-none resize-none text-slate-700"
                                       placeholder="Medicare covers 80% leaving 20% to be billed..."
                                       >Medicare covers 80% leaving 20% to be billed. This will be billed to a secondary insurance if available. If patient does not have a secondary insurance will be billed FOR 20%</textarea>
@@ -152,6 +154,7 @@ If secondary insurance is available will bill 20% to secondary insurance.</texta
                     <label class="flex items-start gap-3 p-4 border border-slate-200 rounded-xl cursor-pointer
                                   hover:border-amber-300 hover:bg-amber-50/50 transition-colors has-[:checked]:border-amber-400 has-[:checked]:bg-amber-50">
                         <input type="radio" name="patient_option" value="1"
+                               required data-label="Patient Option (G)"
                                class="mt-0.5 w-4 h-4 text-amber-500 border-slate-300 focus:ring-amber-400 flex-shrink-0">
                         <div class="text-sm text-slate-700">
                             <span class="font-bold">OPTION 1.</span> I want the Office visit listed above. You may ask to be paid now, but I also want Medicare billed for an official decision on payment, which is sent to me on a Medicare Summary Notice (MSN). I understand that if Medicare doesn't pay, I am responsible for payment, but I can appeal to Medicare by following the directions on the MSN. If Medicare does pay, you will refund any payments I made to you, less co-pays or deductibles.

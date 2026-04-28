@@ -131,34 +131,83 @@
         }
 
         function validateStep(idx) {
-            const step     = steps[idx];
-            const required = step.querySelectorAll('[required]');
-            let ok         = true;
-            required.forEach(function (el) {
-                el.classList.remove('wiz-invalid');
-                if (!el.value.trim()) {
-                    el.classList.add('wiz-invalid');
-                    if (ok) { el.focus(); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+            const step    = steps[idx];
+            let ok        = true;
+            const missing = [];
+            const radioGroups = {};
+
+            // Remove prior error state in this step
+            step.querySelectorAll('.pd-req-error, .wiz-invalid, .wiz-radio-invalid').forEach(function (el) {
+                el.classList.remove('pd-req-error', 'wiz-invalid', 'wiz-radio-invalid', 'ring-2', 'ring-red-500', '!border-red-400');
+            });
+            const oldBanner = step.querySelector('#pdStepBanner');
+            if (oldBanner) oldBanner.remove();
+
+            step.querySelectorAll('[required]').forEach(function (el) {
+                if (el.type === 'radio') {
+                    radioGroups[el.name] = radioGroups[el.name] || [];
+                    radioGroups[el.name].push(el);
+                    return;
+                }
+                if (el.type === 'checkbox') {
+                    if (!el.checked) {
+                        const lbl = el.closest('label') || el.parentElement;
+                        if (lbl) lbl.classList.add('pd-req-error', '!border-red-400', 'ring-2', 'ring-red-500');
+                        missing.push(el.getAttribute('data-label') || el.name);
+                        ok = false;
+                        el.addEventListener('change', function () {
+                            const lbl2 = el.closest('label') || el.parentElement;
+                            if (lbl2) lbl2.classList.remove('pd-req-error', '!border-red-400', 'ring-2', 'ring-red-500');
+                        }, { once: true });
+                    }
+                    return;
+                }
+                el.classList.remove('wiz-invalid', 'pd-req-error');
+                if (!(el.value || '').trim()) {
+                    el.classList.add('wiz-invalid', 'pd-req-error', 'ring-2', 'ring-red-500', '!border-red-400');
+                    missing.push(el.getAttribute('data-label') || el.placeholder || el.name);
                     ok = false;
+                    if (missing.length === 1) { el.focus(); el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+                    el.addEventListener('input', function () {
+                        el.classList.remove('wiz-invalid', 'pd-req-error', 'ring-2', 'ring-red-500', '!border-red-400');
+                    }, { once: true });
                 }
             });
 
-            // Radio groups: check at least one selected
-            const radioGroups = {};
-            step.querySelectorAll('input[type="radio"][required]').forEach(function (r) {
-                radioGroups[r.name] = radioGroups[r.name] || [];
-                radioGroups[r.name].push(r);
-            });
+            // Radio groups
             Object.keys(radioGroups).forEach(function (name) {
                 const group = radioGroups[name];
                 const checked = group.some(r => r.checked);
                 if (!checked) {
-                    group.forEach(r => r.closest('label')?.classList.add('wiz-radio-invalid'));
+                    const wrap = group[0].closest('[data-req-group]') || group[0].closest('.grid') || group[0].parentElement;
+                    if (wrap) wrap.classList.add('pd-req-error', 'ring-2', 'ring-red-500', 'rounded-xl');
+                    group.forEach(function (r) {
+                        r.closest('label')?.classList.add('wiz-radio-invalid');
+                        r.addEventListener('change', function () {
+                            if (wrap) wrap.classList.remove('pd-req-error', 'ring-2', 'ring-red-500');
+                            group.forEach(r2 => r2.closest('label')?.classList.remove('wiz-radio-invalid'));
+                        }, { once: true });
+                    });
+                    missing.push(group[0].getAttribute('data-label') || name);
                     ok = false;
-                } else {
-                    group.forEach(r => r.closest('label')?.classList.remove('wiz-radio-invalid'));
                 }
             });
+
+            if (!ok && missing.length) {
+                const banner = document.createElement('div');
+                banner.id = 'pdStepBanner';
+                banner.className = 'flex items-start gap-3 bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded-xl text-sm mb-4';
+                banner.innerHTML =
+                    '<i class="bi bi-exclamation-triangle-fill text-base shrink-0 mt-0.5"></i>' +
+                    '<div class="flex-1"><strong class="font-bold block mb-1">Complete before continuing:</strong>' +
+                    '<ul class="list-disc ml-4 space-y-0.5">' +
+                    missing.map(function (m) { return '<li>' + m + '</li>'; }).join('') +
+                    '</ul></div>' +
+                    '<button type="button" onclick="this.parentElement.remove()" ' +
+                    'class="shrink-0 text-red-400 hover:text-red-600 text-xl font-bold leading-none ml-2">&times;</button>';
+                step.insertBefore(banner, step.firstChild);
+                banner.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
 
             return ok;
         }

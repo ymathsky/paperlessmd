@@ -148,6 +148,7 @@ include __DIR__ . '/../includes/header.php';
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">Provider</label>
                     <input type="text" name="provider_name"
+                           required data-label="Provider Name"
                            class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
                                   focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition focus:bg-white"
                            placeholder="Attending provider name">
@@ -155,6 +156,7 @@ include __DIR__ . '/../includes/header.php';
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">Date of Visit</label>
                     <input type="date" name="form_date" value="<?= date('Y-m-d') ?>"
+                           required data-label="Date of Visit"
                            class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
                                   focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition focus:bg-white">
                 </div>
@@ -164,14 +166,15 @@ include __DIR__ . '/../includes/header.php';
             <div>
                 <label class="block text-sm font-bold text-slate-700 mb-3">Visit Type</label>
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
-                    <?php foreach (['New','Follow Up','Sick','Post Hospital F/U'] as $vt): ?>
+                    <?php $vt_first = true; foreach (['New','Follow Up','Sick','Post Hospital F/U'] as $vt): ?>
                     <label class="flex items-center gap-2.5 p-3 border border-slate-200 rounded-xl cursor-pointer
                                   hover:border-red-300 hover:bg-red-50/50 transition-colors has-[:checked]:border-red-400 has-[:checked]:bg-red-50">
                         <input type="radio" name="visit_type" value="<?= $vt ?>"
+                               <?= $vt_first ? 'required data-label="Visit Type"' : '' ?>
                                class="w-4 h-4 text-red-600 border-slate-300 focus:ring-red-400 flex-shrink-0">
                         <span class="text-sm font-medium text-slate-700"><?= $vt ?></span>
                     </label>
-                    <?php endforeach; ?>
+                    <?php $vt_first = false; endforeach; ?>
                 </div>
                 <div class="grid grid-cols-3 gap-4">
                     <div>
@@ -184,12 +187,14 @@ include __DIR__ . '/../includes/header.php';
                     <div>
                         <label class="block text-xs font-semibold text-slate-600 mb-1.5">Time In</label>
                         <input type="time" name="time_in"
+                               required data-label="Time In"
                                class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
                                       focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition focus:bg-white">
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-slate-600 mb-1.5">Time Out</label>
                         <input type="time" name="time_out"
+                               required data-label="Time Out"
                                class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
                                       focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition focus:bg-white">
                     </div>
@@ -203,6 +208,7 @@ include __DIR__ . '/../includes/header.php';
                     <label class="flex items-center gap-3 p-4 border-2 border-slate-200 rounded-xl cursor-pointer
                                   hover:border-red-300 hover:bg-red-50/50 transition-colors has-[:checked]:border-red-500 has-[:checked]:bg-red-50">
                         <input type="radio" name="homebound" value="homebound"
+                               required data-label="Homebound Status"
                                class="w-4 h-4 text-red-600 border-slate-300 focus:ring-red-400">
                         <span class="font-semibold text-slate-700 underline decoration-2">Patient IS Homebound</span>
                     </label>
@@ -241,24 +247,25 @@ include __DIR__ . '/../includes/header.php';
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <?php
                 $vitals = [
-                    ['name'=>'bp',      'label'=>'BP',       'placeholder'=>'120/80'],
-                    ['name'=>'pulse',   'label'=>'Pulse',    'placeholder'=>'72 bpm'],
-                    ['name'=>'temp',    'label'=>'Temp',     'placeholder'=>'98.6Â°F'],
-                    ['name'=>'o2sat',   'label'=>'O2Sat',    'placeholder'=>'98%'],
-                    ['name'=>'glucose', 'label'=>'Glucose',  'placeholder'=>'mg/dL'],
-                    ['name'=>'height',  'label'=>'Height',   'placeholder'=>'in / cm'],
-                    ['name'=>'weight',  'label'=>'Weight',   'placeholder'=>'lbs / kg'],
-                    ['name'=>'resp',    'label'=>'Resp',     'placeholder'=>'breaths/min'],
+                    ['name'=>'bp',      'label'=>'BP',       'placeholder'=>'120/80',      'req'=>true],
+                    ['name'=>'pulse',   'label'=>'Pulse',    'placeholder'=>'72 bpm',      'req'=>true],
+                    ['name'=>'temp',    'label'=>'Temp',     'placeholder'=>'98.6°F',      'req'=>false],
+                    ['name'=>'o2sat',   'label'=>'O2Sat',    'placeholder'=>'98%',         'req'=>true],
+                    ['name'=>'glucose', 'label'=>'Glucose',  'placeholder'=>'mg/dL',       'req'=>false],
+                    ['name'=>'height',  'label'=>'Height',   'placeholder'=>'in / cm',     'req'=>false],
+                    ['name'=>'weight',  'label'=>'Weight',   'placeholder'=>'lbs / kg',    'req'=>false],
+                    ['name'=>'resp',    'label'=>'Resp',     'placeholder'=>'breaths/min', 'req'=>false],
                 ];
                 foreach ($vitals as $v):
                     $prefilled = pv($prev, $v['name']);
                 ?>
                 <div class="bg-slate-50 border <?= $prefilled ? 'border-amber-300' : 'border-slate-200' ?> rounded-xl p-3">
                     <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">
-                        <?= $v['label'] ?>
+                        <?= $v['label'] ?><?= $v['req'] ? ' <span class="text-red-400">*</span>' : '' ?>
                         <?php if ($prefilled): ?><span class="ml-1 text-amber-400" title="Pre-filled"><i class="bi bi-arrow-counterclockwise"></i></span><?php endif; ?>
                     </label>
                     <input type="text" name="<?= $v['name'] ?>" value="<?= $prefilled ?>"
+                           <?= $v['req'] ? 'required data-label="' . $v['label'] . '"' : '' ?>
                            class="w-full bg-transparent text-sm font-semibold text-slate-800 border-0 border-b border-slate-300 pb-1
                                   focus:outline-none focus:border-red-400 transition"
                            placeholder="<?= $v['placeholder'] ?>">
@@ -273,6 +280,7 @@ include __DIR__ . '/../includes/header.php';
             <div>
                 <label class="block text-sm font-semibold text-slate-700 mb-1.5">Chief Complaint / Notes</label>
                 <textarea name="chief_complaint" rows="4"
+                          required data-label="Chief Complaint"
                           class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
                                  focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition focus:bg-white resize-none"
                           placeholder="Chief complaint and clinical notes..."></textarea>

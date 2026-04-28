@@ -131,6 +131,7 @@ include __DIR__ . '/../includes/header.php';
                     <label class="flex items-start gap-3 p-4 border border-slate-200 rounded-xl cursor-pointer
                                   hover:border-emerald-300 hover:bg-emerald-50/50 transition-colors has-[:checked]:border-emerald-400 has-[:checked]:bg-emerald-50">
                         <input type="checkbox" name="<?= $name ?>" value="1"
+                               required data-label="<?= h($text) ?>"
                                class="mt-0.5 w-4 h-4 text-emerald-600 border-slate-300 rounded focus:ring-emerald-400 flex-shrink-0">
                         <span class="text-sm text-slate-700"><?= h($text) ?></span>
                     </label>
@@ -164,6 +165,7 @@ include __DIR__ . '/../includes/header.php';
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">MA / Staff Name</label>
                     <input type="text" name="ma_name" value="<?= h($_SESSION['full_name'] ?? '') ?>"
+                           required data-label="MA / Staff Name"
                            class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
                                   focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition focus:bg-white">
                 </div>

@@ -137,8 +137,117 @@ document.addEventListener('DOMContentLoaded', function () {
     const mainForm  = document.getElementById('mainForm');
     const submitBtn = document.getElementById('submitBtn');
 
+    // ── Required field validation ─────────────────────────────────────
+    function getLabelText(field) {
+        if (field.id) {
+            var lbl = document.querySelector('label[for="' + field.id + '"]');
+            if (lbl) return lbl.textContent.trim().replace(/\s*\*.*$/, '').trim();
+        }
+        var parent = field.closest('label');
+        if (parent) return parent.textContent.trim().replace(/\s*\*.*$/, '').trim().substring(0, 60);
+        var sibling = field.parentElement && field.parentElement.querySelector('label');
+        if (sibling) return sibling.textContent.trim().replace(/\s*\*.*$/, '').trim();
+        return field.getAttribute('data-label') || field.getAttribute('placeholder') || field.name;
+    }
+
+    function validateRequiredFields() {
+        if (!mainForm) return true;
+
+        // Clear previous error state
+        mainForm.querySelectorAll('.pd-req-error').forEach(function (el) {
+            el.classList.remove('pd-req-error', 'ring-2', 'ring-red-500', '!border-red-400');
+        });
+        var oldBanner = document.getElementById('pdValidationBanner');
+        if (oldBanner) oldBanner.remove();
+
+        var missing   = [];
+        var firstEl   = null;
+        var radiosDone = {};
+
+        mainForm.querySelectorAll('[required]').forEach(function (field) {
+            if (field.disabled || field.closest('.hidden')) return;
+
+            // ── Radio groups ──────────────────────────────────────────
+            if (field.type === 'radio') {
+                if (radiosDone[field.name]) return;
+                radiosDone[field.name] = true;
+                var allR = mainForm.querySelectorAll('input[type="radio"][name="' + field.name.replace(/"/g, '\\"') + '"]');
+                var anyChecked = false;
+                allR.forEach(function (r) { if (r.checked) anyChecked = true; });
+                if (!anyChecked) {
+                    var wrap = field.closest('[data-req-group]') || field.closest('.grid') || field.parentElement;
+                    if (wrap) {
+                        wrap.classList.add('pd-req-error', 'ring-2', 'ring-red-500', 'rounded-xl');
+                        allR.forEach(function (r) {
+                            r.addEventListener('change', function () {
+                                wrap.classList.remove('pd-req-error', 'ring-2', 'ring-red-500');
+                            }, { once: true });
+                        });
+                    }
+                    missing.push(field.getAttribute('data-label') || field.name);
+                    if (!firstEl) firstEl = field;
+                }
+                return;
+            }
+
+            // ── Checkboxes ────────────────────────────────────────────
+            if (field.type === 'checkbox') {
+                if (!field.checked) {
+                    var lbl = field.closest('label') || field.parentElement;
+                    if (lbl) {
+                        lbl.classList.add('pd-req-error', '!border-red-400', 'ring-2', 'ring-red-500');
+                        field.addEventListener('change', function () {
+                            lbl.classList.remove('pd-req-error', '!border-red-400', 'ring-2', 'ring-red-500');
+                        }, { once: true });
+                    }
+                    missing.push(field.getAttribute('data-label') || getLabelText(field));
+                    if (!firstEl) firstEl = field;
+                }
+                return;
+            }
+
+            // ── Text / textarea / date / time / tel / number / select ─
+            if (!(field.value || '').trim()) {
+                field.classList.add('pd-req-error', '!border-red-400', 'ring-2', 'ring-red-500');
+                missing.push(field.getAttribute('data-label') || getLabelText(field));
+                if (!firstEl) firstEl = field;
+                field.addEventListener('input', function () {
+                    field.classList.remove('pd-req-error', '!border-red-400', 'ring-2', 'ring-red-500');
+                }, { once: true });
+                field.addEventListener('change', function () {
+                    field.classList.remove('pd-req-error', '!border-red-400', 'ring-2', 'ring-red-500');
+                }, { once: true });
+            }
+        });
+
+        if (!missing.length) return true;
+
+        // Build summary banner
+        var banner = document.createElement('div');
+        banner.id = 'pdValidationBanner';
+        banner.className = 'flex items-start gap-3 bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded-xl text-sm mb-4';
+        banner.innerHTML =
+            '<i class="bi bi-exclamation-triangle-fill text-base shrink-0 mt-0.5"></i>' +
+            '<div class="flex-1"><strong class="font-bold block mb-1">Please complete the highlighted fields before submitting:</strong>' +
+            '<ul class="list-disc ml-4 space-y-0.5">' +
+            missing.map(function (m) { return '<li>' + m + '</li>'; }).join('') +
+            '</ul></div>' +
+            '<button type="button" onclick="this.parentElement.remove()" ' +
+            'class="shrink-0 text-red-400 hover:text-red-600 text-xl font-bold leading-none ml-2">&times;</button>';
+
+        // Insert at top of the currently visible wizard step (or mainForm)
+        var step = mainForm.querySelector('.wiz-step:not(.hidden)') || mainForm;
+        step.insertBefore(banner, step.firstChild);
+        banner.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+        return false;
+    }
+
     function captureAndSubmit() {
         if (!mainForm) return;
+
+        // ── Required field check first ────────────────────────────────
+        if (!validateRequiredFields()) return;
 
         // Validate patient signature
         const sigAlert   = document.getElementById('sigAlert');
