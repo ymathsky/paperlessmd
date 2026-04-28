@@ -117,6 +117,7 @@ if (!isBilling()) {
             ['href' => '/schedule.php',  'key' => 'schedule',  'icon' => 'bi-calendar3',       'label' => 'Schedule',   'billingHide' => true],
             ['href' => '/esign_queue.php','key'=> 'esign',     'icon' => 'bi-pen-fill',        'label' => 'Sign Queue', 'billingHide' => true, 'badge' => $_esignCount, 'badgeCls' => 'bg-violet-500'],
             ['href' => '/messages.php',  'key' => 'messages',  'icon' => 'bi-chat-dots-fill',  'label' => 'Messages',   'badge' => $_unreadMessages, 'badgeCls' => 'bg-emerald-500'],
+            ['href' => '/whats_new.php', 'key' => 'whats_new', 'icon' => 'bi-rocket-takeoff-fill', 'label' => "What's New"],
         ];
         ?>
         <!-- Search trigger -->
