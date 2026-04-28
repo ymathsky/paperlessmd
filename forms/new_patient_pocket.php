@@ -10,6 +10,14 @@ $pStmt->execute([$patient_id]);
 $patient = $pStmt->fetch();
 if (!$patient) { header('Location: ' . BASE_URL . '/patients.php'); exit; }
 
+// Fetch logged-in user's pre-saved signature for provider auto-fill
+$_provSavedSig = '';
+if (!empty($_SESSION['user_id'])) {
+    $__ps = $pdo->prepare("SELECT saved_signature FROM staff WHERE id = ? LIMIT 1");
+    $__ps->execute([(int)$_SESSION['user_id']]);
+    $_provSavedSig = (string)($__ps->fetchColumn() ?: '');
+}
+
 // One-signature rule
 $_dupQ = $pdo->prepare("SELECT id FROM form_submissions WHERE patient_id = ? AND form_type = 'new_patient_pocket' AND status IN ('signed','uploaded') AND DATE(created_at) = CURDATE() LIMIT 1");
 $_dupQ->execute([$patient_id]);
@@ -870,12 +878,24 @@ If secondary insurance is available will bill 20% to secondary insurance.</texta
                 <div class="bg-gradient-to-r from-violet-600 to-violet-500 px-5 py-3 flex items-center gap-2">
                     <i class="bi bi-person-check-fill text-white"></i>
                     <span class="text-white font-semibold text-sm">Provider / Physician Signature</span>
+                    <?php if ($_provSavedSig): ?>
+                    <span class="ml-auto inline-flex items-center gap-1 text-xs bg-white/20 text-white rounded-full px-2.5 py-0.5">
+                        <i class="bi bi-lightning-charge-fill"></i> Auto-fill on
+                    </span>
+                    <?php endif; ?>
                 </div>
                 <div class="p-5">
                     <div id="providerSigAlert" class="hidden flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm mb-4">
                         <i class="bi bi-exclamation-circle text-lg flex-shrink-0"></i>
                         Provider signature is required before submitting.
                     </div>
+                    <?php if ($_provSavedSig): ?>
+                    <div id="provSavedBanner" class="flex items-center gap-3 bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-2.5 rounded-xl text-sm mb-3">
+                        <i class="bi bi-check-circle-fill shrink-0"></i>
+                        <span class="flex-1">Using your <strong>saved signature</strong>. <a href="<?= BASE_URL ?>/profile.php#savedSigSection" class="underline hover:text-emerald-900 font-semibold" target="_blank">Update in Profile</a></span>
+                        <button type="button" id="useManualProvSig" class="text-xs font-semibold bg-emerald-100 hover:bg-emerald-200 px-3 py-1 rounded-lg transition-colors">Sign manually</button>
+                    </div>
+                    <?php endif; ?>
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                         <div>
                             <label class="block text-sm font-semibold text-slate-700 mb-1.5">Provider Name (Print)</label>
@@ -891,21 +911,26 @@ If secondary insurance is available will bill 20% to secondary insurance.</texta
                                    placeholder="10-digit NPI">
                         </div>
                     </div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-2">Provider sign below
-                        <span class="text-slate-400 font-normal text-xs ml-1">(attending physician / nurse practitioner)</span>
-                    </label>
-                    <div class="sig-wrapper border-2 border-dashed border-slate-300 rounded-2xl focus-within:border-violet-400 transition-colors" id="providerSigWrapper">
-                        <canvas id="providerSigPad"></canvas>
-                        <div class="sig-placeholder">Provider sign here</div>
-                    </div>
-                    <div class="mt-3 flex items-center gap-2">
-                        <button type="button" id="clearProviderSig"
-                                class="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-xl transition-colors">
-                            <i class="bi bi-eraser"></i> Clear
-                        </button>
-                        <span class="text-xs text-slate-400">Provider signature confirms medical supervision and authorization</span>
+                    <div id="provSigPadArea" <?= $_provSavedSig ? 'class="hidden"' : '' ?>>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Provider sign below
+                            <span class="text-slate-400 font-normal text-xs ml-1">(attending physician / nurse practitioner)</span>
+                        </label>
+                        <div class="sig-wrapper border-2 border-dashed border-slate-300 rounded-2xl focus-within:border-violet-400 transition-colors" id="providerSigWrapper">
+                            <canvas id="providerSigPad"></canvas>
+                            <div class="sig-placeholder">Provider sign here</div>
+                        </div>
+                        <div class="mt-3 flex items-center gap-2">
+                            <button type="button" id="clearProviderSig"
+                                    class="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-xl transition-colors">
+                                <i class="bi bi-eraser"></i> Clear
+                            </button>
+                            <span class="text-xs text-slate-400">Provider signature confirms medical supervision and authorization</span>
+                        </div>
                     </div>
                     <input type="hidden" name="provider_signature" id="providerSigData" form="mainForm">
+                    <?php if ($_provSavedSig): ?>
+                    <script>window._pdProvSavedSig = <?= json_encode($_provSavedSig) ?>;</script>
+                    <?php endif; ?>
                 </div>
             </div>
 
@@ -1048,45 +1073,81 @@ $extraJs = <<<JSBLOCK
     var hidden  = document.getElementById('providerSigData');
     var clearBtn = document.getElementById('clearProviderSig');
     var wrapper = document.getElementById('providerSigWrapper');
-    if (!canvas || !window.SignaturePad) return;
+    if (!hidden) return;
 
-    function initProviderPad() {
-        if (canvas._sp) return;
-        canvas.width  = wrapper.offsetWidth  || 600;
-        canvas.height = wrapper.offsetHeight || 140;
-        var sp = new SignaturePad(canvas, {
-            minWidth: 1, maxWidth: 3,
-            penColor: 'rgb(30, 27, 75)'
-        });
-        canvas._sp = sp;
-        sp.addEventListener('endStroke', function () {
-            hidden.value = sp.toDataURL('image/png');
-            var ph = wrapper.querySelector('.sig-placeholder');
-            if (ph) ph.style.display = 'none';
-        });
-        if (hidden.value) {
-            try { sp.fromDataURL(hidden.value); } catch(e) {}
-        }
+    // Pre-fill from saved sig if available (pad may be hidden)
+    if (window._pdProvSavedSig && !hidden.value) {
+        hidden.value = window._pdProvSavedSig;
     }
-    setTimeout(initProviderPad, 120);
-    window.addEventListener('resize', initProviderPad);
 
-    clearBtn && clearBtn.addEventListener('click', function () {
-        if (!canvas._sp || canvas._sp.isEmpty()) return;
-        if (!confirm('Clear the provider signature? This cannot be undone.')) return;
-        canvas._sp.clear();
-        hidden.value = '';
-        var ph = wrapper.querySelector('.sig-placeholder');
-        if (ph) ph.style.display = '';
-    });
+    if (!canvas || !window.SignaturePad) {
+        // "Sign manually" still needs to work even if canvas doesn't exist yet
+    } else {
+        function initProviderPad() {
+            if (canvas._sp) return;
+            canvas.width  = wrapper.offsetWidth  || 600;
+            canvas.height = wrapper.offsetHeight || 140;
+            var sp = new SignaturePad(canvas, {
+                minWidth: 1, maxWidth: 3,
+                penColor: 'rgb(30, 27, 75)'
+            });
+            canvas._sp = sp;
+            sp.addEventListener('endStroke', function () {
+                hidden.value = sp.toDataURL('image/png');
+                var ph = wrapper.querySelector('.sig-placeholder');
+                if (ph) ph.style.display = 'none';
+            });
+            if (hidden.value) {
+                try { sp.fromDataURL(hidden.value); } catch(e) {}
+            }
+        }
+        setTimeout(initProviderPad, 120);
+        window.addEventListener('resize', initProviderPad);
+
+        clearBtn && clearBtn.addEventListener('click', function () {
+            if (!canvas._sp || canvas._sp.isEmpty()) return;
+            if (!confirm('Clear the provider signature? This cannot be undone.')) return;
+            canvas._sp.clear();
+            hidden.value = '';
+            var ph = wrapper.querySelector('.sig-placeholder');
+            if (ph) ph.style.display = '';
+        });
+    }
+
+    // "Sign manually" button — show pad area, discard saved sig
+    var manualBtn = document.getElementById('useManualProvSig');
+    if (manualBtn) {
+        manualBtn.addEventListener('click', function () {
+            var banner  = document.getElementById('provSavedBanner');
+            var padArea = document.getElementById('provSigPadArea');
+            if (banner)  banner.style.display = 'none';
+            if (padArea) padArea.classList.remove('hidden');
+            hidden.value = '';
+            window._pdProvSavedSig = null;
+            // Re-init pad now that it is visible
+            if (canvas && window.SignaturePad && !canvas._sp && wrapper) {
+                setTimeout(function () {
+                    canvas.width  = wrapper.offsetWidth  || 600;
+                    canvas.height = wrapper.offsetHeight || 140;
+                    var sp = new SignaturePad(canvas, { minWidth: 1, maxWidth: 3, penColor: 'rgb(30, 27, 75)' });
+                    canvas._sp = sp;
+                    sp.addEventListener('endStroke', function () {
+                        hidden.value = sp.toDataURL('image/png');
+                        var ph = wrapper.querySelector('.sig-placeholder');
+                        if (ph) ph.style.display = 'none';
+                    });
+                }, 80);
+            }
+        });
+    }
 
     // Validate provider sig before form submit
     document.getElementById('mainForm').addEventListener('submit', function (e) {
         if (!hidden.value) {
             e.preventDefault();
-            var alert = document.getElementById('providerSigAlert');
-            if (alert) alert.classList.remove('hidden');
-            canvas.scrollIntoView({behavior:'smooth', block:'center'});
+            var alertEl = document.getElementById('providerSigAlert');
+            if (alertEl) alertEl.classList.remove('hidden');
+            (canvas || document.getElementById('providerSigAlert')).scrollIntoView({behavior:'smooth', block:'center'});
         }
     }, true);
 })();

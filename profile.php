@@ -321,8 +321,67 @@ include __DIR__ . '/includes/header.php';
         </div>
         <?php endif; ?>
 
-    </div>
-</div>
+        <!-- ── Saved Signature ── -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden" id="savedSigSection">
+            <div class="bg-gradient-to-r from-emerald-600 to-teal-500 px-6 py-4 flex items-center gap-3">
+                <div class="bg-white/20 p-2 rounded-xl shrink-0">
+                    <i class="bi bi-pen-fill text-white text-lg"></i>
+                </div>
+                <div>
+                    <h3 class="text-white font-bold">Pre-Saved Signature</h3>
+                    <p class="text-emerald-100 text-xs">Draw once — auto-fills your signature on every form</p>
+                </div>
+            </div>
+            <div class="p-6">
+                <div id="savedSigMsg" class="hidden mb-4 text-sm font-semibold"></div>
+
+                <?php if (!empty($user['saved_signature'])): ?>
+                <!-- Currently saved signature preview -->
+                <div id="savedSigPreview" class="mb-4">
+                    <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Current Saved Signature</p>
+                    <div class="border border-slate-200 rounded-xl bg-slate-50 p-3 inline-block">
+                        <img src="<?= h($user['saved_signature']) ?>" alt="Saved signature" class="max-h-16 max-w-xs object-contain">
+                    </div>
+                    <?php if ($user['saved_sig_updated_at']): ?>
+                    <p class="text-xs text-slate-400 mt-1">Saved <?= date('M j, Y', strtotime($user['saved_sig_updated_at'])) ?></p>
+                    <?php endif; ?>
+                </div>
+                <?php else: ?>
+                <div id="savedSigPreview" class="hidden"></div>
+                <?php endif; ?>
+
+                <p class="text-sm text-slate-600 mb-3">Draw your signature below. It will be automatically applied to the <strong>MA signature</strong> field on every form — you can still clear and re-sign on any individual form if needed.</p>
+
+                <div class="relative border-2 border-dashed border-slate-300 rounded-2xl bg-white overflow-hidden focus-within:border-emerald-400 transition-colors" style="touch-action:none;" id="savedSigWrapper">
+                    <canvas id="savedSigCanvas" style="display:block;width:100%;height:140px;touch-action:none;cursor:crosshair;"></canvas>
+                    <div id="savedSigPlaceholder" class="absolute inset-0 flex items-center justify-center text-slate-300 pointer-events-none select-none italic text-sm">
+                        Draw your signature here
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-3 mt-4">
+                    <button id="saveSigBtn"
+                            class="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700
+                                   active:scale-95 text-white font-semibold rounded-xl text-sm transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i class="bi bi-floppy-fill"></i> Save Signature
+                    </button>
+                    <button id="clearSigPadBtn"
+                            class="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200
+                                   text-slate-600 font-semibold rounded-xl text-sm transition-all">
+                        <i class="bi bi-eraser"></i> Clear Pad
+                    </button>
+                    <?php if (!empty($user['saved_signature'])): ?>
+                    <button id="deleteSavedSigBtn"
+                            class="inline-flex items-center gap-2 px-4 py-2.5 bg-red-50 hover:bg-red-100
+                                   text-red-600 font-semibold rounded-xl text-sm transition-all">
+                        <i class="bi bi-trash3"></i> Remove Saved Signature
+                    </button>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- /lg:col-span-2 -->
 
 <script>
 // Password strength indicator
@@ -375,6 +434,111 @@ function checkMatch() {
 
 newPw.addEventListener('input', checkMatch);
 confirmPw.addEventListener('input', checkMatch);
+</script>
+
+<script>
+/* ── Profile: Saved Signature Pad ── */
+(function () {
+    var canvas      = document.getElementById('savedSigCanvas');
+    var wrapper     = document.getElementById('savedSigWrapper');
+    var placeholder = document.getElementById('savedSigPlaceholder');
+    var saveBtn     = document.getElementById('saveSigBtn');
+    var clearBtn    = document.getElementById('clearSigPadBtn');
+    var deleteBtn   = document.getElementById('deleteSavedSigBtn');
+    var msgEl       = document.getElementById('savedSigMsg');
+    var previewEl   = document.getElementById('savedSigPreview');
+
+    if (!canvas || typeof SignaturePad === 'undefined') return;
+
+    // Size canvas to match CSS width
+    function resizeCanvas() {
+        var ratio = Math.max(window.devicePixelRatio || 1, 1);
+        var w = wrapper.getBoundingClientRect().width || wrapper.offsetWidth;
+        if (!w) return;
+        var h = 140;
+        canvas.width  = w * ratio;
+        canvas.height = h * ratio;
+        canvas.style.width  = w + 'px';
+        canvas.style.height = h + 'px';
+        canvas.getContext('2d').scale(ratio, ratio);
+        pad.clear();
+    }
+
+    var pad = new SignaturePad(canvas, { penColor: 'rgb(15,23,42)', minWidth: 1.5, maxWidth: 3 });
+    pad.addEventListener('beginStroke', function () { placeholder.style.display = 'none'; });
+
+    (function tryInit(n) {
+        var w = wrapper.getBoundingClientRect().width || wrapper.offsetWidth;
+        if (!w && n < 30) { requestAnimationFrame(function () { tryInit(n + 1); }); return; }
+        resizeCanvas();
+    })(0);
+    window.addEventListener('resize', function () { resizeCanvas(); });
+
+    function showMsg(text, type) {
+        msgEl.textContent = text;
+        msgEl.className = 'mb-4 text-sm font-semibold ' + (type === 'ok' ? 'text-emerald-600' : 'text-red-500');
+        msgEl.classList.remove('hidden');
+        setTimeout(function () { msgEl.classList.add('hidden'); }, 4000);
+    }
+
+    clearBtn && clearBtn.addEventListener('click', function () {
+        pad.clear();
+        placeholder.style.display = '';
+    });
+
+    saveBtn && saveBtn.addEventListener('click', function () {
+        if (pad.isEmpty()) { showMsg('Please draw your signature first.', 'err'); return; }
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving…';
+        fetch('<?= BASE_URL ?>/api/save_signature.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ csrf: '<?= csrfToken() ?>', action: 'save', signature: pad.toDataURL('image/png') })
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="bi bi-floppy-fill"></i> Save Signature';
+            if (j.ok) {
+                showMsg('✓ Signature saved — forms will auto-fill from now on.', 'ok');
+                // Update preview
+                var img = previewEl.querySelector('img');
+                if (img) {
+                    img.src = pad.toDataURL('image/png');
+                } else {
+                    previewEl.innerHTML = '<p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Current Saved Signature</p>' +
+                        '<div class="border border-slate-200 rounded-xl bg-slate-50 p-3 inline-block">' +
+                        '<img src="' + pad.toDataURL('image/png') + '" alt="Saved signature" class="max-h-16 max-w-xs object-contain"></div>';
+                    previewEl.classList.remove('hidden');
+                }
+                // Show delete button if missing
+                if (!deleteBtn) { location.reload(); }
+            } else {
+                showMsg('Error: ' + (j.error || 'Unknown error'), 'err');
+            }
+        })
+        .catch(function () {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="bi bi-floppy-fill"></i> Save Signature';
+            showMsg('Network error — please try again.', 'err');
+        });
+    });
+
+    deleteBtn && deleteBtn.addEventListener('click', function () {
+        if (!confirm('Remove your saved signature? Forms will require manual signing again.')) return;
+        deleteBtn.disabled = true;
+        fetch('<?= BASE_URL ?>/api/save_signature.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ csrf: '<?= csrfToken() ?>', action: 'clear' })
+        })
+        .then(function (r) { return r.json(); })
+        .then(function (j) {
+            if (j.ok) { location.reload(); }
+            else { deleteBtn.disabled = false; showMsg('Error: ' + j.error, 'err'); }
+        });
+    });
+})();
 </script>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>

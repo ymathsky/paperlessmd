@@ -87,6 +87,16 @@ document.addEventListener('DOMContentLoaded', function () {
         (function tryMaInit(attempts) {
             if (!resizeMaCanvas(false) && attempts < 30) {
                 requestAnimationFrame(function() { tryMaInit(attempts + 1); });
+            } else {
+                // Pre-fill from saved signature after canvas is sized
+                if (window._maSavedSignature && maSigData) {
+                    maSigData.value = window._maSavedSignature;
+                    // Pad is hidden when saved sig is active, so only load when visible
+                    var padArea = document.getElementById('maSigPadArea');
+                    if (padArea && !padArea.classList.contains('hidden')) {
+                        maSigPad.fromDataURL(window._maSavedSignature);
+                    }
+                }
             }
         })(0);
         // Only re-size on actual window resize (not layout shifts during drawing)
@@ -97,6 +107,20 @@ document.addEventListener('DOMContentLoaded', function () {
             if (maSigPad.isEmpty()) return;
             if (confirm('Clear the MA signature? This cannot be undone.')) maSigPad.clear();
         });
+
+        // "Sign manually" button — show the pad and clear saved pre-fill
+        const manualBtn = document.getElementById('useManualMaSig');
+        if (manualBtn) {
+            manualBtn.addEventListener('click', function () {
+                var banner  = document.getElementById('maSavedBanner');
+                var padArea = document.getElementById('maSigPadArea');
+                if (banner)  banner.style.display  = 'none';
+                if (padArea) { padArea.classList.remove('hidden'); resizeMaCanvas(false); }
+                // Clear the hidden input so empty-check will fire
+                if (maSigData) maSigData.value = '';
+                window._maSavedSignature = null;
+            });
+        }
     }
 
     // ── POA Toggle ────────────────────────────────────────────────────
@@ -138,12 +162,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // Validate MA signature
         if (maSigPad) {
-            if (maSigPad.isEmpty()) {
+            // If using saved signature the hidden input is already populated; pad may be hidden
+            var padArea = document.getElementById('maSigPadArea');
+            var usingSaved = maSigData && maSigData.value && (!padArea || padArea.classList.contains('hidden'));
+            if (!usingSaved && maSigPad.isEmpty()) {
                 if (maSigAlert) { maSigAlert.classList.remove('hidden'); if (valid) maSigAlert.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
                 valid = false;
             } else {
                 if (maSigAlert) maSigAlert.classList.add('hidden');
-                maSigData.value = maSigPad.toDataURL('image/png');
+                if (!usingSaved) maSigData.value = maSigPad.toDataURL('image/png');
             }
         }
 
