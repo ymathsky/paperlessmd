@@ -61,12 +61,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['last_active'] = time();
                 auditLog($pdo, 'login', 'user', (int)$user['id'], $user['username']);
                 // Prompt to set up pre-saved signature if not yet saved
+                // Wrapped in try/catch — column may not exist until migration is run
                 if (in_array($user['role'], ['ma', 'admin'])) {
-                    $__sigQ = $pdo->prepare("SELECT saved_signature FROM staff WHERE id = ? LIMIT 1");
-                    $__sigQ->execute([(int)$user['id']]);
-                    if (empty($__sigQ->fetchColumn())) {
-                        $_SESSION['prompt_saved_sig'] = true;
-                    }
+                    try {
+                        $__sigQ = $pdo->prepare("SELECT saved_signature FROM staff WHERE id = ? LIMIT 1");
+                        $__sigQ->execute([(int)$user['id']]);
+                        if (empty($__sigQ->fetchColumn())) {
+                            $_SESSION['prompt_saved_sig'] = true;
+                        }
+                    } catch (PDOException $e) { /* column not yet added — run migrate_saved_signatures.php */ }
                 }
                 header('Location: ' . BASE_URL . '/dashboard.php');
                 exit;
