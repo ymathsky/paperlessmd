@@ -1,5 +1,6 @@
 <?php
 header('Content-Type: text/html; charset=UTF-8');
+header('Permissions-Policy: geolocation=(self)');
 // Each page sets $pageTitle and $activeNav before including this.
 // Build esign count once (used in sidebar)
 $_esignCount = 0;

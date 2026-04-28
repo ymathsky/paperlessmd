@@ -6,5 +6,6 @@ php_value max_input_time 120
 
 # Allow geolocation for MA location tracking
 <IfModule mod_headers.c>
+    Header always unset Permissions-Policy
     Header always set Permissions-Policy "geolocation=(self)"
 </IfModule>
