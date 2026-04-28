@@ -60,6 +60,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['role']        = $user['role'];
                 $_SESSION['last_active'] = time();
                 auditLog($pdo, 'login', 'user', (int)$user['id'], $user['username']);
+                // Prompt to set up pre-saved signature if not yet saved
+                if (in_array($user['role'], ['ma', 'admin'])) {
+                    $__sigQ = $pdo->prepare("SELECT saved_signature FROM staff WHERE id = ? LIMIT 1");
+                    $__sigQ->execute([(int)$user['id']]);
+                    if (empty($__sigQ->fetchColumn())) {
+                        $_SESSION['prompt_saved_sig'] = true;
+                    }
+                }
                 header('Location: ' . BASE_URL . '/dashboard.php');
                 exit;
 

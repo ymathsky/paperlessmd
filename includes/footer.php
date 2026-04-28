@@ -37,6 +37,73 @@
     </div>
 </div>
 
+<?php if (!empty($_SESSION['prompt_saved_sig'])): unset($_SESSION['prompt_saved_sig']); ?>
+<!-- ── Pre-Saved Signature Prompt Modal ───────────────────────────────── -->
+<div id="savedSigPromptModal"
+     class="fixed inset-0 z-[9900] flex items-center justify-center p-4 no-print"
+     aria-modal="true" role="dialog" aria-labelledby="savedSigPromptTitle">
+    <!-- Backdrop -->
+    <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+         id="savedSigPromptBackdrop"></div>
+    <!-- Card -->
+    <div class="relative bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-md overflow-hidden">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-emerald-600 to-teal-500 px-6 py-5 flex items-center gap-4">
+            <div class="w-12 h-12 bg-white/20 rounded-2xl grid place-items-center shrink-0">
+                <i class="bi bi-pen-fill text-white text-2xl"></i>
+            </div>
+            <div>
+                <h2 id="savedSigPromptTitle" class="text-white font-extrabold text-lg leading-tight">Set Up Your Signature</h2>
+                <p class="text-emerald-100 text-xs mt-0.5">Draw once — auto-fills every form you complete</p>
+            </div>
+        </div>
+        <!-- Body -->
+        <div class="px-6 py-5">
+            <p class="text-slate-600 text-sm mb-4">Hi <strong><?= h($_SESSION['full_name'] ?? '') ?></strong> — you don&rsquo;t have a pre-saved signature yet.</p>
+            <ul class="space-y-2 mb-5">
+                <li class="flex items-start gap-2.5 text-sm text-slate-600">
+                    <span class="w-5 h-5 bg-emerald-100 text-emerald-600 rounded-full grid place-items-center shrink-0 mt-0.5 text-xs"><i class="bi bi-lightning-charge-fill"></i></span>
+                    Forms auto-fill your MA signature — no manual signing each time
+                </li>
+                <li class="flex items-start gap-2.5 text-sm text-slate-600">
+                    <span class="w-5 h-5 bg-emerald-100 text-emerald-600 rounded-full grid place-items-center shrink-0 mt-0.5 text-xs"><i class="bi bi-clock-fill"></i></span>
+                    Saves time on every patient visit
+                </li>
+                <li class="flex items-start gap-2.5 text-sm text-slate-600">
+                    <span class="w-5 h-5 bg-emerald-100 text-emerald-600 rounded-full grid place-items-center shrink-0 mt-0.5 text-xs"><i class="bi bi-shield-check-fill"></i></span>
+                    You can update or remove it anytime from your Profile
+                </li>
+            </ul>
+            <div class="flex flex-col sm:flex-row gap-3">
+                <a href="<?= BASE_URL ?>/profile.php#savedSigSection"
+                   class="flex-1 inline-flex items-center justify-center gap-2 px-5 py-3
+                          bg-emerald-600 hover:bg-emerald-700 text-white font-bold
+                          rounded-xl transition-colors shadow-sm text-sm">
+                    <i class="bi bi-pen-fill"></i> Set Up Now
+                </a>
+                <button type="button" id="savedSigPromptDismiss"
+                        class="flex-1 inline-flex items-center justify-center gap-2 px-5 py-3
+                               bg-slate-100 hover:bg-slate-200 text-slate-600 font-semibold
+                               rounded-xl transition-colors text-sm">
+                    <i class="bi bi-x-circle"></i> Remind Me Later
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+(function () {
+    var modal   = document.getElementById('savedSigPromptModal');
+    var dismiss = document.getElementById('savedSigPromptDismiss');
+    var backdrop = document.getElementById('savedSigPromptBackdrop');
+    function close() { if (modal) modal.remove(); }
+    dismiss  && dismiss.addEventListener('click', close);
+    backdrop && backdrop.addEventListener('click', close);
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+})();
+</script>
+<?php endif; ?>
+
 <!-- ── Global Search Modal ──────────────────────────────────────────── -->
 <div id="searchModal"
      class="hidden fixed inset-0 z-[9800] items-start justify-center pt-[10vh] px-4 no-print"
