@@ -498,7 +498,7 @@ confirmPw.addEventListener('input', checkMatch);
 
 <script>
 /* ── Profile: Saved Signature Pad + Upload ── */
-(function () {
+document.addEventListener('DOMContentLoaded', function () {
     var canvas      = document.getElementById('savedSigCanvas');
     var wrapper     = document.getElementById('savedSigWrapper');
     var placeholder = document.getElementById('savedSigPlaceholder');
@@ -695,7 +695,7 @@ confirmPw.addEventListener('input', checkMatch);
             else { deleteBtn.disabled = false; showMsg('Error: ' + j.error, 'err'); }
         });
     });
-})();
+});
 </script>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>
