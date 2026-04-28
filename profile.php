@@ -350,34 +350,94 @@ include __DIR__ . '/includes/header.php';
                 <div id="savedSigPreview" class="hidden"></div>
                 <?php endif; ?>
 
-                <p class="text-sm text-slate-600 mb-3">Draw your signature below. It will be automatically applied to the <strong>MA signature</strong> field on every form — you can still clear and re-sign on any individual form if needed.</p>
+                <p class="text-sm text-slate-600 mb-4">Your signature will be automatically applied to the <strong>MA signature</strong> field on every form — you can still clear and re-sign on any individual form if needed.</p>
 
-                <div class="relative border-2 border-dashed border-slate-300 rounded-2xl bg-white overflow-hidden focus-within:border-emerald-400 transition-colors" style="touch-action:none;" id="savedSigWrapper">
-                    <canvas id="savedSigCanvas" style="display:block;width:100%;height:140px;touch-action:none;cursor:crosshair;"></canvas>
-                    <div id="savedSigPlaceholder" class="absolute inset-0 flex items-center justify-center text-slate-300 pointer-events-none select-none italic text-sm">
-                        Draw your signature here
+                <!-- Tab switcher: Draw / Upload -->
+                <div class="flex gap-1 p-1 bg-slate-100 rounded-xl mb-4 w-fit">
+                    <button type="button" id="tabDraw"
+                            class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all
+                                   bg-white text-slate-800 shadow-sm">
+                        <i class="bi bi-pen"></i> Draw
+                    </button>
+                    <button type="button" id="tabUpload"
+                            class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all
+                                   text-slate-500 hover:text-slate-700">
+                        <i class="bi bi-upload"></i> Upload
+                    </button>
+                </div>
+
+                <!-- Draw panel -->
+                <div id="panelDraw">
+                    <div class="relative border-2 border-dashed border-slate-300 rounded-2xl bg-white overflow-hidden focus-within:border-emerald-400 transition-colors" style="touch-action:none;" id="savedSigWrapper">
+                        <canvas id="savedSigCanvas" style="display:block;width:100%;height:140px;touch-action:none;cursor:crosshair;"></canvas>
+                        <div id="savedSigPlaceholder" class="absolute inset-0 flex items-center justify-center text-slate-300 pointer-events-none select-none italic text-sm">
+                            Draw your signature here
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-3 mt-4">
+                        <button id="saveSigBtn"
+                                class="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700
+                                       active:scale-95 text-white font-semibold rounded-xl text-sm transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
+                            <i class="bi bi-floppy-fill"></i> Save Signature
+                        </button>
+                        <button id="clearSigPadBtn"
+                                class="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200
+                                       text-slate-600 font-semibold rounded-xl text-sm transition-all">
+                            <i class="bi bi-eraser"></i> Clear Pad
+                        </button>
                     </div>
                 </div>
 
-                <div class="flex flex-wrap items-center gap-3 mt-4">
-                    <button id="saveSigBtn"
-                            class="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700
-                                   active:scale-95 text-white font-semibold rounded-xl text-sm transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed">
-                        <i class="bi bi-floppy-fill"></i> Save Signature
-                    </button>
-                    <button id="clearSigPadBtn"
-                            class="inline-flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200
-                                   text-slate-600 font-semibold rounded-xl text-sm transition-all">
-                        <i class="bi bi-eraser"></i> Clear Pad
-                    </button>
-                    <?php if (!empty($user['saved_signature'])): ?>
+                <!-- Upload panel -->
+                <div id="panelUpload" class="hidden">
+                    <!-- Drop zone -->
+                    <div id="uploadDropZone"
+                         class="border-2 border-dashed border-slate-300 rounded-2xl bg-slate-50 hover:bg-emerald-50
+                                hover:border-emerald-400 transition-colors cursor-pointer flex flex-col items-center
+                                justify-center gap-3 py-8 px-4 text-center">
+                        <div class="w-12 h-12 bg-slate-100 rounded-2xl grid place-items-center">
+                            <i class="bi bi-image text-slate-400 text-2xl"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm font-semibold text-slate-700">Drop an image here, or <span class="text-emerald-600 underline">browse</span></p>
+                            <p class="text-xs text-slate-400 mt-0.5">PNG, JPG or GIF — white/transparent background recommended</p>
+                        </div>
+                        <input type="file" id="sigUploadInput" accept="image/png,image/jpeg,image/gif"
+                               class="hidden">
+                    </div>
+                    <!-- Preview after file chosen -->
+                    <div id="uploadPreviewWrapper" class="hidden mt-4">
+                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Preview</p>
+                        <div class="border border-slate-200 rounded-xl bg-white p-3 inline-block">
+                            <img id="uploadPreviewImg" src="" alt="Signature preview" class="max-h-20 max-w-xs object-contain">
+                        </div>
+                        <p id="uploadFileName" class="text-xs text-slate-400 mt-1"></p>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-3 mt-4">
+                        <button id="saveUploadBtn"
+                                class="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700
+                                       active:scale-95 text-white font-semibold rounded-xl text-sm transition-all shadow-sm
+                                       disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                            <i class="bi bi-floppy-fill"></i> Save Uploaded Signature
+                        </button>
+                        <button id="clearUploadBtn"
+                                class="hidden inline-flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200
+                                       text-slate-600 font-semibold rounded-xl text-sm transition-all">
+                            <i class="bi bi-x-circle"></i> Clear
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Delete button (shown regardless of tab) -->
+                <?php if (!empty($user['saved_signature'])): ?>
+                <div class="mt-4 pt-4 border-t border-slate-100">
                     <button id="deleteSavedSigBtn"
                             class="inline-flex items-center gap-2 px-4 py-2.5 bg-red-50 hover:bg-red-100
                                    text-red-600 font-semibold rounded-xl text-sm transition-all">
                         <i class="bi bi-trash3"></i> Remove Saved Signature
                     </button>
-                    <?php endif; ?>
                 </div>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -437,7 +497,7 @@ confirmPw.addEventListener('input', checkMatch);
 </script>
 
 <script>
-/* ── Profile: Saved Signature Pad ── */
+/* ── Profile: Saved Signature Pad + Upload ── */
 (function () {
     var canvas      = document.getElementById('savedSigCanvas');
     var wrapper     = document.getElementById('savedSigWrapper');
@@ -448,82 +508,179 @@ confirmPw.addEventListener('input', checkMatch);
     var msgEl       = document.getElementById('savedSigMsg');
     var previewEl   = document.getElementById('savedSigPreview');
 
-    if (!canvas || typeof SignaturePad === 'undefined') return;
+    // ── Tab switcher ──────────────────────────────────────────────────
+    var tabDraw   = document.getElementById('tabDraw');
+    var tabUpload = document.getElementById('tabUpload');
+    var panelDraw = document.getElementById('panelDraw');
+    var panelUpload = document.getElementById('panelUpload');
 
-    // Size canvas to match CSS width
-    function resizeCanvas() {
-        var ratio = Math.max(window.devicePixelRatio || 1, 1);
-        var w = wrapper.getBoundingClientRect().width || wrapper.offsetWidth;
-        if (!w) return;
-        var h = 140;
-        canvas.width  = w * ratio;
-        canvas.height = h * ratio;
-        canvas.style.width  = w + 'px';
-        canvas.style.height = h + 'px';
-        canvas.getContext('2d').scale(ratio, ratio);
-        pad.clear();
+    function activateTab(tab) {
+        var isDraw = (tab === 'draw');
+        tabDraw.className   = 'inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ' +
+            (isDraw ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700');
+        tabUpload.className = 'inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ' +
+            (!isDraw ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-700');
+        panelDraw.classList.toggle('hidden', !isDraw);
+        panelUpload.classList.toggle('hidden', isDraw);
+    }
+    tabDraw   && tabDraw.addEventListener('click',   function () { activateTab('draw'); });
+    tabUpload && tabUpload.addEventListener('click', function () { activateTab('upload'); });
+
+    // ── Draw pad ──────────────────────────────────────────────────────
+    var pad = null;
+    if (canvas && typeof SignaturePad !== 'undefined') {
+        function resizeCanvas() {
+            var ratio = Math.max(window.devicePixelRatio || 1, 1);
+            var w = wrapper.getBoundingClientRect().width || wrapper.offsetWidth;
+            if (!w) return;
+            canvas.width  = w * ratio;
+            canvas.height = 140 * ratio;
+            canvas.style.width  = w + 'px';
+            canvas.style.height = '140px';
+            canvas.getContext('2d').scale(ratio, ratio);
+            pad.clear();
+        }
+
+        pad = new SignaturePad(canvas, { penColor: 'rgb(15,23,42)', minWidth: 1.5, maxWidth: 3 });
+        pad.addEventListener('beginStroke', function () { placeholder.style.display = 'none'; });
+
+        (function tryInit(n) {
+            var w = wrapper.getBoundingClientRect().width || wrapper.offsetWidth;
+            if (!w && n < 30) { requestAnimationFrame(function () { tryInit(n + 1); }); return; }
+            resizeCanvas();
+        })(0);
+        window.addEventListener('resize', function () { resizeCanvas(); });
     }
 
-    var pad = new SignaturePad(canvas, { penColor: 'rgb(15,23,42)', minWidth: 1.5, maxWidth: 3 });
-    pad.addEventListener('beginStroke', function () { placeholder.style.display = 'none'; });
+    clearBtn && clearBtn.addEventListener('click', function () {
+        if (pad) { pad.clear(); }
+        if (placeholder) placeholder.style.display = '';
+    });
 
-    (function tryInit(n) {
-        var w = wrapper.getBoundingClientRect().width || wrapper.offsetWidth;
-        if (!w && n < 30) { requestAnimationFrame(function () { tryInit(n + 1); }); return; }
-        resizeCanvas();
-    })(0);
-    window.addEventListener('resize', function () { resizeCanvas(); });
+    // ── Upload panel ──────────────────────────────────────────────────
+    var dropZone       = document.getElementById('uploadDropZone');
+    var fileInput      = document.getElementById('sigUploadInput');
+    var previewWrapper = document.getElementById('uploadPreviewWrapper');
+    var previewImg     = document.getElementById('uploadPreviewImg');
+    var fileNameEl     = document.getElementById('uploadFileName');
+    var saveUploadBtn  = document.getElementById('saveUploadBtn');
+    var clearUploadBtn = document.getElementById('clearUploadBtn');
+    var _uploadDataURL = null;
 
+    function handleFile(file) {
+        if (!file || !file.type.startsWith('image/')) {
+            showMsg('Please select a PNG, JPG, or GIF image.', 'err'); return;
+        }
+        if (file.size > 2 * 1024 * 1024) {
+            showMsg('Image must be under 2 MB.', 'err'); return;
+        }
+        var reader = new FileReader();
+        reader.onload = function (e) {
+            // Convert to PNG via canvas for consistent base64 format
+            var img = new Image();
+            img.onload = function () {
+                var cvs = document.createElement('canvas');
+                // Scale down if very large, keep aspect ratio, max 600×200
+                var maxW = 600, maxH = 200;
+                var scale = Math.min(1, maxW / img.naturalWidth, maxH / img.naturalHeight);
+                cvs.width  = Math.round(img.naturalWidth  * scale);
+                cvs.height = Math.round(img.naturalHeight * scale);
+                var ctx = cvs.getContext('2d');
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, cvs.width, cvs.height);
+                ctx.drawImage(img, 0, 0, cvs.width, cvs.height);
+                _uploadDataURL = cvs.toDataURL('image/png');
+                previewImg.src = _uploadDataURL;
+                fileNameEl.textContent = file.name + ' (' + Math.round(file.size / 1024) + ' KB)';
+                previewWrapper.classList.remove('hidden');
+                saveUploadBtn.disabled = false;
+                clearUploadBtn.classList.remove('hidden');
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    dropZone && dropZone.addEventListener('click', function () { fileInput && fileInput.click(); });
+    fileInput && fileInput.addEventListener('change', function () { if (this.files[0]) handleFile(this.files[0]); });
+
+    dropZone && dropZone.addEventListener('dragover',  function (e) { e.preventDefault(); dropZone.classList.add('border-emerald-400', 'bg-emerald-50'); });
+    dropZone && dropZone.addEventListener('dragleave', function ()  { dropZone.classList.remove('border-emerald-400', 'bg-emerald-50'); });
+    dropZone && dropZone.addEventListener('drop', function (e) {
+        e.preventDefault();
+        dropZone.classList.remove('border-emerald-400', 'bg-emerald-50');
+        var f = e.dataTransfer.files && e.dataTransfer.files[0];
+        if (f) handleFile(f);
+    });
+
+    clearUploadBtn && clearUploadBtn.addEventListener('click', function () {
+        _uploadDataURL = null;
+        previewWrapper.classList.add('hidden');
+        saveUploadBtn.disabled = true;
+        clearUploadBtn.classList.add('hidden');
+        if (fileInput) fileInput.value = '';
+    });
+
+    // ── Shared helpers ────────────────────────────────────────────────
     function showMsg(text, type) {
         msgEl.textContent = text;
         msgEl.className = 'mb-4 text-sm font-semibold ' + (type === 'ok' ? 'text-emerald-600' : 'text-red-500');
         msgEl.classList.remove('hidden');
-        setTimeout(function () { msgEl.classList.add('hidden'); }, 4000);
+        setTimeout(function () { msgEl.classList.add('hidden'); }, 5000);
     }
 
-    clearBtn && clearBtn.addEventListener('click', function () {
-        pad.clear();
-        placeholder.style.display = '';
-    });
+    function updatePreview(dataURL) {
+        var img = previewEl.querySelector('img');
+        if (img) {
+            img.src = dataURL;
+        } else {
+            previewEl.innerHTML = '<p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Current Saved Signature</p>' +
+                '<div class="border border-slate-200 rounded-xl bg-slate-50 p-3 inline-block">' +
+                '<img src="' + dataURL + '" alt="Saved signature" class="max-h-16 max-w-xs object-contain"></div>';
+            previewEl.classList.remove('hidden');
+        }
+        if (!deleteBtn) location.reload();
+    }
 
-    saveBtn && saveBtn.addEventListener('click', function () {
-        if (pad.isEmpty()) { showMsg('Please draw your signature first.', 'err'); return; }
-        saveBtn.disabled = true;
-        saveBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving…';
+    function postSig(dataURL, btn, originalLabel) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving…';
         fetch('<?= BASE_URL ?>/api/save_signature.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ csrf: '<?= csrfToken() ?>', action: 'save', signature: pad.toDataURL('image/png') })
+            body: JSON.stringify({ csrf: '<?= csrfToken() ?>', action: 'save', signature: dataURL })
         })
         .then(function (r) { return r.json(); })
         .then(function (j) {
-            saveBtn.disabled = false;
-            saveBtn.innerHTML = '<i class="bi bi-floppy-fill"></i> Save Signature';
+            btn.disabled = false;
+            btn.innerHTML = originalLabel;
             if (j.ok) {
                 showMsg('✓ Signature saved — forms will auto-fill from now on.', 'ok');
-                // Update preview
-                var img = previewEl.querySelector('img');
-                if (img) {
-                    img.src = pad.toDataURL('image/png');
-                } else {
-                    previewEl.innerHTML = '<p class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Current Saved Signature</p>' +
-                        '<div class="border border-slate-200 rounded-xl bg-slate-50 p-3 inline-block">' +
-                        '<img src="' + pad.toDataURL('image/png') + '" alt="Saved signature" class="max-h-16 max-w-xs object-contain"></div>';
-                    previewEl.classList.remove('hidden');
-                }
-                // Show delete button if missing
-                if (!deleteBtn) { location.reload(); }
+                updatePreview(dataURL);
             } else {
                 showMsg('Error: ' + (j.error || 'Unknown error'), 'err');
             }
         })
         .catch(function () {
-            saveBtn.disabled = false;
-            saveBtn.innerHTML = '<i class="bi bi-floppy-fill"></i> Save Signature';
+            btn.disabled = false;
+            btn.innerHTML = originalLabel;
             showMsg('Network error — please try again.', 'err');
         });
+    }
+
+    // ── Save (draw) ───────────────────────────────────────────────────
+    saveBtn && saveBtn.addEventListener('click', function () {
+        if (!pad || pad.isEmpty()) { showMsg('Please draw your signature first.', 'err'); return; }
+        postSig(pad.toDataURL('image/png'), saveBtn, '<i class="bi bi-floppy-fill"></i> Save Signature');
     });
 
+    // ── Save (upload) ─────────────────────────────────────────────────
+    saveUploadBtn && saveUploadBtn.addEventListener('click', function () {
+        if (!_uploadDataURL) { showMsg('Please choose an image first.', 'err'); return; }
+        postSig(_uploadDataURL, saveUploadBtn, '<i class="bi bi-floppy-fill"></i> Save Uploaded Signature');
+    });
+
+    // ── Delete ────────────────────────────────────────────────────────
     deleteBtn && deleteBtn.addEventListener('click', function () {
         if (!confirm('Remove your saved signature? Forms will require manual signing again.')) return;
         deleteBtn.disabled = true;
