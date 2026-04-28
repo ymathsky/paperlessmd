@@ -3,6 +3,9 @@ require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/db.php';
 requireAdmin();
 
+// Allow geolocation on this page
+header('Permissions-Policy: geolocation=(self)');
+
 $pageTitle = 'MA Location Monitor';
 $activeNav = 'ma_locations';
 
@@ -18,8 +21,7 @@ include __DIR__ . '/../includes/header.php';
 ?>
 
 <!-- Leaflet CSS -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
     <div>
@@ -97,8 +99,7 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <!-- Leaflet JS -->
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WLlc=" crossorigin=""></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 (function () {
     var BASE = window._pdBase || '';
