@@ -160,6 +160,7 @@ if (!isBilling()) {
             ['href' => '/admin/schedule_manage.php',  'key' => 'schedule_manage',  'icon' => 'bi-calendar-week-fill', 'label' => 'Manage Schedule'],
             ['href' => '/admin/recurring_schedule.php','key' => 'recurring_schedule','icon' => 'bi-arrow-repeat',      'label' => 'Recurring Schedule'],
             ['href' => '/admin/ma_productivity.php', 'key' => 'ma_report',         'icon' => 'bi-graph-up-arrow',     'label' => 'Productivity Report'],
+            ['href' => '/admin/ma_locations.php',    'key' => 'ma_locations',       'icon' => 'bi-geo-alt-fill',        'label' => 'MA Locations'],
             ['href' => '/admin/users.php',           'key' => 'users',           'icon' => 'bi-gear-fill',            'label' => 'Manage Staff'],
             ['href' => '/admin/roles.php',            'key' => 'roles',           'icon' => 'bi-person-badge-fill',    'label' => 'Roles & Permissions'],
             ['href' => '/admin/audit_log.php',       'key' => 'audit_log',       'icon' => 'bi-shield-lock-fill',     'label' => 'Audit Log'],

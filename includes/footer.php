@@ -280,6 +280,46 @@ window._pdCsrf = '<?= htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8') ?>';
 <script src="<?= BASE_URL ?>/assets/js/voice.js" defer></script>
 <script src="<?= BASE_URL ?>/assets/js/offline.js" defer></script>
 <script src="<?= BASE_URL ?>/assets/js/ai-assistant.js" defer></script>
+<?php if (in_array($_SESSION['role'] ?? '', ['ma', 'admin'])): ?>
+<script>
+/* ── MA Location Tracking ─────────────────────────────────────────────
+   Requests geolocation permission once, then pushes coordinates to
+   api/update_location.php every 5 minutes while the tab is open.
+   No data is collected if the user denies permission.
+──────────────────────────────────────────────────────────────────── */
+(function () {
+    if (!navigator.geolocation || !window._pdCsrf) return;
+
+    var INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+    var BASE = window._pdBase || '';
+
+    function sendLocation(pos) {
+        fetch(BASE + '/api/update_location.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                csrf:     window._pdCsrf,
+                lat:      pos.coords.latitude,
+                lng:      pos.coords.longitude,
+                accuracy: pos.coords.accuracy || null
+            })
+        }).catch(function () { /* silently ignore network errors */ });
+    }
+
+    function requestAndSend() {
+        navigator.geolocation.getCurrentPosition(
+            sendLocation,
+            function () { /* permission denied or unavailable — do nothing */ },
+            { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+        );
+    }
+
+    // Send immediately on page load, then every 5 minutes
+    requestAndSend();
+    setInterval(requestAndSend, INTERVAL_MS);
+})();
+</script>
+<?php endif; ?>
 <script>
 (function () {
     // Sidebar toggle (mobile)
