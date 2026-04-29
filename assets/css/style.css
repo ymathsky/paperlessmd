@@ -404,3 +404,208 @@ input[type="checkbox"].big, input[type="radio"].big {
 
 @media print { #aiChatWrap, .ai-soap-modal-overlay { display: none !important; } }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   Mobile & Tablet Optimizations
+   Targets: phones (≤ 767px) and small phones (≤ 479px)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. iOS Auto-Zoom Fix ──────────────────────────────────────────────────
+   iOS Safari zooms the viewport when a focused input has font-size < 16px.
+   Override Tailwind's text-sm / text-xs on all form controls. */
+@media (max-width: 767px) {
+    input[type="text"],
+    input[type="tel"],
+    input[type="email"],
+    input[type="number"],
+    input[type="date"],
+    input[type="time"],
+    input[type="search"],
+    input[type="url"],
+    input[type="password"],
+    select,
+    textarea {
+        font-size: 16px !important;
+    }
+
+    /* Minimum 48 × 48 px touch targets (Apple HIG recommendation) */
+    input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="range"]),
+    select {
+        min-height: 48px !important;
+    }
+
+    /* Larger checkboxes & radios — easier to tap */
+    input[type="checkbox"],
+    input[type="radio"] {
+        min-width: 1.25rem !important;
+        min-height: 1.25rem !important;
+        width: 1.25rem;
+        height: 1.25rem;
+        flex-shrink: 0;
+        cursor: pointer;
+        accent-color: #2563eb;
+    }
+
+    /* Bigger signature pads for finger / stylus signing */
+    .sig-wrapper {
+        min-height: 210px;
+    }
+    .sig-wrapper canvas {
+        height: 210px !important;
+    }
+
+    /* Frequency quick-pick pills: larger tap area */
+    .freq-pill {
+        padding: 9px 16px !important;
+        font-size: 0.8125rem !important;
+        min-height: 42px;
+        display: inline-flex !important;
+        align-items: center;
+    }
+
+    /* Reduce inner horizontal padding on small screens */
+    #wiz-header {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+}
+
+/* ── 2. Step Pills — shrink circles on tiny screens so all 8–9 fit ── */
+@media (max-width: 639px) {
+    .wiz-pill > span:first-child {
+        width: 2rem !important;
+        height: 2rem !important;
+    }
+    .wiz-pill .wiz-num,
+    .wiz-pill .wiz-check {
+        font-size: 0.75rem;
+    }
+}
+@media (max-width: 479px) {
+    .wiz-pill > span:first-child {
+        width: 1.75rem !important;
+        height: 1.75rem !important;
+    }
+    #wiz-header {
+        padding-left: 0.625rem;
+        padding-right: 0.625rem;
+    }
+}
+
+/* ── 3. Sticky Bottom Wizard Nav ──────────────────────────────────────────
+   Fixed to the bottom so Back / Next are always reachable without scrolling.
+   #mainForm gets bottom padding so content is never hidden behind the bar. */
+@media (max-width: 767px) {
+    #wiz-nav {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 30;
+        background: #fff;
+        border-top: 1.5px solid #e2e8f0;
+        border-radius: 0;
+        padding: 10px 16px;
+        /* iOS safe area: avoid home-bar overlap on notched phones */
+        padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+        box-shadow: 0 -4px 24px rgba(0, 0, 0, .09);
+        margin-top: 0;
+    }
+
+    /* Content padding so sticky nav never covers the bottom of the form */
+    #mainForm {
+        padding-bottom: 96px;
+    }
+
+    /* Submit & Save: fill available width on mobile */
+    #submitBtn {
+        flex: 1 1 0%;
+        justify-content: center;
+    }
+
+    /* Larger tap targets for nav buttons */
+    #wiz-nav button,
+    #wiz-nav a {
+        min-height: 48px;
+        padding-top: 10px;
+        padding-bottom: 10px;
+    }
+}
+
+/* ── 4. Medication Table → Card Layout on small phones ───────────────────
+   On screens < 640px each row becomes a rounded card with inline field labels.
+   Requires data-label attributes on <td> elements (added in PHP + JS). */
+@media (max-width: 639px) {
+    .med-rows-thead {
+        display: none !important;
+    }
+    /* Remove wrapper border; each row card has its own border */
+    .med-rows-tbody {
+        display: block;
+        padding: 8px;
+    }
+    .med-rows-tbody tr {
+        display: block;
+        border: 1.5px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 10px 12px;
+        margin-bottom: 8px;
+        background: #fff;
+        box-shadow: 0 1px 4px rgba(0,0,0,.04);
+    }
+    .med-rows-tbody td {
+        display: block;
+        padding: 4px 0 !important;
+        border: none !important;
+    }
+    /* Inline label from data-label attribute */
+    .med-rows-tbody td[data-label]::before {
+        content: attr(data-label);
+        display: block;
+        font-size: 0.65rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: #94a3b8;
+        margin-bottom: 3px;
+    }
+    /* Remove row button: right-aligned at card bottom */
+    .med-rows-tbody td.no-print {
+        text-align: right;
+        border-top: 1px solid #f1f5f9 !important;
+        padding-top: 8px !important;
+        margin-top: 4px;
+    }
+    .med-rows-tbody .med-remove-btn {
+        padding: 6px 12px;
+        border-radius: 8px;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #ef4444 !important;
+    }
+}
+
+/* ── 5. General Touch UX ──────────────────────────────────────────────────*/
+@media (max-width: 767px) {
+    /* Prevent double-tap zoom on buttons */
+    button, a, label[for], .wiz-pill {
+        touch-action: manipulation;
+    }
+
+    /* Wider tap area on Clear Signature buttons */
+    #clearSig, #clearMaSig {
+        min-height: 44px;
+        padding: 10px 18px;
+    }
+
+    /* Vitals numpad: ensure it doesn't overlap sticky nav */
+    #pd-vnp {
+        margin-bottom: 10px;
+    }
+
+    /* Resume / prefill banners: smaller text on mobile */
+    #wiz-resume-banner,
+    #prefillBanner {
+        font-size: 0.8125rem;
+    }
+}
+

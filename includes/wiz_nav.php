@@ -31,8 +31,8 @@ $cancelUrl   ??= BASE_URL . '/patients.php';
 
         <!-- Submit (only visible on last step, hidden by JS) -->
         <button type="button" id="submitBtn"
-                class="hidden flex items-center gap-2 px-8 py-3 <?= $accentClass ?>
-                       text-white font-bold rounded-xl transition-all shadow-md hover:shadow-lg text-base active:scale-95">
+                class="hidden flex items-center justify-center gap-2 px-8 py-3 <?= $accentClass ?>
+                       text-white font-bold rounded-xl transition-all shadow-md hover:shadow-lg text-base active:scale-95 flex-1 sm:flex-none">
             <i class="bi bi-check2-circle text-xl"></i> Submit &amp; Save
         </button>
     </div>

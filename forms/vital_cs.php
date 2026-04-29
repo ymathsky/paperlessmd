@@ -406,7 +406,7 @@ include __DIR__ . '/../includes/header.php';
 
             <div class="overflow-x-auto border border-slate-200 rounded-xl">
                 <table class="w-full text-sm">
-                    <thead class="bg-slate-50">
+                    <thead class="bg-slate-50 med-rows-thead">
                         <tr>
                             <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide w-28">New / Refill</th>
                             <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Medication &amp; Dose</th>
@@ -421,7 +421,7 @@ include __DIR__ . '/../includes/header.php';
                         ?>
                         <input type="hidden" name="med_id_<?= $i ?>" value="<?= $row['med_id'] ?>">
                         <tr class="<?= $isPrefilled ? 'bg-emerald-50/30 med-prefilled' : '' ?>">
-                            <td class="px-3 py-2">
+                            <td class="px-3 py-2" data-label="Type">
                                 <select name="med_type_<?= $i ?>"
                                         class="w-full px-2 py-2 border <?= $isPrefilled ? 'border-emerald-200' : 'border-slate-200' ?> rounded-lg text-xs bg-white
                                                focus:outline-none focus:ring-2 focus:ring-red-400">
@@ -431,7 +431,7 @@ include __DIR__ . '/../includes/header.php';
                                     <?php endforeach; ?>
                                 </select>
                             </td>
-                            <td class="px-3 py-2">
+                            <td class="px-3 py-2" data-label="Medication &amp; Dose">
                                 <?php if ($isPrefilled): ?><div class="flex items-center gap-1.5"><?php endif; ?>
                                 <?php if ($isPrefilled): ?><i class="bi bi-capsule text-emerald-500 text-xs shrink-0"></i><?php endif; ?>
                                 <input type="text" name="med_name_<?= $i ?>" value="<?= h($row['med_name']) ?>"
@@ -440,7 +440,7 @@ include __DIR__ . '/../includes/header.php';
                                        placeholder="Medication name and dose">
                                 <?php if ($isPrefilled): ?></div><?php endif; ?>
                             </td>
-                            <td class="px-3 py-2">
+                            <td class="px-3 py-2" data-label="Frequency">
                                 <input type="text" name="med_freq_<?= $i ?>" value="<?= h($row['med_freq']) ?>"
                                        class="w-full px-3 py-2 border <?= $isPrefilled ? 'border-emerald-200' : 'border-slate-200' ?> rounded-lg text-sm bg-white
                                               focus:outline-none focus:ring-2 focus:ring-red-400"

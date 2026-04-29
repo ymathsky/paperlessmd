@@ -218,6 +218,7 @@
             // Type cell
             var tdType = document.createElement('td');
             tdType.className = 'px-3 py-2';
+            tdType.setAttribute('data-label', 'Type');
             tdType.innerHTML =
                 '<select name="med_type_' + idx + '" ' +
                 '        class="w-full px-2 py-2 border border-slate-200 rounded-lg text-xs bg-white ' +
@@ -229,6 +230,7 @@
             // Name cell
             var tdName = document.createElement('td');
             tdName.className = 'px-3 py-2';
+            tdName.setAttribute('data-label', 'Medication & Dose');
             tdName.innerHTML =
                 '<input type="text" name="med_name_' + idx + '" value="" ' +
                 '       class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white ' +
@@ -238,6 +240,7 @@
             // Freq cell
             var tdFreq = document.createElement('td');
             tdFreq.className = 'px-3 py-2';
+            tdFreq.setAttribute('data-label', 'Frequency');
             tdFreq.innerHTML =
                 '<input type="text" name="med_freq_' + idx + '" value="" ' +
                 '       class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white ' +
