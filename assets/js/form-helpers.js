@@ -13,8 +13,27 @@
     'use strict';
 
     function currentTimeHHMM() {
-        var now = new Date();
-        return String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+        var tz = (window._pdTimezone && window._pdTimezone !== '') ? window._pdTimezone : undefined;
+        try {
+            var parts = new Intl.DateTimeFormat('en-US', {
+                timeZone: tz,
+                hour:     '2-digit',
+                minute:   '2-digit',
+                hour12:   false
+            }).formatToParts(new Date());
+            var h = '', m = '';
+            parts.forEach(function (p) {
+                if (p.type === 'hour')   h = p.value;
+                if (p.type === 'minute') m = p.value;
+            });
+            // Intl may return '24' for midnight — normalise to '00'
+            if (h === '24') h = '00';
+            return h.padStart(2,'0') + ':' + m.padStart(2,'0');
+        } catch (e) {
+            // Fallback: browser local time
+            var now = new Date();
+            return String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+        }
     }
 
     function init() {

@@ -270,10 +270,11 @@
 <script src="<?= BASE_URL ?>/assets/js/app.js?v=3"></script>
 <script src="<?= BASE_URL ?>/assets/js/form-wizard.js"></script>
 <script src="<?= BASE_URL ?>/assets/js/handwriting.js"></script>
-<script src="<?= BASE_URL ?>/assets/js/form-helpers.js?v=3"></script>
+<script src="<?= BASE_URL ?>/assets/js/form-helpers.js?v=4"></script>
 <script>
 window._pdBase = '<?= BASE_URL ?>';
 window._pdCompany = '<?= htmlspecialchars(($patient['company'] ?? PRACTICE_NAME), ENT_QUOTES, 'UTF-8') ?>';
+window._pdTimezone = '<?= htmlspecialchars(APP_TIMEZONE, ENT_QUOTES, 'UTF-8') ?>';
 <?php if (!empty($_SESSION['user_id'])): ?>
 window._pdCsrf = '<?= htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8') ?>';
 <?php endif; ?>
