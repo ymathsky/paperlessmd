@@ -13,7 +13,7 @@
 
     /* Selectors that get a mic button */
     var TEXTAREA_SEL = 'textarea[name]';
-    var INPUT_SEL    = 'input[type="text"][name*="description"], input[type="text"][name*="notes"], input[type="text"][name*="complaint"]';
+    var INPUT_SEL    = 'input[type="text"][name], input[type="search"][name]';
 
     /* Active recognition instance */
     var activeRec = null;
