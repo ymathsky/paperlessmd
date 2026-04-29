@@ -31,6 +31,9 @@ if ($viewAll) {
     if (!$ma) { header('Location: ' . BASE_URL . '/dashboard.php'); exit; }
 }
 
+// Provider filter — must be defined before any queries that reference it
+$filterProvider = trim($_GET['provider'] ?? '');
+
 // Week bounds (Monday–Sunday of the week containing $date)
 $dow       = (int)date('N', strtotime($date));   // 1=Mon … 7=Sun
 $weekStart = date('Y-m-d', strtotime($date . ' -' . ($dow - 1) . ' days'));
@@ -126,8 +129,7 @@ if (isAdmin()) {
     $allMas = $pdo->query("SELECT id, full_name FROM staff WHERE active=1 ORDER BY full_name")->fetchAll();
 }
 
-// Provider filter
-$filterProvider = trim($_GET['provider'] ?? '');
+// Provider options for the filter dropdown
 $providerOptions = [];
 try {
     $providerOptions = $pdo->query("SELECT DISTINCT provider_name FROM `schedule` WHERE provider_name IS NOT NULL AND provider_name != '' ORDER BY provider_name")->fetchAll(PDO::FETCH_COLUMN);

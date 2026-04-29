@@ -4,8 +4,8 @@
  * Provides offline-first caching and triggers form queue sync on reconnect.
  * ──────────────────────────────────────────────────────────────────────── */
 
-const STATIC_CACHE   = 'pd-static-v1';
-const PAGES_CACHE    = 'pd-pages-v1';
+const STATIC_CACHE   = 'pd-static-v2';
+const PAGES_CACHE    = 'pd-pages-v2';
 const SYNC_TAG       = 'pd-form-sync';
 const LOC_SYNC_TAG   = 'pd-location-sync';
 const LOC_IDB_NAME   = 'pd-location-queue';
@@ -83,7 +83,8 @@ async function pageStrategy(req) {
     const cache = await caches.open(PAGES_CACHE);
     try {
         const response = await fetch(req);
-        cache.put(req, response.clone());
+        // Only cache successful responses — never cache 4xx/5xx errors
+        if (response.ok) cache.put(req, response.clone());
         return response;
     } catch {
         const cached   = await cache.match(req);
