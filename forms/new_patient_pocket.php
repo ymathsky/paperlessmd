@@ -19,6 +19,13 @@ if (!empty($_SESSION['user_id']) && isProvider()) {
     $_provSavedSig = (string)($__ps->fetchColumn() ?: '');
 }
 
+// ── Provider list for autocomplete ──────────────────────────────────────
+$_providerNames = [];
+try {
+    $_pnStmt = $pdo->query("SELECT full_name FROM staff WHERE active=1 AND role='provider' ORDER BY full_name");
+    $_providerNames = $_pnStmt->fetchAll(PDO::FETCH_COLUMN);
+} catch (PDOException $e) {}
+
 // One-signature rule
 $_dupQ = $pdo->prepare("SELECT id FROM form_submissions WHERE patient_id = ? AND form_type = 'new_patient_pocket' AND status IN ('signed','uploaded') AND DATE(created_at) = CURDATE() LIMIT 1");
 $_dupQ->execute([$patient_id]);
@@ -150,9 +157,15 @@ include __DIR__ . '/../includes/header.php';
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">Provider</label>
                     <input type="text" name="provider_name"
+                           list="providerNameList"
                            class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
                                   focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition focus:bg-white"
                            placeholder="Attending provider name">
+                    <datalist id="providerNameList">
+                        <?php foreach ($_providerNames as $_pn): ?>
+                        <option value="<?= h($_pn) ?>">
+                        <?php endforeach; ?>
+                    </datalist>
                 </div>
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">Date of Visit</label>
@@ -239,7 +252,7 @@ include __DIR__ . '/../includes/header.php';
                 Section 2 of 9 &mdash; Vital Signs &amp; Clinical <span class="text-slate-400 font-normal text-xs">(Visit Consent / CS)</span>
             </p>
 
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="vitals-quick-grid grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <?php
                 $vitals = [
                     ['name'=>'bp',      'label'=>'BP',       'placeholder'=>'120/80'],
@@ -382,13 +395,14 @@ include __DIR__ . '/../includes/header.php';
                             <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide w-28">New / Refill</th>
                             <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Medication &amp; Dose</th>
                             <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide w-36">Frequency</th>
+                            <th class="w-8 no-print"></th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-100">
+                    <tbody class="med-rows-tbody divide-y divide-slate-100">
                         <?php foreach ($medRows as $mi => $row):
                             $i = $mi + 1; $isPrefilled = $row['med_id'] > 0; ?>
                         <input type="hidden" name="med_id_<?= $i ?>" value="<?= $row['med_id'] ?>">
-                        <tr class="<?= $isPrefilled ? 'bg-emerald-50/30' : '' ?>">
+                        <tr class="<?= $isPrefilled ? 'bg-emerald-50/30 med-prefilled' : '' ?>">
                             <td class="px-3 py-2">
                                 <select name="med_type_<?= $i ?>"
                                         class="w-full px-2 py-2 border <?= $isPrefilled ? 'border-emerald-200' : 'border-slate-200' ?> rounded-lg text-xs bg-white
@@ -413,16 +427,32 @@ include __DIR__ . '/../includes/header.php';
                                               focus:outline-none focus:ring-2 focus:ring-indigo-400"
                                        placeholder="e.g. BID">
                             </td>
+                            <td class="px-2 py-2 no-print">
+                                <?php if (!$isPrefilled): ?>
+                                <button type="button" class="med-remove-btn text-slate-300 hover:text-red-500 transition-colors"
+                                        title="Remove row"
+                                        onclick="(function(btn){var tr=btn.closest('tr');tr&&tr.remove();})(this)">
+                                    <i class="bi bi-x-circle text-base"></i>
+                                </button>
+                                <?php endif; ?>
+                            </td>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
             </div>
-            <p class="text-xs text-slate-400 mt-1">
-                <i class="bi bi-info-circle mr-0.5 text-emerald-500"></i>
-                Set type to <strong class="text-red-600">D/C</strong> to discontinue &mdash;
-                <strong class="text-emerald-600">New</strong> rows are added to the master list on save.
-            </p>
+            <div class="flex items-center gap-4 mt-2">
+                <button type="button" id="medAddRow"
+                        class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-50 hover:bg-indigo-100
+                               border border-indigo-200 text-indigo-700 font-semibold text-sm rounded-xl transition-all no-print">
+                    <i class="bi bi-plus-circle"></i> Add Row
+                </button>
+                <p class="text-xs text-slate-400">
+                    <i class="bi bi-info-circle mr-0.5 text-emerald-500"></i>
+                    Set type to <strong class="text-red-600">D/C</strong> to discontinue &mdash;
+                    <strong class="text-emerald-600">New</strong> rows are added to the master list on save.
+                </p>
+            </div>
 
             <!-- Handwriting pad (tablet stylus) -->
             <?php

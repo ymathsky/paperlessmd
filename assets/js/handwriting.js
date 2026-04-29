@@ -27,10 +27,19 @@ document.addEventListener('DOMContentLoaded', function () {
 
         var pad = null;
 
-        // Show preview if there's a pre-existing value
+        // Show preview if there's a pre-existing value (initial PHP value or autosave restore)
         if (hiddenInput.value) {
             showPreview(hiddenInput.value);
         }
+
+        // Re-show preview when autosave.js restores the hidden input's value after DOMContentLoaded
+        hiddenInput.addEventListener('change', function () {
+            if (hiddenInput.value) {
+                showPreview(hiddenInput.value);
+            } else {
+                clearPreview();
+            }
+        });
 
         function initPad() {
             if (pad) return; // already initialised
