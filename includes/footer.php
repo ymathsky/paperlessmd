@@ -284,40 +284,88 @@ window._pdCsrf = '<?= htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8') ?>';
 <?php if (in_array($_SESSION['role'] ?? '', ['ma', 'admin'])): ?>
 <script>
 /* ── MA Location Tracking ─────────────────────────────────────────────
-   Requests geolocation permission once, then pushes coordinates to
-   api/update_location.php every 5 minutes while the tab is open.
-   No data is collected if the user denies permission.
+   Uses watchPosition (continuous) + throttle instead of setInterval.
+   Queues each update in IndexedDB and registers a Background Sync tag
+   so the service worker delivers it even when the tab is backgrounded
+   or the connection is briefly lost.
+   Falls back to a direct fetch() if Background Sync is unavailable.
 ──────────────────────────────────────────────────────────────────── */
 (function () {
     if (!navigator.geolocation || !window._pdCsrf) return;
 
-    var INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
-    var BASE = window._pdBase || '';
+    var INTERVAL_MS   = 5 * 60 * 1000; // max 1 update per 5 minutes
+    var BASE          = window._pdBase || '';
+    var LOC_SYNC_TAG  = 'pd-location-sync';
+    var LOC_IDB_NAME  = 'pd-location-queue';
+    var LOC_IDB_STORE = 'queue';
+    var lastSentAt    = 0;
 
-    function sendLocation(pos) {
-        fetch(BASE + '/api/update_location.php', {
-            method: 'POST',
+    /* ── IndexedDB helpers ── */
+    function openLocDB() {
+        return new Promise(function (resolve, reject) {
+            var req = indexedDB.open(LOC_IDB_NAME, 1);
+            req.onupgradeneeded = function (e) {
+                e.target.result.createObjectStore(LOC_IDB_STORE, { keyPath: 'id', autoIncrement: true });
+            };
+            req.onsuccess = function (e) { resolve(e.target.result); };
+            req.onerror   = function (e) { reject(e.target.error); };
+        });
+    }
+    function locDbAdd(db, entry) {
+        return new Promise(function (resolve, reject) {
+            var req = db.transaction(LOC_IDB_STORE, 'readwrite').objectStore(LOC_IDB_STORE).add(entry);
+            req.onsuccess = function () { resolve(); };
+            req.onerror   = function (e) { reject(e.target.error); };
+        });
+    }
+
+    /* ── Deliver via Background Sync (or direct fetch fallback) ── */
+    function queueAndSync(payload) {
+        var url = BASE + '/api/update_location.php';
+
+        if ('serviceWorker' in navigator && 'SyncManager' in window) {
+            openLocDB()
+                .then(function (db) { return locDbAdd(db, { url: url, payload: payload, ts: Date.now() }); })
+                .then(function ()   { return navigator.serviceWorker.ready; })
+                .then(function (reg){ return reg.sync.register(LOC_SYNC_TAG); })
+                .catch(function ()  { directFetch(url, payload); });
+        } else {
+            directFetch(url, payload);
+        }
+    }
+
+    function directFetch(url, payload) {
+        fetch(url, {
+            method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                csrf:     window._pdCsrf,
-                lat:      pos.coords.latitude,
-                lng:      pos.coords.longitude,
-                accuracy: pos.coords.accuracy || null
-            })
-        }).catch(function () { /* silently ignore network errors */ });
+            body:    JSON.stringify(payload)
+        }).catch(function () {});
     }
 
-    function requestAndSend() {
-        navigator.geolocation.getCurrentPosition(
-            sendLocation,
-            function () { /* permission denied or unavailable — do nothing */ },
-            { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
-        );
+    /* ── watchPosition handler (throttled) ── */
+    function onPosition(pos) {
+        var now = Date.now();
+        if (now - lastSentAt < INTERVAL_MS) return;
+        lastSentAt = now;
+        queueAndSync({
+            csrf:     window._pdCsrf,
+            lat:      pos.coords.latitude,
+            lng:      pos.coords.longitude,
+            accuracy: pos.coords.accuracy || null
+        });
     }
 
-    // Send immediately on page load, then every 5 minutes
-    requestAndSend();
-    setInterval(requestAndSend, INTERVAL_MS);
+    // watchPosition gives continuous updates efficiently — no polling needed
+    navigator.geolocation.watchPosition(
+        onPosition,
+        function () { /* denied or unavailable */ },
+        { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 }
+    );
+
+    // When the tab comes back into focus, force an immediate update
+    document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) { lastSentAt = 0; }
+    });
 })();
 </script>
 <?php endif; ?>

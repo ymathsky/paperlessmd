@@ -4,9 +4,12 @@
  * Provides offline-first caching and triggers form queue sync on reconnect.
  * ──────────────────────────────────────────────────────────────────────── */
 
-const STATIC_CACHE = 'pd-static-v1';
-const PAGES_CACHE  = 'pd-pages-v1';
-const SYNC_TAG     = 'pd-form-sync';
+const STATIC_CACHE   = 'pd-static-v1';
+const PAGES_CACHE    = 'pd-pages-v1';
+const SYNC_TAG       = 'pd-form-sync';
+const LOC_SYNC_TAG   = 'pd-location-sync';
+const LOC_IDB_NAME   = 'pd-location-queue';
+const LOC_IDB_STORE  = 'queue';
 
 // Derive base path from sw.js location (/pd on local, '' on production)
 const BASE = self.location.pathname.replace(/\/sw\.js$/, '');
@@ -107,11 +110,14 @@ async function staticStrategy(req) {
 }
 
 // ── Background Sync ───────────────────────────────────────────────────────
-// When the browser reconnects and has a pending sync tag, tell the open
-// window(s) to process their IndexedDB queue.
+// pd-form-sync  → tell open windows to process their offline form queue
+// pd-location-sync → SW flushes the location IDB queue directly (no page needed)
 self.addEventListener('sync', event => {
     if (event.tag === SYNC_TAG) {
         event.waitUntil(notifyClients());
+    }
+    if (event.tag === LOC_SYNC_TAG) {
+        event.waitUntil(flushLocationQueue());
     }
 });
 
@@ -121,4 +127,58 @@ async function notifyClients() {
         type: 'window',
     });
     clients.forEach(c => c.postMessage({ type: 'SYNC_FORMS' }));
+}
+
+// ── Location queue helpers (IndexedDB) ───────────────────────────────────
+function openLocDB() {
+    return new Promise((resolve, reject) => {
+        const req = indexedDB.open(LOC_IDB_NAME, 1);
+        req.onupgradeneeded = e => {
+            e.target.result.createObjectStore(LOC_IDB_STORE, { keyPath: 'id', autoIncrement: true });
+        };
+        req.onsuccess = e => resolve(e.target.result);
+        req.onerror   = e => reject(e.target.error);
+    });
+}
+function locGetAll(db) {
+    return new Promise((resolve, reject) => {
+        const req = db.transaction(LOC_IDB_STORE, 'readonly').objectStore(LOC_IDB_STORE).getAll();
+        req.onsuccess = e => resolve(e.target.result);
+        req.onerror   = e => reject(e.target.error);
+    });
+}
+function locDelete(db, id) {
+    return new Promise((resolve, reject) => {
+        const req = db.transaction(LOC_IDB_STORE, 'readwrite').objectStore(LOC_IDB_STORE).delete(id);
+        req.onsuccess = () => resolve();
+        req.onerror   = e => reject(e.target.error);
+    });
+}
+
+async function flushLocationQueue() {
+    const db      = await openLocDB();
+    const pending = await locGetAll(db);
+    const cutoff  = Date.now() - 3600 * 1000; // discard entries older than 1 h (CSRF expired)
+
+    for (const item of pending) {
+        if (item.ts < cutoff) {
+            await locDelete(db, item.id);
+            continue;
+        }
+        try {
+            const res = await fetch(item.url, {
+                method:    'POST',
+                headers:   { 'Content-Type': 'application/json' },
+                body:      JSON.stringify(item.payload),
+                keepalive: true,
+            });
+            // 2xx = success; 4xx = bad request / CSRF expired — remove, no point retrying
+            if (res.ok || (res.status >= 400 && res.status < 500)) {
+                await locDelete(db, item.id);
+            }
+            // 5xx → leave in queue, SW will retry on next sync event
+        } catch {
+            break; // network error — stop processing; browser will fire sync again when online
+        }
+    }
 }
