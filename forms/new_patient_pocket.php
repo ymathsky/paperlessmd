@@ -11,8 +11,9 @@ $patient = $pStmt->fetch();
 if (!$patient) { header('Location: ' . BASE_URL . '/patients.php'); exit; }
 
 // Fetch logged-in user's pre-saved signature for provider auto-fill
+// Only auto-fill if the logged-in user IS a provider (not admin/MA filling on their behalf)
 $_provSavedSig = '';
-if (!empty($_SESSION['user_id'])) {
+if (!empty($_SESSION['user_id']) && isProvider()) {
     $__ps = $pdo->prepare("SELECT saved_signature FROM staff WHERE id = ? LIMIT 1");
     $__ps->execute([(int)$_SESSION['user_id']]);
     $_provSavedSig = (string)($__ps->fetchColumn() ?: '');
