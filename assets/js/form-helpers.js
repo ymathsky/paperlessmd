@@ -4,22 +4,53 @@
  *
  * Features:
  *   1. Auto-fill Time In to current time when field is empty
- *   2. "Set Normal Vitals" quick-fill button
- *   3. Frequency quick-pick pills (QD / BID / TID / QID / PRN / QHS / Q8H)
- *   4. "Add Row" / remove-row for medication table
+ *   2. Auto-fill Time Out when the Sign step becomes visible (MA/Provider about to sign)
+ *   3. "Set Normal Vitals" quick-fill button
+ *   4. Frequency quick-pick pills (QD / BID / TID / QID / PRN / QHS / Q8H)
+ *   5. "Add Row" / remove-row for medication table
  */
 (function () {
     'use strict';
 
+    function currentTimeHHMM() {
+        var now = new Date();
+        return String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
 
         /* ── 1. Auto-fill Time In ────────────────────────────────────────── */
-        var timeInField = document.querySelector('[name="time_in"]');
+        var timeInField  = document.querySelector('[name="time_in"]');
+        var timeOutField = document.querySelector('[name="time_out"]');
+
         if (timeInField && !timeInField.value) {
-            var now  = new Date();
-            var hh   = String(now.getHours()).padStart(2, '0');
-            var mm   = String(now.getMinutes()).padStart(2, '0');
-            timeInField.value = hh + ':' + mm;
+            timeInField.value = currentTimeHHMM();
+        }
+
+        /* ── 2. Auto-fill Time Out when Sign step becomes visible ────────── */
+        // Watches the last wizard step (Sign & Submit). When it un-hides,
+        // stamps the current time into time_out (if still empty).
+        if (timeOutField) {
+            var wizSteps = document.querySelectorAll('.wiz-step');
+            var signStep = wizSteps.length ? wizSteps[wizSteps.length - 1] : null;
+
+            if (signStep) {
+                var signObs = new MutationObserver(function () {
+                    if (!signStep.classList.contains('hidden') && !timeOutField.value) {
+                        timeOutField.value = currentTimeHHMM();
+                    }
+                });
+                signObs.observe(signStep, { attributes: true, attributeFilter: ['class'] });
+            } else {
+                // Non-wizard single-page form: fill time_out when sig pad is first touched
+                var sigCanvas = document.getElementById('signaturePad') || document.getElementById('maSigPad');
+                if (sigCanvas) {
+                    sigCanvas.addEventListener('pointerdown', function fillOnce() {
+                        if (!timeOutField.value) timeOutField.value = currentTimeHHMM();
+                        sigCanvas.removeEventListener('pointerdown', fillOnce);
+                    });
+                }
+            }
         }
 
         /* ── 2. Normal Vitals quick-fill ─────────────────────────────────── */

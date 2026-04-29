@@ -270,7 +270,7 @@
 <script src="<?= BASE_URL ?>/assets/js/app.js?v=3"></script>
 <script src="<?= BASE_URL ?>/assets/js/form-wizard.js"></script>
 <script src="<?= BASE_URL ?>/assets/js/handwriting.js"></script>
-<script src="<?= BASE_URL ?>/assets/js/form-helpers.js" defer></script>
+<script src="<?= BASE_URL ?>/assets/js/form-helpers.js?v=2" defer></script>
 <script>
 window._pdBase = '<?= BASE_URL ?>';
 window._pdCompany = '<?= htmlspecialchars(($patient['company'] ?? PRACTICE_NAME), ENT_QUOTES, 'UTF-8') ?>';
