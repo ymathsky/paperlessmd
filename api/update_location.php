@@ -66,6 +66,10 @@ try {
           )
     ")->execute([(int)$_SESSION['user_id'], (int)$_SESSION['user_id']]);
 
+    // Also update last_active_at so the admin map shows correct online status
+    $pdo->prepare("UPDATE staff SET last_active_at = NOW() WHERE id = ?")
+        ->execute([(int)$_SESSION['user_id']]);
+
     echo json_encode(['ok' => true]);
 } catch (PDOException $e) {
     http_response_code(500);

@@ -58,7 +58,7 @@ include __DIR__ . '/../includes/header.php';
                     </span>
                     <div class="flex-1 min-w-0">
                         <p class="text-sm font-semibold text-slate-700 truncate"><?= htmlspecialchars($m['full_name']) ?></p>
-                        <p class="text-xs text-slate-400 capitalize"><?= htmlspecialchars($m['role']) ?></p>
+                        <p class="staff-status text-xs text-slate-400 capitalize mt-0.5"><?= htmlspecialchars($m['role']) ?></p>
                     </div>
                     <span class="staff-dot w-2.5 h-2.5 rounded-full bg-slate-200 shrink-0" title="No data"></span>
                 </li>
@@ -72,9 +72,12 @@ include __DIR__ . '/../includes/header.php';
         <!-- Legend -->
         <div class="bg-white rounded-2xl shadow-sm border border-slate-100 px-4 py-3 text-xs text-slate-500 space-y-1.5">
             <p class="font-bold text-slate-600 mb-2">Legend</p>
+            <p class="text-[10px] uppercase tracking-wide text-slate-400 font-semibold mb-1">Session status</p>
             <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-emerald-500 shrink-0"></span> Online (&lt; 10 min)</div>
             <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-amber-400 shrink-0"></span> Away (10–60 min)</div>
             <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-slate-300 shrink-0"></span> Offline (&gt; 60 min)</div>
+            <p class="text-[10px] uppercase tracking-wide text-slate-400 font-semibold mt-2 mb-1">Map pin color</p>
+            <p class="text-slate-400 leading-relaxed">Pin color reflects GPS data freshness (same scale). No pin = location not yet shared.</p>
         </div>
     </div>
 
@@ -152,6 +155,25 @@ include __DIR__ . '/../includes/header.php';
         return color === 'green' ? 'bg-emerald-500' : color === 'amber' ? 'bg-amber-400' : 'bg-slate-300';
     }
 
+    // Online status is driven by last_active_at (session heartbeat),
+    // GPS color is driven by recorded_at (location timestamp)
+    function sessionColor(lastActiveAt) {
+        if (!lastActiveAt) return 'grey';
+        var diff = (Date.now() - new Date(lastActiveAt).getTime()) / 60000;
+        if (diff < 10)  return 'green';
+        if (diff < 60)  return 'amber';
+        return 'grey';
+    }
+
+    function sessionLabel(lastActiveAt) {
+        if (!lastActiveAt) return 'Never logged in';
+        var diff = Math.round((Date.now() - new Date(lastActiveAt).getTime()) / 60000);
+        if (diff < 1)  return 'Online now';
+        if (diff < 60) return 'Active ' + diff + ' min ago';
+        var h = Math.round(diff / 60);
+        return 'Active ' + h + ' hr ago';
+    }
+
     function loadLocations() {
         fetch(BASE + '/api/get_locations.php')
             .then(function (r) { return r.json(); })
@@ -159,31 +181,44 @@ include __DIR__ . '/../includes/header.php';
                 if (!data.ok) return;
                 var locs = data.locations;
 
-                // Update staff sidebar dots
+                // Update staff sidebar dots — based on session activity, not GPS
                 document.querySelectorAll('.staff-row').forEach(function (row) {
                     var id  = parseInt(row.dataset.id, 10);
                     var dot = row.querySelector('.staff-dot');
                     var loc = locs.find(function (l) { return parseInt(l.staff_id, 10) === id; });
-                    var col = loc ? statusColor(loc.recorded_at) : 'grey';
+                    var col = loc ? sessionColor(loc.last_active_at) : 'grey';
                     dot.className = 'staff-dot w-2.5 h-2.5 rounded-full shrink-0 ' + dotColor(col);
-                    dot.title = loc ? statusLabel(loc.recorded_at) : 'No data';
+                    dot.title = loc ? sessionLabel(loc.last_active_at) : 'No data';
+
+                    // Update the status text under the name if the element exists
+                    var statusEl = row.querySelector('.staff-status');
+                    if (statusEl && loc) {
+                        statusEl.textContent = sessionLabel(loc.last_active_at);
+                        statusEl.className = 'staff-status text-xs mt-0.5 '
+                            + (col === 'green' ? 'text-emerald-600 font-semibold'
+                            : col === 'amber'  ? 'text-amber-500'
+                            : 'text-slate-400');
+                    }
                 });
 
-                // Place / update markers
+                // Place / update GPS markers (only for staff that have location data)
                 var bounds = [];
                 locs.forEach(function (loc) {
+                    if (!loc.latitude || !loc.longitude) return; // no GPS data yet
                     var lat = parseFloat(loc.latitude);
                     var lng = parseFloat(loc.longitude);
-                    var col = statusColor(loc.recorded_at);
+                    var col = statusColor(loc.recorded_at);      // GPS freshness color
                     var initials = loc.full_name.split(' ').map(function (w) { return w[0]; }).join('').toUpperCase().substring(0, 2);
                     var icon = makeIcon(col, initials);
 
                     var accuracy = loc.accuracy ? parseFloat(loc.accuracy).toFixed(0) + ' m' : 'Unknown';
+                    var onlineStatus = sessionLabel(loc.last_active_at);
                     var popup =
-                        '<div class="text-sm" style="min-width:160px">' +
-                        '<p class="font-bold text-slate-800 mb-1">' + loc.full_name + '</p>' +
-                        '<p class="text-slate-500 capitalize mb-1">' + loc.role + '</p>' +
-                        '<p class="text-slate-600 text-xs">Last seen: <strong>' + statusLabel(loc.recorded_at) + '</strong></p>' +
+                        '<div class="text-sm" style="min-width:170px">' +
+                        '<p class="font-bold text-slate-800 mb-0.5">' + loc.full_name + '</p>' +
+                        '<p class="text-slate-500 capitalize mb-2">' + loc.role + '</p>' +
+                        '<p class="text-xs mb-0.5"><span class="font-semibold text-slate-700">Session:</span> ' + onlineStatus + '</p>' +
+                        '<p class="text-xs mb-0.5"><span class="font-semibold text-slate-700">GPS update:</span> ' + statusLabel(loc.recorded_at) + '</p>' +
                         '<p class="text-slate-400 text-xs mt-0.5">Accuracy: ' + accuracy + '</p>' +
                         '<p class="text-slate-400 text-xs">Coords: ' + lat.toFixed(5) + ', ' + lng.toFixed(5) + '</p>' +
                         '</div>';

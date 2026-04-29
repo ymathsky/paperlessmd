@@ -17,18 +17,19 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 }
 
 try {
-    // Latest location per staff member, joined with staff name/role
+    // All active MA/admin staff with their latest GPS location (if any) + last_active_at
     $rows = $pdo->query("
         SELECT
-            s.id          AS staff_id,
+            s.id             AS staff_id,
             s.full_name,
             s.role,
+            s.last_active_at,
             ml.latitude,
             ml.longitude,
             ml.accuracy,
             ml.recorded_at
         FROM staff s
-        INNER JOIN ma_locations ml ON ml.id = (
+        LEFT JOIN ma_locations ml ON ml.id = (
             SELECT id FROM ma_locations
             WHERE staff_id = s.id
             ORDER BY recorded_at DESC
