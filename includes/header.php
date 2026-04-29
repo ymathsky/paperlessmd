@@ -181,6 +181,7 @@ if (!isBilling()) {
         <?php foreach ([
             ['href' => '/admin/schedule_manage.php',  'key' => 'schedule_manage',  'icon' => 'bi-calendar-week-fill', 'label' => 'Manage Schedule'],
             ['href' => '/admin/recurring_schedule.php','key' => 'recurring_schedule','icon' => 'bi-arrow-repeat',      'label' => 'Recurring Schedule'],
+            ['href' => '/admin/wound_photos.php',    'key' => 'wound_photos',     'icon' => 'bi-camera-fill',         'label' => 'Wound Photos'],
             ['href' => '/admin/ma_productivity.php', 'key' => 'ma_report',         'icon' => 'bi-graph-up-arrow',     'label' => 'Productivity Report'],
             ['href' => '/admin/ma_locations.php',    'key' => 'ma_locations',       'icon' => 'bi-geo-alt-fill',        'label' => 'MA Locations'],
             ['href' => '/admin/users.php',           'key' => 'users',           'icon' => 'bi-gear-fill',            'label' => 'Manage Staff'],
