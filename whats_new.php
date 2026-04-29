@@ -10,10 +10,21 @@ include __DIR__ . '/includes/header.php';
 
 $releases = [
     [
-        'version' => 'v1.7',
-        'date'    => 'April 29, 2026',
+        'version' => 'v1.8',
+        'date'    => 'May 2, 2026',
         'label'   => 'Latest',
         'color'   => 'emerald',
+        'items'   => [
+            ['icon' => 'bi-person-badge-fill',  'tag' => 'New',     'tag_color' => 'blue',    'title' => 'Provider Role',                         'desc' => 'New "Provider" user role for physicians and nurse practitioners. Providers have full read access to clinical data (vitals, medications, wounds, SOAP notes, diagnoses), can view and sign the e-signature queue, view the daily schedule, and use internal messaging — without schedule management or admin functions.'],
+            ['icon' => 'bi-pen-fill',            'tag' => 'New',     'tag_color' => 'blue',    'title' => 'E-Sign Queue: Provider Access',          'desc' => 'Provider-role users now see all pending provider signatures across every MA in the E-Sign queue — not just forms belonging to their own MA. Admins retain the same all-access view.'],
+            ['icon' => 'bi-heart-pulse-fill',    'tag' => 'Improve', 'tag_color' => 'teal',    'title' => 'Clinical Data Access for Providers',    'desc' => 'The canAccessClinical() permission now includes the Provider role alongside Admin and MA, granting access to vitals, medications, wounds, and SOAP notes throughout the application.'],
+        ],
+    ],
+    [
+        'version' => 'v1.7',
+        'date'    => 'April 29, 2026',
+        'label'   => null,
+        'color'   => 'blue',
         'items'   => [
             ['icon' => 'bi-calendar-week-fill', 'tag' => 'New',     'tag_color' => 'blue',    'title' => 'Scheduler Role',                        'desc' => 'New "Scheduler" user role for staff who manage scheduling only. Schedulers can view the daily schedule, add/edit visits, and manage recurring schedules — without access to clinical data, forms, or admin functions.'],
             ['icon' => 'bi-calendar-plus-fill', 'tag' => 'New',     'tag_color' => 'blue',    'title' => 'Schedule Management for Schedulers',   'desc' => 'Manage Schedule and Recurring Schedule pages are now accessible to both Admins and Schedulers. Schedulers see a dedicated "Scheduling" section in the sidebar navigation.'],

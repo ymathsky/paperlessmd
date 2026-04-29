@@ -25,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $vals = [
         'username'  => trim($_POST['username']  ?? ''),
         'full_name' => trim($_POST['full_name'] ?? ''),
-        'role'      => in_array($_POST['role'] ?? '', ['admin','ma','billing','scheduler']) ? $_POST['role'] : 'ma',
+        'role'      => in_array($_POST['role'] ?? '', ['admin','ma','billing','scheduler','provider']) ? $_POST['role'] : 'ma',
     ];
     $password  = $_POST['password']  ?? '';
     $password2 = $_POST['password2'] ?? '';
@@ -120,6 +120,14 @@ include __DIR__ . '/../includes/header.php';
                         <div>
                             <div class="text-sm font-semibold text-slate-700">Medical Assistant</div>
                             <div class="text-xs text-slate-500">Clinical access</div>
+                        </div>
+                    </label>
+                    <label class="flex items-center gap-3 p-3.5 border border-slate-200 rounded-xl cursor-pointer transition-colors has-[:checked]:border-teal-400 has-[:checked]:bg-teal-50">
+                        <input type="radio" name="role" value="provider" <?= $vals['role'] === 'provider' ? 'checked' : '' ?>
+                               class="w-4 h-4 text-teal-600 border-slate-300 focus:ring-teal-400">
+                        <div>
+                            <div class="text-sm font-semibold text-slate-700">Provider</div>
+                            <div class="text-xs text-slate-500">Physician / NP — signs &amp; reviews forms</div>
                         </div>
                     </label>
                     <label class="flex items-center gap-3 p-3.5 border border-slate-200 rounded-xl cursor-pointer transition-colors has-[:checked]:border-violet-400 has-[:checked]:bg-violet-50">

@@ -91,7 +91,7 @@ include __DIR__ . '/../includes/header.php';
                     <td class="px-4 py-4">
                         <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold
                                      <?php
-                                     $roleCls = ['admin'=>'bg-indigo-100 text-indigo-700','billing'=>'bg-amber-100 text-amber-700','scheduler'=>'bg-violet-100 text-violet-700'];
+                                     $roleCls = ['admin'=>'bg-indigo-100 text-indigo-700','billing'=>'bg-amber-100 text-amber-700','scheduler'=>'bg-violet-100 text-violet-700','provider'=>'bg-teal-100 text-teal-700'];
                                      echo $roleCls[$u['role']] ?? 'bg-slate-100 text-slate-600';
                                      ?>">
                             <?= ucfirst($u['role']) ?>

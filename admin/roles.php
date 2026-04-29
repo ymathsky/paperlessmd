@@ -14,12 +14,12 @@ $sections = [
         'icon'  => 'bi-people-fill',
         'color' => 'blue',
         'rows'  => [
-            ['label' => 'View patient list',                  'desc' => '',                                       'admin' => true,  'ma' => true,  'billing' => true,  'scheduler' => true ],
-            ['label' => 'View patient profile',               'desc' => '',                                       'admin' => true,  'ma' => true,  'billing' => true,  'scheduler' => true ],
-            ['label' => 'Add / edit patients',                'desc' => 'Create new records, update demographics','admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => false],
-            ['label' => 'Change patient status',              'desc' => 'Active / Inactive / Discharged',         'admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => false],
-            ['label' => 'Delete patient records',             'desc' => 'Permanent removal',                      'admin' => true,  'ma' => false, 'billing' => false, 'scheduler' => false],
-            ['label' => 'Upload patient photo',               'desc' => '',                                       'admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => false],
+            ['label' => 'View patient list',                  'desc' => '',                                       'admin' => true,  'ma' => true,  'billing' => true,  'scheduler' => true,  'provider' => true ],
+            ['label' => 'View patient profile',               'desc' => '',                                       'admin' => true,  'ma' => true,  'billing' => true,  'scheduler' => true,  'provider' => true ],
+            ['label' => 'Add / edit patients',                'desc' => 'Create new records, update demographics','admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => false, 'provider' => false],
+            ['label' => 'Change patient status',              'desc' => 'Active / Inactive / Discharged',         'admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => false, 'provider' => false],
+            ['label' => 'Delete patient records',             'desc' => 'Permanent removal',                      'admin' => true,  'ma' => false, 'billing' => false, 'scheduler' => false, 'provider' => false],
+            ['label' => 'Upload patient photo',               'desc' => '',                                       'admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => false, 'provider' => false],
         ],
     ],
     [
@@ -27,12 +27,13 @@ $sections = [
         'icon'  => 'bi-file-earmark-text-fill',
         'color' => 'indigo',
         'rows'  => [
-            ['label' => 'Fill out / submit forms',            'desc' => 'All 12 form types',                      'admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => false],
-            ['label' => 'View submitted documents',           'desc' => 'Read-only view',                         'admin' => true,  'ma' => true,  'billing' => true,  'scheduler' => false],
-            ['label' => 'Print / export PDF',                 'desc' => 'Single or bulk export',                  'admin' => true,  'ma' => true,  'billing' => true,  'scheduler' => false],
-            ['label' => 'Upload documents to portal',         'desc' => 'Mark as Uploaded to PF',                 'admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => false],
-            ['label' => 'Request e-signature',                'desc' => '',                                       'admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => false],
-            ['label' => 'Delete form submissions',            'desc' => 'Permanent removal',                      'admin' => true,  'ma' => false, 'billing' => false, 'scheduler' => false],
+            ['label' => 'Fill out / submit forms',            'desc' => 'All 12 form types',                      'admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => false, 'provider' => false],
+            ['label' => 'View submitted documents',           'desc' => 'Read-only view',                         'admin' => true,  'ma' => true,  'billing' => true,  'scheduler' => false, 'provider' => true ],
+            ['label' => 'Print / export PDF',                 'desc' => 'Single or bulk export',                  'admin' => true,  'ma' => true,  'billing' => true,  'scheduler' => false, 'provider' => true ],
+            ['label' => 'Upload documents to portal',         'desc' => 'Mark as Uploaded to PF',                 'admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => false, 'provider' => false],
+            ['label' => 'Request e-signature',                'desc' => '',                                       'admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => false, 'provider' => false],
+            ['label' => 'Provider e-signature',               'desc' => 'Sign forms as the ordering provider',    'admin' => true,  'ma' => false, 'billing' => false, 'scheduler' => false, 'provider' => true ],
+            ['label' => 'Delete form submissions',            'desc' => 'Permanent removal',                      'admin' => true,  'ma' => false, 'billing' => false, 'scheduler' => false, 'provider' => false],
         ],
     ],
     [
@@ -40,13 +41,13 @@ $sections = [
         'icon'  => 'bi-heart-pulse-fill',
         'color' => 'red',
         'rows'  => [
-            ['label' => 'View vitals & vital trends',         'desc' => 'BP, weight, O2, pulse, glucose, etc.',   'admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => false],
-            ['label' => 'View & manage medications',          'desc' => 'Add, edit, discontinue meds',            'admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => false],
-            ['label' => 'View & log wound measurements',      'desc' => 'Wound size, photos, trend chart',        'admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => false],
-            ['label' => 'Wound photos',                       'desc' => 'Upload and view wound images',           'admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => false],
-            ['label' => 'Manage diagnoses (ICD-10)',          'desc' => 'Add / remove diagnosis codes',           'admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => false],
-            ['label' => 'SOAP notes',                         'desc' => 'Create and edit clinical notes',         'admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => false],
-            ['label' => 'Care coordination notes',            'desc' => 'Team discussion thread per patient',     'admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => false],
+            ['label' => 'View vitals & vital trends',         'desc' => 'BP, weight, O2, pulse, glucose, etc.',   'admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => false, 'provider' => true ],
+            ['label' => 'View & manage medications',          'desc' => 'Add, edit, discontinue meds',            'admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => false, 'provider' => true ],
+            ['label' => 'View & log wound measurements',      'desc' => 'Wound size, photos, trend chart',        'admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => false, 'provider' => true ],
+            ['label' => 'Wound photos',                       'desc' => 'Upload and view wound images',           'admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => false, 'provider' => true ],
+            ['label' => 'Manage diagnoses (ICD-10)',          'desc' => 'Add / remove diagnosis codes',           'admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => false, 'provider' => true ],
+            ['label' => 'SOAP notes',                         'desc' => 'Create and edit clinical notes',         'admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => false, 'provider' => true ],
+            ['label' => 'Care coordination notes',            'desc' => 'Team discussion thread per patient',     'admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => false, 'provider' => true ],
         ],
     ],
     [
@@ -54,11 +55,11 @@ $sections = [
         'icon'  => 'bi-receipt-cutoff',
         'color' => 'amber',
         'rows'  => [
-            ['label' => 'View submitted forms (read-only)',   'desc' => 'For coding reference',                   'admin' => true,  'ma' => true,  'billing' => true,  'scheduler' => false],
-            ['label' => 'View ICD-10 diagnoses',              'desc' => 'Diagnosis codes on patient record',      'admin' => true,  'ma' => true,  'billing' => true,  'scheduler' => false],
-            ['label' => 'Export forms to PDF',                'desc' => 'For billing records',                    'admin' => true,  'ma' => true,  'billing' => true,  'scheduler' => false],
-            ['label' => 'Add / edit diagnoses',               'desc' => 'Modify clinical data',                   'admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => false],
-            ['label' => 'View clinical PHI fields',           'desc' => 'Vitals, meds, wounds, chief complaint',  'admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => false],
+            ['label' => 'View submitted forms (read-only)',   'desc' => 'For coding reference',                   'admin' => true,  'ma' => true,  'billing' => true,  'scheduler' => false, 'provider' => true ],
+            ['label' => 'View ICD-10 diagnoses',              'desc' => 'Diagnosis codes on patient record',      'admin' => true,  'ma' => true,  'billing' => true,  'scheduler' => false, 'provider' => true ],
+            ['label' => 'Export forms to PDF',                'desc' => 'For billing records',                    'admin' => true,  'ma' => true,  'billing' => true,  'scheduler' => false, 'provider' => true ],
+            ['label' => 'Add / edit diagnoses',               'desc' => 'Modify clinical data',                   'admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => false, 'provider' => true ],
+            ['label' => 'View clinical PHI fields',           'desc' => 'Vitals, meds, wounds, chief complaint',  'admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => false, 'provider' => true ],
         ],
     ],
     [
@@ -66,10 +67,10 @@ $sections = [
         'icon'  => 'bi-chat-dots-fill',
         'color' => 'teal',
         'rows'  => [
-            ['label' => 'Internal messaging',                 'desc' => 'Send/receive staff messages',            'admin' => true,  'ma' => true,  'billing' => true,  'scheduler' => true ],
-            ['label' => 'Receive notifications',              'desc' => 'Bell icon — pending uploads, drafts',    'admin' => true,  'ma' => true,  'billing' => true,  'scheduler' => true ],
-            ['label' => 'Global search',                      'desc' => 'Search patients and forms (Ctrl+K)',     'admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => false],
-            ['label' => 'View patient messages/updates',      'desc' => 'Message thread for billing only',        'admin' => true,  'ma' => true,  'billing' => true,  'scheduler' => false],
+            ['label' => 'Internal messaging',                 'desc' => 'Send/receive staff messages',            'admin' => true,  'ma' => true,  'billing' => true,  'scheduler' => true,  'provider' => true ],
+            ['label' => 'Receive notifications',              'desc' => 'Bell icon — pending uploads, drafts',    'admin' => true,  'ma' => true,  'billing' => true,  'scheduler' => true,  'provider' => true ],
+            ['label' => 'Global search',                      'desc' => 'Search patients and forms (Ctrl+K)',     'admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => false, 'provider' => true ],
+            ['label' => 'View patient messages/updates',      'desc' => 'Message thread for billing only',        'admin' => true,  'ma' => true,  'billing' => true,  'scheduler' => false, 'provider' => true ],
         ],
     ],
     [
@@ -77,11 +78,11 @@ $sections = [
         'icon'  => 'bi-calendar-week-fill',
         'color' => 'violet',
         'rows'  => [
-            ['label' => 'View daily schedule',                'desc' => '',                                       'admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => true ],
-            ['label' => 'Add / edit visits',                  'desc' => 'Schedule patient home visits',           'admin' => true,  'ma' => false, 'billing' => false, 'scheduler' => true ],
-            ['label' => 'Manage recurring schedules',         'desc' => 'Set up repeating visit patterns',        'admin' => true,  'ma' => false, 'billing' => false, 'scheduler' => true ],
-            ['label' => 'Mark visits complete / en-route',   'desc' => '',                                       'admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => false],
-            ['label' => 'Productivity reports',               'desc' => 'Per-MA visit and form metrics',          'admin' => true,  'ma' => false, 'billing' => false, 'scheduler' => false],
+            ['label' => 'View daily schedule',                'desc' => '',                                       'admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => true,  'provider' => true ],
+            ['label' => 'Add / edit visits',                  'desc' => 'Schedule patient home visits',           'admin' => true,  'ma' => false, 'billing' => false, 'scheduler' => true,  'provider' => false],
+            ['label' => 'Manage recurring schedules',         'desc' => 'Set up repeating visit patterns',        'admin' => true,  'ma' => false, 'billing' => false, 'scheduler' => true,  'provider' => false],
+            ['label' => 'Mark visits complete / en-route',   'desc' => '',                                       'admin' => true,  'ma' => true,  'billing' => false, 'scheduler' => false, 'provider' => false],
+            ['label' => 'Productivity reports',               'desc' => 'Per-MA visit and form metrics',          'admin' => true,  'ma' => false, 'billing' => false, 'scheduler' => false, 'provider' => false],
         ],
     ],
     [
@@ -89,11 +90,11 @@ $sections = [
         'icon'  => 'bi-shield-lock-fill',
         'color' => 'purple',
         'rows'  => [
-            ['label' => 'Add / edit staff accounts',          'desc' => 'Create users, change passwords',         'admin' => true,  'ma' => false, 'billing' => false, 'scheduler' => false],
-            ['label' => 'Assign / change user roles',         'desc' => '',                                       'admin' => true,  'ma' => false, 'billing' => false, 'scheduler' => false],
-            ['label' => 'Enable / disable staff accounts',    'desc' => '',                                       'admin' => true,  'ma' => false, 'billing' => false, 'scheduler' => false],
-            ['label' => 'View HIPAA audit log',               'desc' => 'Full access / action trail',             'admin' => true,  'ma' => false, 'billing' => false, 'scheduler' => false],
-            ['label' => 'System settings',                    'desc' => 'Portal URL, session timeout, etc.',      'admin' => true,  'ma' => false, 'billing' => false, 'scheduler' => false],
+            ['label' => 'Add / edit staff accounts',          'desc' => 'Create users, change passwords',         'admin' => true,  'ma' => false, 'billing' => false, 'scheduler' => false, 'provider' => false],
+            ['label' => 'Assign / change user roles',         'desc' => '',                                       'admin' => true,  'ma' => false, 'billing' => false, 'scheduler' => false, 'provider' => false],
+            ['label' => 'Enable / disable staff accounts',    'desc' => '',                                       'admin' => true,  'ma' => false, 'billing' => false, 'scheduler' => false, 'provider' => false],
+            ['label' => 'View HIPAA audit log',               'desc' => 'Full access / action trail',             'admin' => true,  'ma' => false, 'billing' => false, 'scheduler' => false, 'provider' => false],
+            ['label' => 'System settings',                    'desc' => 'Portal URL, session timeout, etc.',      'admin' => true,  'ma' => false, 'billing' => false, 'scheduler' => false, 'provider' => false],
         ],
     ],
 ];
@@ -120,11 +121,12 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <!-- Role summary cards -->
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
     <?php
     $roleMeta = [
         'admin'     => ['label'=>'Admin',             'color'=>'indigo',  'icon'=>'bi-shield-fill-check',    'desc'=>'Full access to all features, settings, and audit trails.'],
         'ma'        => ['label'=>'Medical Assistant', 'color'=>'blue',    'icon'=>'bi-bandaid-fill',          'desc'=>'Clinical and form access. No admin panel or account management.'],
+        'provider'  => ['label'=>'Provider',          'color'=>'teal',    'icon'=>'bi-person-badge-fill',     'desc'=>'Physician/NP — reviews patient charts, signs forms, and views schedules.'],
         'scheduler' => ['label'=>'Scheduler',         'color'=>'violet',  'icon'=>'bi-calendar-week-fill',   'desc'=>'Schedule management only. No clinical data or admin functions.'],
         'billing'   => ['label'=>'Billing',           'color'=>'amber',   'icon'=>'bi-receipt-cutoff',        'desc'=>'Read-only access to submitted forms and diagnoses. No PHI clinical fields.'],
     ];
@@ -204,6 +206,11 @@ include __DIR__ . '/../includes/header.php';
                             <i class="bi bi-bandaid-fill"></i> Med. Asst.
                         </div>
                     </th>
+                    <th class="px-4 py-3 text-center text-xs font-bold text-teal-600 uppercase tracking-wide whitespace-nowrap min-w-[100px]">
+                        <div class="flex items-center justify-center gap-1.5">
+                            <i class="bi bi-person-badge-fill"></i> Provider
+                        </div>
+                    </th>
                     <th class="px-4 py-3 text-center text-xs font-bold text-violet-600 uppercase tracking-wide whitespace-nowrap min-w-[100px]">
                         <div class="flex items-center justify-center gap-1.5">
                             <i class="bi bi-calendar-week-fill"></i> Scheduler
@@ -225,7 +232,7 @@ include __DIR__ . '/../includes/header.php';
                         <div class="text-xs text-slate-400 mt-0.5"><?= htmlspecialchars($row['desc']) ?></div>
                         <?php endif; ?>
                     </td>
-                    <?php foreach (['admin','ma','scheduler','billing'] as $role): ?>
+                    <?php foreach (['admin','ma','provider','scheduler','billing'] as $role): ?>
                     <td class="px-4 py-3.5 text-center">
                         <?php if ($row[$role]): ?>
                         <span class="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-100">

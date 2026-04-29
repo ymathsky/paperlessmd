@@ -22,8 +22,8 @@ $dateFilter = in_array($_GET['date'] ?? '', $allowedDates, true) ? $_GET['date']
 $where  = ["fs.status IN ('signed','uploaded')", "(fs.provider_signature IS NULL OR fs.provider_signature = '')"];
 $params = [];
 
-// Non-admin users only see forms they collected
-if (!isAdmin()) {
+// Non-admin users only see forms they collected; providers see ALL pending signatures
+if (!isAdmin() && !isProvider()) {
     $where[] = 'fs.ma_id = ?';
     $params[] = (int)$_SESSION['user_id'];
 }
