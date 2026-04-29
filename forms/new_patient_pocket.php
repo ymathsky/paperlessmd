@@ -548,7 +548,7 @@ include __DIR__ . '/../includes/header.php';
                 foreach ($auths as $name => $text): ?>
                 <label class="flex items-start gap-3 p-3 border border-slate-200 rounded-xl cursor-pointer
                               hover:border-emerald-300 hover:bg-emerald-50/50 transition-colors has-[:checked]:border-emerald-400 has-[:checked]:bg-emerald-50">
-                    <input type="checkbox" name="<?= $name ?>" value="1"
+                    <input type="checkbox" name="<?= $name ?>" value="1" checked
                            class="mt-0.5 w-4 h-4 text-emerald-600 border-slate-300 rounded focus:ring-emerald-400 flex-shrink-0">
                     <span class="text-sm text-slate-700"><?= h($text) ?></span>
                 </label>
