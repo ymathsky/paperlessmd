@@ -310,6 +310,110 @@
             input.addEventListener('blur',  function () { setTimeout(function () { wrap.classList.add('hidden'); }, 200); });
         }
 
+        /* ── 6. Medication PDF upload ──────────────────────────────────── */
+        (function () {
+            var fileInput  = document.getElementById('medPdfFile');
+            var hiddenData = document.getElementById('medPdfData');
+            var nameEl     = document.getElementById('medPdfName');
+            var removeBtn  = document.getElementById('medPdfRemove');
+            if (!fileInput || !hiddenData) return;
+
+            fileInput.addEventListener('change', function () {
+                var file = fileInput.files[0];
+                if (!file) return;
+                if (file.type !== 'application/pdf') {
+                    alert('Please select a PDF file.');
+                    fileInput.value = '';
+                    return;
+                }
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('PDF must be under 5 MB.');
+                    fileInput.value = '';
+                    return;
+                }
+                var reader = new FileReader();
+                reader.onload = function (e) {
+                    hiddenData.value = e.target.result;
+                    if (nameEl)    { nameEl.textContent = file.name; nameEl.classList.remove('hidden'); }
+                    if (removeBtn) removeBtn.classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            });
+
+            removeBtn && removeBtn.addEventListener('click', function () {
+                hiddenData.value = '';
+                fileInput.value  = '';
+                if (nameEl)    nameEl.classList.add('hidden');
+                if (removeBtn) removeBtn.classList.add('hidden');
+            });
+        })();
+
+        /* ── 7. Add more handwriting pads ─────────────────────────────── */
+        (function () {
+            var addBtn    = document.getElementById('addMoreHw');
+            var container = document.getElementById('hwExtraContainer');
+            if (!addBtn || !container) return;
+
+            var hwCounter = 1; // index 1 = the static med_handwriting field
+
+            addBtn.addEventListener('click', function () {
+                hwCounter++;
+                var fieldName = 'med_handwriting_' + hwCounter;
+                var fieldId   = 'medHandwritingData' + hwCounter;
+                var uid       = 'hw_extra_' + hwCounter;
+
+                var wrap = document.createElement('div');
+                wrap.className = 'hw-pad-wrap mt-4 pt-4 border-t border-slate-100';
+                wrap.dataset.uid     = uid;
+                wrap.dataset.fieldId = fieldId;
+                wrap.innerHTML =
+                    '<input type="hidden" name="' + fieldName + '" id="' + fieldId + '" value="">' +
+                    '<div class="flex flex-wrap items-center gap-3">' +
+                      '<button type="button" class="hw-toggle inline-flex items-center gap-2 px-4 py-2 ' +
+                              'bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 ' +
+                              'text-indigo-700 font-semibold text-sm rounded-xl transition-all no-print">' +
+                        '<i class="bi bi-pencil-square"></i> Drawing #' + hwCounter +
+                      '</button>' +
+                      '<span class="hw-preview-wrap hidden items-center gap-2">' +
+                        '<img class="hw-thumb" src="" alt="Handwritten medications" ' +
+                             'style="height:44px;max-width:320px;border:1px solid #e2e8f0;border-radius:8px;background:#fff;display:none;">' +
+                        '<button type="button" class="hw-remove-thumb text-slate-400 hover:text-red-500 transition-colors text-xs no-print">' +
+                          '<i class="bi bi-x-circle"></i> Remove</button>' +
+                      '</span>' +
+                      '<button type="button" class="hw-remove-extra ml-auto text-xs text-red-400 hover:text-red-600 no-print">' +
+                        '<i class="bi bi-trash"></i> Remove pad</button>' +
+                    '</div>' +
+                    '<div class="hw-panel hidden mt-3 border-2 border-indigo-200 rounded-2xl overflow-hidden bg-white no-print">' +
+                      '<div class="flex flex-wrap items-center gap-3 px-4 py-3 bg-indigo-50 border-b border-indigo-200">' +
+                        '<i class="bi bi-pencil-square text-indigo-600 text-base"></i>' +
+                        '<span class="text-sm font-bold text-indigo-700 flex-1">Draw with stylus or finger</span>' +
+                        '<div class="flex items-center gap-2">' +
+                          '<button type="button" class="hw-pen w-5 h-5 rounded-full bg-slate-800 border-2 border-transparent hover:border-indigo-500 transition-all hw-pen--active" data-min="0.8" data-max="1.5"></button>' +
+                          '<button type="button" class="hw-pen w-6 h-6 rounded-full bg-slate-800 border-2 border-transparent hover:border-indigo-500 transition-all" data-min="1.5" data-max="3"></button>' +
+                          '<button type="button" class="hw-pen w-7 h-7 rounded-full bg-slate-800 border-2 border-transparent hover:border-indigo-500 transition-all" data-min="3" data-max="6"></button>' +
+                        '</div>' +
+                        '<button type="button" class="hw-undo ml-1 px-3 py-1.5 text-xs bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-all">' +
+                          '<i class="bi bi-arrow-counterclockwise"></i> Undo</button>' +
+                      '</div>' +
+                      '<div class="hw-canvas-wrap relative" style="touch-action:none;">' +
+                        '<canvas class="hw-canvas block" style="width:100%;height:220px;cursor:crosshair;touch-action:none;display:block;"></canvas>' +
+                        '<div class="hw-placeholder absolute inset-0 flex items-center justify-center text-slate-300 pointer-events-none select-none italic text-sm text-center px-6">' +
+                          'Write medication names, doses &amp; frequencies with your stylus or finger&hellip;</div>' +
+                      '</div>' +
+                      '<div class="flex flex-wrap items-center gap-3 px-4 py-3 bg-slate-50 border-t border-slate-200">' +
+                        '<button type="button" class="hw-done px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition-all shadow-sm">' +
+                          '<i class="bi bi-check2-circle"></i> Save Drawing</button>' +
+                        '<button type="button" class="hw-clear px-4 py-2 bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 text-sm font-semibold rounded-xl transition-all">' +
+                          '<i class="bi bi-eraser"></i> Clear</button>' +
+                        '<button type="button" class="hw-cancel ml-auto px-4 py-2 text-slate-400 hover:text-slate-600 text-sm transition-all">Cancel</button>' +
+                      '</div>' +
+                    '</div>';
+
+                container.appendChild(wrap);
+                if (typeof window.initHwPad === 'function') window.initHwPad(wrap);
+            });
+        })();
+
     }
 
     /* ── Vitals Numpad ──────────────────────────────────────────────────

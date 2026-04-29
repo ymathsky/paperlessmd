@@ -481,10 +481,34 @@ include __DIR__ . '/../includes/header.php';
             $hwExisting    = '';
             include __DIR__ . '/../includes/handwriting_pad.php';
             ?>
+
+            <!-- Extra handwriting pads added dynamically -->
+            <div id="hwExtraContainer"></div>
+
+            <!-- Add another drawing + PDF upload row -->
+            <div class="flex flex-wrap items-center gap-3 mt-3 no-print">
+                <button type="button" id="addMoreHw"
+                        class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 hover:bg-indigo-100
+                               border border-indigo-200 text-indigo-700 font-semibold text-sm rounded-xl transition-all">
+                    <i class="bi bi-plus-square"></i> Add Another Drawing
+                </button>
+
+                <label class="inline-flex items-center gap-2 px-4 py-2 bg-slate-50 hover:bg-slate-100
+                              border border-slate-200 text-slate-700 font-semibold text-sm rounded-xl
+                              transition-all cursor-pointer">
+                    <i class="bi bi-file-earmark-pdf text-red-500"></i> Upload Medication PDF
+                    <input type="file" id="medPdfFile" accept="application/pdf" class="sr-only">
+                </label>
+                <input type="hidden" name="med_pdf" id="medPdfData">
+                <span id="medPdfName" class="hidden text-xs text-slate-600 max-w-[180px] truncate"></span>
+                <button type="button" id="medPdfRemove"
+                        class="hidden text-xs text-red-400 hover:text-red-600 transition-colors">
+                    <i class="bi bi-x-circle"></i>
+                </button>
+            </div>
         </div><!-- /step 3 -->
 
 
-        <!-- â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•— -->
         <!-- â•‘  STEP 4 &mdash; Sign & Submit          â•‘ -->
         <!-- â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
         <div class="wiz-step hidden space-y-6 py-4"

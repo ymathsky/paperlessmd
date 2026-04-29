@@ -74,6 +74,23 @@ if (!empty($formData['med_handwriting'])) {
     }
 }
 
+// Validate additional handwriting pages (med_handwriting_2 … med_handwriting_5)
+for ($hwi = 2; $hwi <= 5; $hwi++) {
+    $hwKey = 'med_handwriting_' . $hwi;
+    if (!empty($formData[$hwKey])) {
+        if (!preg_match('/^data:image\/png;base64,[A-Za-z0-9+\/=]+$/', $formData[$hwKey])) {
+            unset($formData[$hwKey]);
+        }
+    }
+}
+
+// Validate med_pdf if provided (base64 PDF data URI)
+if (!empty($formData['med_pdf'])) {
+    if (!preg_match('/^data:application\/pdf;base64,[A-Za-z0-9+\/=]+$/', $formData['med_pdf'])) {
+        unset($formData['med_pdf']);
+    }
+}
+
 // Validate and require provider_signature for new_patient_pocket
 $providerSig       = null;
 $providerPrintName = null;

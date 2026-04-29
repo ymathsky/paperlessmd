@@ -2,14 +2,16 @@
  * assets/js/handwriting.js
  * Freehand handwriting pad using SignaturePad.js.
  * Handles all .hw-pad-wrap elements on the page.
+ * window.initHwPad(wrapEl) is exposed for dynamically added pads.
  */
-document.addEventListener('DOMContentLoaded', function () {
-    if (typeof SignaturePad === 'undefined') return;
 
-    document.querySelectorAll('.hw-pad-wrap').forEach(function (wrap) {
-        var fieldId     = wrap.dataset.fieldId;
-        var hiddenInput = document.getElementById(fieldId);
-        if (!hiddenInput) return;
+function initHwPad(wrap) {
+    if (wrap._hwInit) return; // already initialised
+    wrap._hwInit = true;
+
+    var fieldId     = wrap.dataset.fieldId;
+    var hiddenInput = document.getElementById(fieldId);
+    if (!hiddenInput) return;
 
         var toggleBtn   = wrap.querySelector('.hw-toggle');
         var panel       = wrap.querySelector('.hw-panel');
@@ -163,5 +165,19 @@ document.addEventListener('DOMContentLoaded', function () {
             clearPreview();
             if (pad) { pad.clear(); if (placeholder) placeholder.style.display = ''; }
         });
+
+        // "Remove pad" button (only on dynamically-added extra pads)
+        var removePadBtn = wrap.querySelector('.hw-remove-extra');
+        removePadBtn && removePadBtn.addEventListener('click', function () {
+            wrap.remove();
+        });
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    if (typeof SignaturePad === 'undefined') return;
+    document.querySelectorAll('.hw-pad-wrap').forEach(function (wrap) {
+        initHwPad(wrap);
     });
 });
+
+window.initHwPad = initHwPad;
