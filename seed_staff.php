@@ -47,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'seed'
     }
 }
 
-function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
+// h() is defined in includes/config.php
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -67,7 +67,11 @@ function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
         </a>
         <div>
             <h1 class="text-xl font-bold text-slate-800">Bulk Staff Registration</h1>
-            <p class="text-slate-500 text-sm">One-time seed — <?= count($accounts) ?> accounts (<?= count(array_filter($accounts, fn($a) => $a['role']==='ma')) ?> MAs + <?= count(array_filter($accounts, fn($a) => $a['role']==='admin')) ?> Admin)</p>
+            <?php
+            $maCnt    = count(array_filter($accounts, function($a){ return $a['role']==='ma'; }));
+            $adminCnt = count(array_filter($accounts, function($a){ return $a['role']==='admin'; }));
+            ?>
+            <p class="text-slate-500 text-sm">One-time seed — <?= count($accounts) ?> accounts (<?= $maCnt ?> MAs + <?= $adminCnt ?> Admin)</p>
         </div>
     </div>
 
@@ -133,9 +137,9 @@ function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
     <?php else: ?>
     <!-- Results -->
     <?php
-    $okCount   = count(array_filter($results, fn($r) => $r[0] === 'ok'));
-    $warnCount = count(array_filter($results, fn($r) => $r[0] === 'warn'));
-    $errCount  = count(array_filter($results, fn($r) => $r[0] === 'err'));
+    $okCount   = count(array_filter($results, function($r){ return $r[0] === 'ok'; }));
+    $warnCount = count(array_filter($results, function($r){ return $r[0] === 'warn'; }));
+    $errCount  = count(array_filter($results, function($r){ return $r[0] === 'err'; }));
     ?>
     <div class="mb-5 flex items-center gap-3 <?= $errCount ? 'bg-red-50 border-red-200 text-red-700' : 'bg-emerald-50 border-emerald-200 text-emerald-700' ?> border px-4 py-3 rounded-xl text-sm">
         <i class="bi bi-<?= $errCount ? 'x-circle-fill' : 'check-circle-fill' ?> flex-shrink-0"></i>
