@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/db.php';
-requireAdmin();
+requireAdminOrScheduler();
 
 $pageTitle = 'Recurring Schedule';
 $activeNav = 'recurring_schedule';

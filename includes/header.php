@@ -153,6 +153,26 @@ if (!isBilling()) {
             <span id="notifBadge" class="hidden bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none min-w-[18px] text-center">0</span>
         </button>
 
+        <?php if (isScheduler()): ?>
+        <!-- Scheduler section divider -->
+        <div class="pt-3 pb-1 px-3">
+            <span class="text-[10px] font-bold uppercase tracking-widest text-blue-400/70">Scheduling</span>
+        </div>
+        <?php foreach ([
+            ['href' => '/admin/schedule_manage.php',  'key' => 'schedule_manage',  'icon' => 'bi-calendar-week-fill', 'label' => 'Manage Schedule'],
+            ['href' => '/admin/recurring_schedule.php','key' => 'recurring_schedule','icon' => 'bi-arrow-repeat',      'label' => 'Recurring Schedule'],
+        ] as $n):
+            $active = ($activeNav ?? '') === $n['key'];
+        ?>
+        <a href="<?= BASE_URL . $n['href'] ?>"
+           class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150
+                  <?= $active ? 'bg-white/20 text-white shadow-sm' : 'text-blue-200 hover:bg-white/10 hover:text-white' ?>">
+            <i class="bi <?= $n['icon'] ?> text-base w-5 shrink-0 text-center"></i>
+            <span><?= $n['label'] ?></span>
+        </a>
+        <?php endforeach; ?>
+        <?php endif; ?>
+
         <?php if (isAdmin()): ?>
         <!-- Admin section divider -->
         <div class="pt-3 pb-1 px-3">

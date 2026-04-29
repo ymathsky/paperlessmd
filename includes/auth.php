@@ -54,6 +54,23 @@ function isMa(): bool
     return ($_SESSION['role'] ?? '') === 'ma';
 }
 
+function isScheduler(): bool
+{
+    return ($_SESSION['role'] ?? '') === 'scheduler';
+}
+
+/**
+ * Allows admin or scheduler — used on schedule management pages.
+ */
+function requireAdminOrScheduler(): void
+{
+    requireLogin();
+    if (!in_array($_SESSION['role'] ?? '', ['admin', 'scheduler'], true)) {
+        header('Location: ' . BASE_URL . '/dashboard.php');
+        exit;
+    }
+}
+
 /**
  * Redirects billing users away — use on any clinical-only page/action.
  */

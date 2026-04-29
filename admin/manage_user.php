@@ -25,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $vals = [
         'username'  => trim($_POST['username']  ?? ''),
         'full_name' => trim($_POST['full_name'] ?? ''),
-        'role'      => in_array($_POST['role'] ?? '', ['admin','ma','billing']) ? $_POST['role'] : 'ma',
+        'role'      => in_array($_POST['role'] ?? '', ['admin','ma','billing','scheduler']) ? $_POST['role'] : 'ma',
     ];
     $password  = $_POST['password']  ?? '';
     $password2 = $_POST['password2'] ?? '';
@@ -111,15 +111,23 @@ include __DIR__ . '/../includes/header.php';
                        placeholder="jsmith" autocomplete="off" required>
             </div>
 
-            <div class="mb-4">
+                <div class="mb-4">
                 <label class="block text-sm font-semibold text-slate-700 mb-1.5">Role</label>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <label class="flex items-center gap-3 p-3.5 border border-slate-200 rounded-xl cursor-pointer transition-colors has-[:checked]:border-indigo-400 has-[:checked]:bg-indigo-50">
                         <input type="radio" name="role" value="ma" <?= $vals['role'] === 'ma' ? 'checked' : '' ?>
                                class="w-4 h-4 text-indigo-600 border-slate-300 focus:ring-indigo-400">
                         <div>
                             <div class="text-sm font-semibold text-slate-700">Medical Assistant</div>
                             <div class="text-xs text-slate-500">Clinical access</div>
+                        </div>
+                    </label>
+                    <label class="flex items-center gap-3 p-3.5 border border-slate-200 rounded-xl cursor-pointer transition-colors has-[:checked]:border-violet-400 has-[:checked]:bg-violet-50">
+                        <input type="radio" name="role" value="scheduler" <?= $vals['role'] === 'scheduler' ? 'checked' : '' ?>
+                               class="w-4 h-4 text-violet-600 border-slate-300 focus:ring-violet-400">
+                        <div>
+                            <div class="text-sm font-semibold text-slate-700">Scheduler</div>
+                            <div class="text-xs text-slate-500">Schedule management only</div>
                         </div>
                     </label>
                     <label class="flex items-center gap-3 p-3.5 border border-slate-200 rounded-xl cursor-pointer transition-colors has-[:checked]:border-amber-400 has-[:checked]:bg-amber-50">

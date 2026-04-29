@@ -90,7 +90,10 @@ include __DIR__ . '/../includes/header.php';
                     <td class="px-4 py-4 text-slate-500 font-mono text-xs"><?= h($u['username']) ?></td>
                     <td class="px-4 py-4">
                         <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold
-                                     <?= $u['role'] === 'admin' ? 'bg-indigo-100 text-indigo-700' : ($u['role'] === 'billing' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600') ?>">
+                                     <?php
+                                     $roleCls = ['admin'=>'bg-indigo-100 text-indigo-700','billing'=>'bg-amber-100 text-amber-700','scheduler'=>'bg-violet-100 text-violet-700'];
+                                     echo $roleCls[$u['role']] ?? 'bg-slate-100 text-slate-600';
+                                     ?>">
                             <?= ucfirst($u['role']) ?>
                         </span>
                     </td>
