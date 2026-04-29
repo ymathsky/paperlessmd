@@ -129,7 +129,7 @@
 
         document.querySelectorAll('[name^="med_freq_"]').forEach(function (input) {
             var wrap = document.createElement('div');
-            wrap.className = 'flex flex-wrap gap-1 mt-1';
+            wrap.className = 'freq-pill-wrap flex flex-wrap gap-1 mt-1 hidden no-print';
 
             FREQ_OPTS.forEach(function (freq) {
                 var btn = document.createElement('button');
@@ -145,7 +145,6 @@
                 btn.addEventListener('click', function () {
                     input.value = freq;
                     input.dispatchEvent(new Event('input', { bubbles: true }));
-                    // Highlight active pill briefly
                     wrap.querySelectorAll('.freq-pill').forEach(function (p) {
                         p.classList.remove('border-indigo-500', 'bg-indigo-50', 'text-indigo-700');
                     });
@@ -156,6 +155,8 @@
             });
 
             input.parentNode.insertBefore(wrap, input.nextSibling);
+            input.addEventListener('focus', function () { wrap.classList.remove('hidden'); });
+            input.addEventListener('blur',  function () { setTimeout(function () { wrap.classList.add('hidden'); }, 200); });
         });
 
         /* ── Mark pill active when input already has a matching value ────── */
@@ -283,7 +284,7 @@
 
         function attachFreqPills(input) {
             var wrap = document.createElement('div');
-            wrap.className = 'flex flex-wrap gap-1 mt-1';
+            wrap.className = 'freq-pill-wrap flex flex-wrap gap-1 mt-1 hidden no-print';
             FREQ_OPTS.forEach(function (freq) {
                 var btn = document.createElement('button');
                 btn.type = 'button';
@@ -300,10 +301,13 @@
                         p.classList.remove('border-indigo-500', 'bg-indigo-50', 'text-indigo-700');
                     });
                     btn.classList.add('border-indigo-500', 'bg-indigo-50', 'text-indigo-700');
+                    input.focus();
                 });
                 wrap.appendChild(btn);
             });
             input.parentNode.insertBefore(wrap, input.nextSibling);
+            input.addEventListener('focus', function () { wrap.classList.remove('hidden'); });
+            input.addEventListener('blur',  function () { setTimeout(function () { wrap.classList.add('hidden'); }, 200); });
         }
 
     }
