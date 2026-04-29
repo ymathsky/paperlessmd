@@ -57,15 +57,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'seed'
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<style>
+@media print {
+  body { background: #fff !important; padding: 0 !important; font-family: Arial, sans-serif; }
+  .no-print { display: none !important; }
+  .print-only { display: block !important; }
+  .max-w-3xl { max-width: 100% !important; }
+  table { width: 100%; border-collapse: collapse; font-size: 11pt; }
+  th, td { border: 1px solid #cbd5e1; padding: 6px 10px; text-align: left; }
+  th { background: #f1f5f9 !important; font-weight: bold; color: #334155; }
+  tr:nth-child(even) td { background: #f8fafc; }
+  .rounded-2xl, .rounded-xl, .shadow-sm { border-radius: 0 !important; box-shadow: none !important; }
+  h1 { font-size: 16pt; margin-bottom: 4px; }
+  .print-title { margin-bottom: 16px; }
+  .bg-amber-50 { background: #fffbeb !important; border: 1px solid #fcd34d; padding: 10px; margin-bottom: 12px; }
+}
+.print-only { display: none; }
+</style>
 </head>
 <body class="bg-slate-50 min-h-screen p-6">
 <div class="max-w-3xl mx-auto">
 
     <div class="flex items-center gap-3 mb-6">
-        <a href="<?= BASE_URL ?>/admin/users.php" class="text-slate-400 hover:text-indigo-600 transition-colors">
+        <a href="<?= BASE_URL ?>/admin/users.php" class="text-slate-400 hover:text-indigo-600 transition-colors no-print">
             <i class="bi bi-arrow-left text-lg"></i>
         </a>
-        <div>
+        <div class="flex-1">
             <h1 class="text-xl font-bold text-slate-800">Bulk Staff Registration</h1>
             <?php
             $maCnt    = count(array_filter($accounts, function($a){ return $a['role']==='ma'; }));
@@ -73,6 +90,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'seed'
             ?>
             <p class="text-slate-500 text-sm">One-time seed — <?= count($accounts) ?> accounts (<?= $maCnt ?> MAs + <?= $adminCnt ?> Admin)</p>
         </div>
+        <button onclick="downloadPdf()" class="no-print ml-auto inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-sm font-semibold rounded-xl transition-all shadow-sm">
+            <i class="bi bi-file-earmark-pdf-fill"></i> Download PDF
+        </button>
     </div>
 
     <?php if (!$executed): ?>
@@ -88,6 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'seed'
                 <tr class="bg-slate-50 border-b border-slate-100 text-left">
                     <th class="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Full Name</th>
                     <th class="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Username</th>
+                    <th class="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Password</th>
                     <th class="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Role</th>
                     <th class="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Phone</th>
                     <th class="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Email</th>
@@ -98,6 +119,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'seed'
                 <tr class="hover:bg-slate-50/60">
                     <td class="px-5 py-3 font-semibold text-slate-800"><?= h($a['full_name']) ?></td>
                     <td class="px-4 py-3 font-mono text-indigo-600 text-xs"><?= h($a['username']) ?></td>
+                    <td class="px-4 py-3 font-mono text-xs text-slate-700"><?= h(SEED_PASSWORD) ?></td>
                     <td class="px-4 py-3">
                         <?php if ($a['role'] === 'admin'): ?>
                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700">
@@ -200,9 +222,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'seed'
 
     <div class="flex items-center gap-3">
         <a href="<?= BASE_URL ?>/admin/users.php"
-           class="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-all shadow-sm">
+           class="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-all shadow-sm no-print">
             <i class="bi bi-people-fill"></i> View All Staff
         </a>
+        <button onclick="downloadPdf()" class="no-print inline-flex items-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl transition-all shadow-sm">
+            <i class="bi bi-file-earmark-pdf-fill"></i> Download PDF
+        </button>
         <?php if ($errCount): ?>
         <form method="POST">
             <?php $tok = csrfToken(); ?>
@@ -217,5 +242,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'seed'
     <?php endif; ?>
 
 </div>
+
+<script>
+function downloadPdf() {
+    var title = document.title;
+    document.title = 'Staff_Accounts_<?= date('Y-m-d') ?>';
+    window.print();
+    document.title = title;
+}
+</script>
 </body>
 </html>
