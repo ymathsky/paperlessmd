@@ -40,10 +40,10 @@ if (!verifyCsrf($body['csrf'] ?? '')) {
 // Refresh the session activity timestamp
 $_SESSION['last_active'] = time();
 
-// Persist last_active_at to DB so admin can see online status
+// Persist last_active_at to DB so admin can see online status (graceful if column missing)
 try {
     $pdo->prepare("UPDATE staff SET last_active_at = NOW() WHERE id = ?")
         ->execute([(int)$_SESSION['user_id']]);
-} catch (Exception $e) { /* column may not exist on older installs */ }
+} catch (PDOException $e) { /* column not yet migrated on this server — safe to ignore */ }
 
 echo json_encode(['ok' => true, 'lastActive' => $_SESSION['last_active']]);

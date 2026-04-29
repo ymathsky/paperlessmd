@@ -17,13 +17,22 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 }
 
 try {
+    // Check whether last_active_at column exists (graceful if migration not yet run)
+    $hasLastActive = false;
+    try {
+        $pdo->query("SELECT last_active_at FROM staff LIMIT 0");
+        $hasLastActive = true;
+    } catch (PDOException $e) { /* column not yet added on this server */ }
+
+    $activeCol = $hasLastActive ? 's.last_active_at,' : 'NULL AS last_active_at,';
+
     // All active MA/admin staff with their latest GPS location (if any) + last_active_at
     $rows = $pdo->query("
         SELECT
             s.id             AS staff_id,
             s.full_name,
             s.role,
-            s.last_active_at,
+            $activeCol
             ml.latitude,
             ml.longitude,
             ml.accuracy,

@@ -67,8 +67,10 @@ try {
     ")->execute([(int)$_SESSION['user_id'], (int)$_SESSION['user_id']]);
 
     // Also update last_active_at so the admin map shows correct online status
-    $pdo->prepare("UPDATE staff SET last_active_at = NOW() WHERE id = ?")
-        ->execute([(int)$_SESSION['user_id']]);
+    try {
+        $pdo->prepare("UPDATE staff SET last_active_at = NOW() WHERE id = ?")
+            ->execute([(int)$_SESSION['user_id']]);
+    } catch (PDOException $e) { /* column not yet migrated — safe to ignore */ }
 
     echo json_encode(['ok' => true]);
 } catch (PDOException $e) {
