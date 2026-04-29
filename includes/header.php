@@ -28,25 +28,9 @@ if (!isBilling()) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title><?= isset($pageTitle) ? h($pageTitle) . ' — ' : '' ?><?= APP_NAME ?></title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-    tailwind.config = {
-        theme: {
-            extend: {
-                fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
-                colors: {
-                    brand: {
-                        50:  '#eff6ff', 100: '#dbeafe', 200: '#bfdbfe',
-                        500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8',
-                        800: '#1e40af', 900: '#1e3a8a', 950: '#172554'
-                    }
-                }
-            }
-        }
-    }
-    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/tailwind.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css">
     <link rel="manifest" href="<?= BASE_URL ?>/manifest.php">

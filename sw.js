@@ -4,8 +4,8 @@
  * Provides offline-first caching and triggers form queue sync on reconnect.
  * ──────────────────────────────────────────────────────────────────────── */
 
-const STATIC_CACHE   = 'pd-static-v2';
-const PAGES_CACHE    = 'pd-pages-v2';
+const STATIC_CACHE   = 'pd-static-v3';
+const PAGES_CACHE    = 'pd-pages-v3';
 const SYNC_TAG       = 'pd-form-sync';
 const LOC_SYNC_TAG   = 'pd-location-sync';
 const LOC_IDB_NAME   = 'pd-location-queue';
@@ -17,6 +17,7 @@ const BASE = self.location.pathname.replace(/\/sw\.js$/, '');
 const PRECACHE_URLS = [
     BASE + '/offline.html',
     BASE + '/assets/css/style.css',
+    BASE + '/assets/css/tailwind.css',
     BASE + '/assets/js/app.js',
     BASE + '/assets/js/offline.js',
 ];
@@ -60,8 +61,8 @@ self.addEventListener('fetch', event => {
         return;
     }
 
-    // HTML page navigations: network-first, cache fallback → offline.html
-    if (req.mode === 'navigate') {
+    // HTML page navigations AND .php fetches: network-first, cache fallback → offline.html
+    if (req.mode === 'navigate' || url.pathname.endsWith('.php')) {
         event.respondWith(pageStrategy(req));
         return;
     }
@@ -103,10 +104,11 @@ async function staticStrategy(req) {
     if (cached) return cached;
     try {
         const response = await fetch(req);
-        cache.put(req, response.clone());
+        // Only cache successful responses — never persist error responses
+        if (response.ok) cache.put(req, response.clone());
         return response;
     } catch {
-        return new Response('', { status: 503 });
+        return new Response('', { status: 504, statusText: 'Gateway Timeout' });
     }
 }
 
