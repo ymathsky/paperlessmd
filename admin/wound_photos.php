@@ -7,6 +7,15 @@ if (!canAccessClinical()) {
     exit;
 }
 
+// Temporary: catch and show DB errors so we can diagnose the 500
+set_exception_handler(function($e) {
+    http_response_code(500);
+    echo '<pre style="background:#fff;padding:20px;color:red;font-size:13px">';
+    echo htmlspecialchars($e->getMessage() . "\n" . $e->getTraceAsString());
+    echo '</pre>';
+    exit;
+});
+
 $pageTitle = 'Wound Photo Portal';
 $activeNav = 'wound_photos';
 
