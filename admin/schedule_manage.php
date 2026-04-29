@@ -22,7 +22,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add')
     $visitType = $_POST['visit_type'] ?? 'routine';
     $allowedTypes = ['routine','new_patient','wound_care','awv','ccm','il'];
     if (!in_array($visitType, $allowedTypes, true)) $visitType = 'routine';
-    $notes     = trim($_POST['notes'] ?? '');
+    $notes        = trim($_POST['notes']         ?? '');
+    $providerName = trim($_POST['provider_name'] ?? '');
 
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $visitDate)) $errors[] = 'Invalid date.';
     if (!$maId)      $errors[] = 'Please select an MA.';
@@ -41,9 +42,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add')
         $orderStmt->execute([$maId, $visitDate]);
         $nextOrder = (int)$orderStmt->fetchColumn();
 
-        $ins = $pdo->prepare("INSERT INTO `schedule` (visit_date,ma_id,patient_id,visit_time,visit_order,visit_type,notes,created_by)
-                               VALUES (?,?,?,?,?,?,?,?)");
-        $ins->execute([$visitDate, $maId, $patientId, $visitTime, $nextOrder, $visitType, $notes ?: null, $_SESSION['user_id']]);
+        $ins = $pdo->prepare("INSERT INTO `schedule` (visit_date,ma_id,patient_id,visit_time,visit_order,visit_type,notes,provider_name,created_by)
+                               VALUES (?,?,?,?,?,?,?,?,?)");
+        $ins->execute([$visitDate, $maId, $patientId, $visitTime, $nextOrder, $visitType, $notes ?: null, $providerName ?: null, $_SESSION['user_id']]);
         $date = $visitDate;
         header('Location: ' . BASE_URL . '/admin/schedule_manage.php?date=' . $date . '&saved=1');
         exit;
@@ -80,6 +81,12 @@ $allMas = $pdo->query("SELECT id, full_name FROM staff WHERE active=1 ORDER BY f
 
 // Fetch all patients (for add form)
 $allPatients = $pdo->query("SELECT id, CONCAT(first_name,' ',last_name) AS name FROM patients ORDER BY last_name,first_name")->fetchAll();
+
+// Distinct provider names already in schedule (for datalist autocomplete)
+$providerList = [];
+try {
+    $providerList = $pdo->query("SELECT DISTINCT provider_name FROM `schedule` WHERE provider_name IS NOT NULL AND provider_name <> '' ORDER BY provider_name")->fetchAll(PDO::FETCH_COLUMN);
+} catch (PDOException $e) { /* column not yet on this server */ }
 
 // Fetch schedule grouped by MA
 $schedStmt = $pdo->prepare("
@@ -240,6 +247,19 @@ include __DIR__ . '/../includes/header.php';
             </div>
 
             <div class="sm:col-span-2 lg:col-span-1">
+                <label class="block text-sm font-semibold text-slate-700 mb-1.5">Provider <span class="font-normal text-slate-400">(optional)</span></label>
+                <input type="text" name="provider_name" value="<?= h($_POST['provider_name'] ?? '') ?>" placeholder="Attending provider name"
+                       list="providerDatalist"
+                       class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
+                              focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition focus:bg-white">
+                <datalist id="providerDatalist">
+                    <?php foreach ($providerList as $pn): ?>
+                    <option value="<?= h($pn) ?>">
+                    <?php endforeach; ?>
+                </datalist>
+            </div>
+
+            <div class="sm:col-span-2 lg:col-span-1">
                 <label class="block text-sm font-semibold text-slate-700 mb-1.5">Notes <span class="font-normal text-slate-400">(optional)</span></label>
                 <input type="text" name="notes" value="<?= h($_POST['notes'] ?? '') ?>" placeholder="e.g. Use back entrance, patient has a dog..."
                        class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
@@ -326,6 +346,9 @@ include __DIR__ . '/../includes/header.php';
                 </div>
                 <?php if ($v['patient_address']): ?>
                 <div class="text-xs text-slate-400 mt-0.5 truncate"><?= h($v['patient_address']) ?></div>
+                <?php endif; ?>
+                <?php if (!empty($v['provider_name'])): ?>
+                <div class="text-xs text-slate-500 mt-0.5"><i class="bi bi-person-badge mr-0.5"></i><?= h($v['provider_name']) ?></div>
                 <?php endif; ?>
                 <?php if ($v['visit_time']): ?>
                 <div class="text-xs text-slate-400"><?= date('g:i A', strtotime($v['visit_time'])) ?></div>

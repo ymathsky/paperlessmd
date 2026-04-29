@@ -43,16 +43,19 @@ $visitsByDate = [];
 $weekVisits   = [];
 $weekCounts   = ['pending'=>0,'en_route'=>0,'completed'=>0,'missed'=>0];
 if ($view === 'week') {
-    $wkStmt = $pdo->prepare("
+    $wkSql = "
         SELECT sc.*,
                CONCAT(p.first_name, ' ', p.last_name) AS patient_name,
                p.id AS patient_id
         FROM `schedule` sc
         JOIN patients p ON p.id = sc.patient_id
         WHERE sc.ma_id = ? AND sc.visit_date BETWEEN ? AND ?
-        ORDER BY sc.visit_date ASC, sc.visit_order ASC, sc.visit_time ASC
-    ");
-    $wkStmt->execute([$viewMaId, $weekStart, $weekEnd]);
+    ";
+    $wkParams = [$viewMaId, $weekStart, $weekEnd];
+    if ($filterProvider !== '') { $wkSql .= " AND sc.provider_name = ?"; $wkParams[] = $filterProvider; }
+    $wkSql .= " ORDER BY sc.visit_date ASC, sc.visit_order ASC, sc.visit_time ASC";
+    $wkStmt = $pdo->prepare($wkSql);
+    $wkStmt->execute($wkParams);
     $weekVisits = $wkStmt->fetchAll();
     foreach ($weekVisits as $wv) {
         $visitsByDate[$wv['visit_date']][] = $wv;
@@ -61,7 +64,7 @@ if ($view === 'week') {
 }
 
 // Fetch schedule for this MA + date, ordered by visit_order
-$schedStmt = $pdo->prepare("
+$schedSql = "
     SELECT sc.*, 
            CONCAT(p.first_name, ' ', p.last_name) AS patient_name,
            p.address AS patient_address,
@@ -70,15 +73,18 @@ $schedStmt = $pdo->prepare("
     FROM `schedule` sc
     JOIN patients p ON p.id = sc.patient_id
     WHERE sc.ma_id = ? AND sc.visit_date = ?
-    ORDER BY sc.visit_order ASC, sc.visit_time ASC
-");
-$schedStmt->execute([$viewMaId, $date]);
+";
+$schedParams = [$viewMaId, $date];
+if ($filterProvider !== '') { $schedSql .= " AND sc.provider_name = ?"; $schedParams[] = $filterProvider; }
+$schedSql .= " ORDER BY sc.visit_order ASC, sc.visit_time ASC";
+$schedStmt = $pdo->prepare($schedSql);
+$schedStmt->execute($schedParams);
 $visits = $schedStmt->fetchAll();
 
 // When admin views all MAs, also build grouped structure
 $allMaVisits = []; // [ma_id => ['name'=>'...', 'counts'=>[], 'visits'=>[]]]
 if ($viewAll && $view === 'day') {
-    $allStmt = $pdo->prepare("
+    $allSql = "
         SELECT sc.*,
                CONCAT(p.first_name,' ',p.last_name) AS patient_name,
                p.address AS patient_address,
@@ -89,9 +95,12 @@ if ($viewAll && $view === 'day') {
         JOIN patients p ON p.id = sc.patient_id
         JOIN staff s    ON s.id = sc.ma_id
         WHERE sc.visit_date = ?
-        ORDER BY s.full_name, sc.visit_order ASC, sc.visit_time ASC
-    ");
-    $allStmt->execute([$date]);
+    ";
+    $allParams = [$date];
+    if ($filterProvider !== '') { $allSql .= " AND sc.provider_name = ?"; $allParams[] = $filterProvider; }
+    $allSql .= " ORDER BY s.full_name, sc.visit_order ASC, sc.visit_time ASC";
+    $allStmt = $pdo->prepare($allSql);
+    $allStmt->execute($allParams);
     foreach ($allStmt->fetchAll() as $av) {
         if (!isset($allMaVisits[$av['ma_id']])) {
             $allMaVisits[$av['ma_id']] = [
@@ -116,6 +125,13 @@ $allMas = [];
 if (isAdmin()) {
     $allMas = $pdo->query("SELECT id, full_name FROM staff WHERE active=1 ORDER BY full_name")->fetchAll();
 }
+
+// Provider filter
+$filterProvider = trim($_GET['provider'] ?? '');
+$providerOptions = [];
+try {
+    $providerOptions = $pdo->query("SELECT DISTINCT provider_name FROM `schedule` WHERE provider_name IS NOT NULL AND provider_name != '' ORDER BY provider_name")->fetchAll(PDO::FETCH_COLUMN);
+} catch (PDOException $e) { /* provider_name column may not exist yet */ }
 
 include __DIR__ . '/includes/header.php';
 ?>
@@ -142,6 +158,7 @@ include __DIR__ . '/includes/header.php';
         <form method="GET" class="flex items-center gap-2">
             <input type="hidden" name="date" value="<?= h($date) ?>">
             <input type="hidden" name="view" value="<?= h($view) ?>">
+            <?php if ($filterProvider !== ''): ?><input type="hidden" name="provider" value="<?= h($filterProvider) ?>"><?php endif; ?>
             <select name="ma_id" onchange="this.form.submit()"
                     class="px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
                 <option value="all" <?= $viewAll ? 'selected' : '' ?>>All MAs</option>
@@ -154,14 +171,30 @@ include __DIR__ . '/includes/header.php';
         </form>
         <?php endif; ?>
 
+        <?php if (!empty($providerOptions)): ?>
+        <form method="GET" class="flex items-center gap-2">
+            <input type="hidden" name="date" value="<?= h($date) ?>">
+            <input type="hidden" name="view" value="<?= h($view) ?>">
+            <input type="hidden" name="ma_id" value="<?= $viewAll ? 'all' : $viewMaId ?>">
+            <select name="provider" onchange="this.form.submit()"
+                    class="px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                <option value="">All Providers</option>
+                <?php foreach ($providerOptions as $pOpt): ?>
+                <option value="<?= h($pOpt) ?>" <?= $filterProvider === $pOpt ? 'selected' : '' ?>><?= h($pOpt) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </form>
+        <?php endif; ?>
+
         <!-- Day / Week toggle -->
-        <?php $maParam = $viewAll ? 'all' : $viewMaId; ?>
+        <?php $maParam = $viewAll ? 'all' : $viewMaId;
+              $pParam  = $filterProvider !== '' ? '&provider=' . urlencode($filterProvider) : ''; ?>
         <div class="flex items-center bg-slate-100 rounded-xl p-1 gap-0.5">
-            <a href="?date=<?= $date ?>&ma_id=<?= $maParam ?>&view=day"
+            <a href="?date=<?= $date ?>&ma_id=<?= $maParam ?>&view=day<?= $pParam ?>"
                class="px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-all <?= $view === 'day' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700' ?>">
                 <i class="bi bi-calendar3 mr-1"></i>Day
             </a>
-            <a href="?date=<?= $weekStart ?>&ma_id=<?= $maParam ?>&view=week"
+            <a href="?date=<?= $weekStart ?>&ma_id=<?= $maParam ?>&view=week<?= $pParam ?>"
                class="px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-all <?= $view === 'week' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700' ?>">
                 <i class="bi bi-calendar-week mr-1"></i>Week
             </a>
@@ -169,28 +202,28 @@ include __DIR__ . '/includes/header.php';
 
         <!-- Date navigation -->
         <?php if ($view === 'week'): ?>
-        <a href="?date=<?= $prevWeek ?>&ma_id=<?= $maParam ?>&view=week"
+        <a href="?date=<?= $prevWeek ?>&ma_id=<?= $maParam ?>&view=week<?= $pParam ?>"
            class="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors text-slate-600">
             <i class="bi bi-chevron-left text-sm"></i>
         </a>
-        <a href="?date=<?= date('Y-m-d') ?>&ma_id=<?= $maParam ?>&view=week"
+        <a href="?date=<?= date('Y-m-d') ?>&ma_id=<?= $maParam ?>&view=week<?= $pParam ?>"
            class="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors <?= (date('Y-m-d') >= $weekStart && date('Y-m-d') <= $weekEnd) ? 'border-indigo-300 text-indigo-600' : '' ?>">
             Today
         </a>
-        <a href="?date=<?= $nextWeek ?>&ma_id=<?= $maParam ?>&view=week"
+        <a href="?date=<?= $nextWeek ?>&ma_id=<?= $maParam ?>&view=week<?= $pParam ?>"
            class="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors text-slate-600">
             <i class="bi bi-chevron-right text-sm"></i>
         </a>
         <?php else: ?>
-        <a href="?date=<?= $prevDate ?>&ma_id=<?= $maParam ?>&view=day"
+        <a href="?date=<?= $prevDate ?>&ma_id=<?= $maParam ?>&view=day<?= $pParam ?>"
            class="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors text-slate-600">
             <i class="bi bi-chevron-left text-sm"></i>
         </a>
-        <a href="?date=<?= date('Y-m-d') ?>&ma_id=<?= $maParam ?>&view=day"
+        <a href="?date=<?= date('Y-m-d') ?>&ma_id=<?= $maParam ?>&view=day<?= $pParam ?>"
            class="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors <?= $isToday ? 'border-indigo-300 text-indigo-600' : '' ?>">
             Today
         </a>
-        <a href="?date=<?= $nextDate ?>&ma_id=<?= $maParam ?>&view=day"
+        <a href="?date=<?= $nextDate ?>&ma_id=<?= $maParam ?>&view=day<?= $pParam ?>"
            class="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors text-slate-600">
             <i class="bi bi-chevron-right text-sm"></i>
         </a>
@@ -454,6 +487,12 @@ function filterMa(maId) {
                     <i class="bi bi-sticky-fill mr-1"></i><?= h($v['notes']) ?>
                 </div>
                 <?php endif; ?>
+                <?php if (!empty($v['provider_name'])): ?>
+                <div class="flex items-center gap-1.5 text-xs text-slate-500 mt-1">
+                    <i class="bi bi-person-badge text-slate-400"></i>
+                    <?= h($v['provider_name']) ?>
+                </div>
+                <?php endif; ?>
             </div>
             <div class="flex flex-col gap-2 shrink-0 no-print">
                 <?php if ($v['status'] === 'pending'): ?>
@@ -595,6 +634,12 @@ function filterMa(maId) {
                 <?php if ($v['notes']): ?>
                 <div class="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
                     <i class="bi bi-sticky-fill mr-1"></i><?= h($v['notes']) ?>
+                </div>
+                <?php endif; ?>
+                <?php if (!empty($v['provider_name'])): ?>
+                <div class="flex items-center gap-1.5 text-xs text-slate-500 mt-1">
+                    <i class="bi bi-person-badge text-slate-400"></i>
+                    <?= h($v['provider_name']) ?>
                 </div>
                 <?php endif; ?>
             </div>
