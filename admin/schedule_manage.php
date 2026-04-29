@@ -120,6 +120,20 @@ $statusDefs = [
 $saved   = isset($_GET['saved']);
 $deleted = isset($_GET['deleted']);
 
+// Summary stats across all entries for today
+$totalStats = ['pending'=>0,'en_route'=>0,'completed'=>0,'missed'=>0];
+foreach ($allEntries as $e) $totalStats[$e['status']]++;
+
+// Visit type — left-border color and badge color
+$vtMeta = [
+    'routine'     => ['border'=>'border-l-indigo-400',  'badge'=>'bg-indigo-100 text-indigo-700',  'label'=>'Routine'],
+    'new_patient' => ['border'=>'border-l-emerald-400', 'badge'=>'bg-emerald-100 text-emerald-700','label'=>'New Patient'],
+    'wound_care'  => ['border'=>'border-l-rose-400',    'badge'=>'bg-rose-100 text-rose-700',      'label'=>'Wound Care'],
+    'awv'         => ['border'=>'border-l-violet-400',  'badge'=>'bg-violet-100 text-violet-700',  'label'=>'AWV'],
+    'ccm'         => ['border'=>'border-l-blue-400',    'badge'=>'bg-blue-100 text-blue-700',      'label'=>'CCM'],
+    'il'          => ['border'=>'border-l-amber-500',   'badge'=>'bg-amber-100 text-amber-700',    'label'=>'IL Disc.'],
+];
+
 include __DIR__ . '/../includes/header.php';
 ?>
 
@@ -144,19 +158,22 @@ include __DIR__ . '/../includes/header.php';
         </h2>
         <p class="text-slate-500 text-sm mt-0.5"><?= date('l, F j, Y', strtotime($date)) ?></p>
     </div>
-    <div class="flex items-center gap-2">
+    <div class="flex items-center gap-2 flex-wrap">
         <a href="<?= BASE_URL ?>/admin/schedule_manage.php?date=<?= $prevDate ?>"
            class="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-600 transition-colors">
             <i class="bi bi-chevron-left text-sm"></i>
         </a>
         <a href="<?= BASE_URL ?>/admin/schedule_manage.php?date=<?= date('Y-m-d') ?>"
-           class="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
+           class="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors <?= $date === date('Y-m-d') ? 'border-indigo-300 text-indigo-600' : '' ?>">
             Today
         </a>
         <a href="<?= BASE_URL ?>/admin/schedule_manage.php?date=<?= $nextDate ?>"
            class="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-slate-600 transition-colors">
             <i class="bi bi-chevron-right text-sm"></i>
         </a>
+        <input type="date" id="datePicker" value="<?= $date ?>"
+               onchange="window.location='<?= BASE_URL ?>/admin/schedule_manage.php?date=' + this.value"
+               class="px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer hover:bg-slate-50 transition-colors">
         <a href="<?= BASE_URL ?>/schedule.php?date=<?= $date ?>"
            class="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-colors">
             <i class="bi bi-eye-fill text-indigo-400"></i> View
@@ -165,6 +182,10 @@ include __DIR__ . '/../includes/header.php';
            class="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-colors">
             <i class="bi bi-arrow-repeat text-indigo-400"></i> Recurring
         </a>
+        <button onclick="window.print()"
+                class="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-colors">
+            <i class="bi bi-printer-fill text-slate-400"></i> Print
+        </button>
     </div>
 </div>
 
@@ -277,6 +298,41 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <!-- Schedule grid per MA -->
+<?php
+$totalVisits = count($allEntries);
+$completedVisits = $totalStats['completed'];
+$pctComplete = $totalVisits > 0 ? round($completedVisits / $totalVisits * 100) : 0;
+?>
+<?php if ($totalVisits > 0): ?>
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+    <?php
+    $summaryCards = [
+        'pending'   => ['label'=>'Pending',   'icon'=>'bi-clock-fill',       'bg'=>'bg-slate-50',    'iconBg'=>'bg-slate-200',   'iconText'=>'text-slate-600', 'text'=>'text-slate-700'],
+        'en_route'  => ['label'=>'En Route',  'icon'=>'bi-car-front-fill',   'bg'=>'bg-blue-50',     'iconBg'=>'bg-blue-200',    'iconText'=>'text-blue-700',  'text'=>'text-blue-800'],
+        'completed' => ['label'=>'Completed', 'icon'=>'bi-check-circle-fill','bg'=>'bg-emerald-50',  'iconBg'=>'bg-emerald-200', 'iconText'=>'text-emerald-700','text'=>'text-emerald-800'],
+        'missed'    => ['label'=>'Missed',    'icon'=>'bi-x-circle-fill',    'bg'=>'bg-red-50',      'iconBg'=>'bg-red-200',     'iconText'=>'text-red-600',   'text'=>'text-red-700'],
+    ];
+    foreach ($summaryCards as $key => $sc):
+    ?>
+    <div class="<?= $sc['bg'] ?> rounded-2xl border border-slate-100 p-4 flex items-center gap-3">
+        <div class="<?= $sc['iconBg'] ?> w-10 h-10 rounded-xl grid place-items-center shrink-0">
+            <i class="bi <?= $sc['icon'] ?> <?= $sc['iconText'] ?> text-lg leading-none"></i>
+        </div>
+        <div>
+            <div class="text-2xl font-extrabold <?= $sc['text'] ?>"><?= $totalStats[$key] ?></div>
+            <div class="text-xs font-medium text-slate-500"><?= $sc['label'] ?></div>
+        </div>
+    </div>
+    <?php endforeach; ?>
+</div>
+<div class="bg-white border border-slate-100 rounded-2xl px-5 py-3.5 mb-6 flex items-center gap-4 shadow-sm">
+    <div class="text-sm font-semibold text-slate-700 shrink-0"><?= $totalVisits ?> visits total</div>
+    <div class="flex-1 bg-slate-100 rounded-full h-2.5 overflow-hidden">
+        <div class="bg-emerald-500 h-2.5 rounded-full transition-all" style="width:<?= $pctComplete ?>%"></div>
+    </div>
+    <div class="text-sm font-bold text-emerald-600 shrink-0"><?= $pctComplete ?>% complete</div>
+</div>
+<?php endif; ?>
 <?php if (empty($byMa)): ?>
 <div class="bg-white border border-slate-100 rounded-2xl shadow-sm p-12 text-center">
     <div class="w-16 h-16 bg-indigo-50 rounded-2xl grid place-items-center mx-auto mb-4">
@@ -287,71 +343,127 @@ include __DIR__ . '/../includes/header.php';
 </div>
 <?php else: ?>
 
-<?php foreach ($byMa as $maId => $maGroup): ?>
+<?php foreach ($byMa as $maId => $maGroup):
+    $maCounts = ['pending'=>0,'en_route'=>0,'completed'=>0,'missed'=>0];
+    foreach ($maGroup['visits'] as $mv) $maCounts[$mv['status']]++;
+    $maDone  = $maCounts['completed'];
+    $maTotal = count($maGroup['visits']);
+    $maPct   = $maTotal > 0 ? round($maDone / $maTotal * 100) : 0;
+?>
 <div class="bg-white border border-slate-100 rounded-2xl shadow-sm mb-5">
-    <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-        <div class="flex items-center gap-3">
-            <div class="w-9 h-9 bg-indigo-100 text-indigo-700 rounded-xl grid place-items-center font-bold text-sm">
-                <?= strtoupper(mb_substr($maGroup['name'], 0, 2)) ?>
+    <div class="px-6 py-4 border-b border-slate-100">
+        <div class="flex items-center justify-between gap-3 mb-3">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-indigo-600 text-white rounded-xl grid place-items-center font-bold text-sm shrink-0">
+                    <?= strtoupper(mb_substr($maGroup['name'], 0, 2)) ?>
+                </div>
+                <div>
+                    <div class="font-bold text-slate-800 text-base"><?= h($maGroup['name']) ?></div>
+                    <div class="text-xs text-slate-500"><?= $maTotal ?> visit<?= $maTotal !== 1 ? 's' : '' ?> &mdash; <?= $maDone ?> completed</div>
+                </div>
             </div>
-            <div>
-                <div class="font-bold text-slate-800"><?= h($maGroup['name']) ?></div>
-                <div class="text-xs text-slate-500"><?= count($maGroup['visits']) ?> visit<?= count($maGroup['visits'])!==1?'s':'' ?></div>
+            <div class="flex items-center gap-2 flex-wrap justify-end">
+                <?php foreach ([
+                    'pending'   => ['bg-slate-100',   'text-slate-600',   'bi-clock'],
+                    'en_route'  => ['bg-blue-100',    'text-blue-700',    'bi-car-front-fill'],
+                    'completed' => ['bg-emerald-100', 'text-emerald-700', 'bi-check-circle-fill'],
+                    'missed'    => ['bg-red-100',     'text-red-600',     'bi-x-circle-fill'],
+                ] as $sk => [$sbg, $stxt, $sico]):
+                    if (!$maCounts[$sk]) continue;
+                ?>
+                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold <?= $sbg ?> <?= $stxt ?>">
+                    <i class="bi <?= $sico ?> text-xs"></i> <?= $maCounts[$sk] ?>
+                </span>
+                <?php endforeach; ?>
+                <a href="<?= BASE_URL ?>/schedule.php?date=<?= $date ?>&ma_id=<?= $maId ?>"
+                   class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 px-2.5 py-1 bg-indigo-50 rounded-full hover:bg-indigo-100 transition-colors">
+                    <i class="bi bi-eye"></i> MA View
+                </a>
+                <?php if (count($maGroup['visits']) > 1): ?>
+                <button type="button"
+                        onclick="optimizeRoute(<?= $maId ?>, this)"
+                        class="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100
+                               text-emerald-700 text-xs font-bold rounded-full transition-colors border border-emerald-200">
+                    <i class="bi bi-magic"></i> Optimize Route
+                </button>
+                <?php endif; ?>
             </div>
         </div>
-        <a href="<?= BASE_URL ?>/schedule.php?date=<?= $date ?>&ma_id=<?= $maId ?>"
-           class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
-            <i class="bi bi-eye"></i> MA View
-        </a>
-        <?php if (count($maGroup['visits']) > 1): ?>
-        <button type="button"
-                onclick="optimizeRoute(<?= $maId ?>, this)"
-                class="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100
-                       text-emerald-700 text-xs font-bold rounded-xl transition-colors border border-emerald-200">
-            <i class="bi bi-magic"></i> Optimize Route
-        </button>
-        <?php endif; ?>
+        <!-- Progress bar -->
+        <div class="flex items-center gap-3">
+            <div class="flex-1 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                <div class="bg-emerald-500 h-1.5 rounded-full transition-all" style="width:<?= $maPct ?>%"></div>
+            </div>
+            <span class="text-xs font-bold text-slate-400 shrink-0"><?= $maPct ?>%</span>
+        </div>
     </div>
 
     <div class="divide-y divide-slate-100" id="sortable-<?= $maId ?>">
         <?php foreach ($maGroup['visits'] as $idx => $v):
-            $sd = $statusDefs[$v['status']];
+            $sd   = $statusDefs[$v['status']];
+            $vt   = $v['visit_type'] ?? 'routine';
+            $vtm  = $vtMeta[$vt] ?? $vtMeta['routine'];
+            $addr = $v['patient_address'] ?? '';
+            $mapsUrl = $addr ? 'https://www.google.com/maps/dir/?api=1&destination=' . rawurlencode($addr) : '';
         ?>
-        <div class="flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50 transition-colors" data-id="<?= $v['id'] ?>" data-address="<?= h($v['patient_address'] ?? '') ?>">
+        <div class="flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50/70 transition-colors border-l-4 <?= $vtm['border'] ?>"
+             data-id="<?= $v['id'] ?>" data-address="<?= h($addr) ?>">
             <!-- Drag handle -->
-            <div class="cursor-grab text-slate-300 hover:text-slate-500 drag-handle">
+            <div class="cursor-grab text-slate-300 hover:text-slate-500 drag-handle shrink-0">
                 <i class="bi bi-grip-vertical text-lg"></i>
             </div>
 
+            <!-- Visit number -->
             <div class="w-7 h-7 bg-slate-100 text-slate-500 rounded-lg grid place-items-center text-xs font-bold shrink-0">
                 <?= $idx + 1 ?>
             </div>
 
             <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 flex-wrap">
-                    <span class="font-semibold text-slate-800 text-sm"><?= h($v['patient_name']) ?></span>
+                <!-- Patient name + badges -->
+                <div class="flex items-center gap-2 flex-wrap mb-1">
+                    <a href="<?= BASE_URL ?>/patient_view.php?id=<?= $v['patient_id'] ?>"
+                       class="font-bold text-slate-800 hover:text-indigo-600 transition-colors text-sm">
+                        <?= h($v['patient_name']) ?>
+                    </a>
                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold <?= $sd['bg'] ?> <?= $sd['text'] ?>">
                         <i class="bi <?= $sd['icon'] ?> text-xs"></i> <?= $sd['label'] ?>
                     </span>
-                    <?php
-                    $vtLabels = ['routine'=>'Routine','new_patient'=>'New Pt','wound_care'=>'Wound Care','awv'=>'AWV','ccm'=>'CCM','il'=>'IL Disc.'];
-                    $vtLabel  = $vtLabels[$v['visit_type'] ?? 'routine'] ?? 'Routine';
-                    ?>
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-700"><?= h($vtLabel) ?></span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold <?= $vtm['badge'] ?>">
+                        <?= h($vtm['label']) ?>
+                    </span>
                     <?php if (!empty($v['recurring_rule_id'])): ?>
                     <span class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-600">
                         <i class="bi bi-arrow-repeat text-xs"></i> Recurring
                     </span>
                     <?php endif; ?>
                 </div>
-                <?php if ($v['patient_address']): ?>
-                <div class="text-xs text-slate-400 mt-0.5 truncate"><?= h($v['patient_address']) ?></div>
-                <?php endif; ?>
-                <?php if (!empty($v['provider_name'])): ?>
-                <div class="text-xs text-slate-500 mt-0.5"><i class="bi bi-person-badge mr-0.5"></i><?= h($v['provider_name']) ?></div>
-                <?php endif; ?>
-                <?php if ($v['visit_time']): ?>
-                <div class="text-xs text-slate-400"><?= date('g:i A', strtotime($v['visit_time'])) ?></div>
+                <!-- Details row -->
+                <div class="flex items-center gap-3 flex-wrap">
+                    <?php if ($v['visit_time']): ?>
+                    <span class="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-lg">
+                        <i class="bi bi-clock text-slate-400"></i>
+                        <?= date('g:i A', strtotime($v['visit_time'])) ?>
+                    </span>
+                    <?php endif; ?>
+                    <?php if (!empty($v['provider_name'])): ?>
+                    <span class="inline-flex items-center gap-1 text-xs text-slate-500">
+                        <i class="bi bi-person-badge text-slate-400"></i><?= h($v['provider_name']) ?>
+                    </span>
+                    <?php endif; ?>
+                    <?php if ($addr): ?>
+                    <a href="<?= h($mapsUrl) ?>" target="_blank" rel="noopener"
+                       class="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 hover:underline">
+                        <i class="bi bi-geo-alt-fill text-blue-400"></i>
+                        <span class="truncate max-w-[200px]"><?= h($addr) ?></span>
+                        <i class="bi bi-box-arrow-up-right text-[10px]"></i>
+                    </a>
+                    <?php endif; ?>
+                </div>
+                <?php if (!empty($v['notes'])): ?>
+                <div class="mt-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5 flex items-start gap-1.5">
+                    <i class="bi bi-sticky-fill mt-0.5 shrink-0"></i>
+                    <span><?= h($v['notes']) ?></span>
+                </div>
                 <?php endif; ?>
             </div>
 
