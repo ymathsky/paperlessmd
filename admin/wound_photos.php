@@ -7,15 +7,6 @@ if (!canAccessClinical()) {
     exit;
 }
 
-// Temporary: catch and show DB errors so we can diagnose the 500
-set_exception_handler(function($e) {
-    http_response_code(500);
-    echo '<pre style="background:#fff;padding:20px;color:red;font-size:13px">';
-    echo htmlspecialchars($e->getMessage() . "\n" . $e->getTraceAsString());
-    echo '</pre>';
-    exit;
-});
-
 $pageTitle = 'Wound Photo Portal';
 $activeNav = 'wound_photos';
 
@@ -59,7 +50,7 @@ $whereStr = implode(' AND ', $where);
 
 $sql = "
     SELECT wp.id, wp.filename, wp.description, wp.wound_location, wp.created_at,
-           p.id AS patient_id, p.full_name AS patient_name,
+           p.id AS patient_id, CONCAT(p.first_name,' ',p.last_name) AS patient_name,
            s.full_name AS ma_name, s.id AS ma_id
     FROM   wound_photos wp
     LEFT   JOIN patients p ON p.id = wp.patient_id
@@ -79,10 +70,10 @@ $weekCount      = count(array_filter($photos, function($p) { return strtotime($p
 
 // ── Dropdown data (unfiltered) ────────────────────────────────────────────────
 $allPatients   = $pdo->query("
-    SELECT DISTINCT p.id, p.full_name
+    SELECT DISTINCT p.id, CONCAT(p.first_name,' ',p.last_name) AS full_name
     FROM wound_photos wp
     JOIN patients p ON p.id = wp.patient_id
-    ORDER BY p.full_name
+    ORDER BY p.last_name, p.first_name
 ")->fetchAll();
 
 $allMas = $pdo->query("
