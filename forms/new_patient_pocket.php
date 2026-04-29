@@ -1152,15 +1152,15 @@ $extraJs = <<<JSBLOCK
         });
     }
 
-    // Validate provider sig before form submit
-    document.getElementById('mainForm').addEventListener('submit', function (e) {
+    // Validate provider sig via app.js hook (mainForm.submit() doesn't fire submit events)
+    window._pdValidateExtra = function () {
         if (!hidden.value) {
-            e.preventDefault();
             var alertEl = document.getElementById('providerSigAlert');
-            if (alertEl) alertEl.classList.remove('hidden');
-            (canvas || document.getElementById('providerSigAlert')).scrollIntoView({behavior:'smooth', block:'center'});
+            if (alertEl) { alertEl.classList.remove('hidden'); alertEl.scrollIntoView({behavior:'smooth', block:'center'}); }
+            return false;
         }
-    }, true);
+        return true;
+    };
 })();
 
 /* ── Auto-fill provider_print_name from provider_name (step 0) ── */

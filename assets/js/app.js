@@ -285,6 +285,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (!valid) return;
 
+        // Page-level extra validation hook (e.g. provider sig in new_patient_pocket)
+        if (typeof window._pdValidateExtra === 'function' && !window._pdValidateExtra()) return;
+
         if (submitBtn) {
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<i class="bi bi-arrow-repeat text-xl" style="display:inline-block;animation:spin 1s linear infinite"></i> Saving…';
@@ -293,10 +296,12 @@ document.addEventListener('DOMContentLoaded', function () {
         mainForm.submit();
     }
 
-    // ── Gate all form submission through captureAndSubmit ────────────
-    // submitBtn (type="submit") click fires the native 'submit' event;
-    // we intercept it here. captureAndSubmit() calls mainForm.submit()
-    // programmatically, which does NOT re-fire this event — no loop.
+    // submitBtn is type="button" — wire click directly
+    if (submitBtn) {
+        submitBtn.addEventListener('click', captureAndSubmit);
+    }
+
+    // Also block accidental native submissions (Enter key in text fields)
     if (mainForm) {
         mainForm.addEventListener('submit', function (e) {
             e.preventDefault();
