@@ -190,7 +190,81 @@ HTML;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 5. Account locked → notify admins
+// 5. Schedule assigned → notify MA, matched provider, and admins
+// ─────────────────────────────────────────────────────────────────────────────
+function notifyScheduleAssigned(
+    PDO $pdo,
+    int $maId,
+    int $patientId,
+    string $visitDate,
+    string $visitType,
+    string $providerName,
+    int $createdBy
+): void {
+    $patientName  = _notifPatientName($pdo, $patientId);
+    $maName       = _notifStaffName($pdo, $maId);
+    $assignedBy   = _notifStaffName($pdo, $createdBy);
+    $scheduleUrl  = (defined('BASE_URL') ? BASE_URL : '') . '/schedule.php';
+    $ts           = date('F j, Y \a\t g:i a T');
+    $visitDate_f  = date('F j, Y', strtotime($visitDate));
+
+    $visitTypeLabels = [
+        'routine'     => 'Routine Visit',
+        'new_patient' => 'New Patient',
+        'wound_care'  => 'Wound Care',
+        'awv'         => 'Annual Wellness Visit',
+        'ccm'         => 'CCM',
+        'il'          => 'IL',
+    ];
+    $visitLabel = isset($visitTypeLabels[$visitType]) ? $visitTypeLabels[$visitType] : ucwords(str_replace('_', ' ', $visitType));
+
+    $providerLine = $providerName ? "<dt>Provider</dt><dd>{$providerName}</dd>" : '';
+
+    $html = <<<HTML
+<p>A new patient visit has been scheduled and assigned to you.</p>
+<dl class="meta">
+  <dt>Patient</dt><dd>{$patientName}</dd>
+  <dt>Visit Date</dt><dd>{$visitDate_f}</dd>
+  <dt>Visit Type</dt><dd>{$visitLabel}</dd>
+  <dt>Assigned MA</dt><dd>{$maName}</dd>
+  {$providerLine}
+  <dt>Scheduled by</dt><dd>{$assignedBy}</dd>
+  <dt>Scheduled at</dt><dd>{$ts}</dd>
+</dl>
+<p><a href="{$scheduleUrl}" class="btn">View Schedule</a></p>
+HTML;
+
+    $recipients = [];
+
+    // Notify the assigned MA
+    $maEmail = _notifGetEmail($pdo, $maId);
+    if ($maEmail) $recipients[] = $maEmail;
+
+    // Notify matching provider staff (lookup by full_name + role=provider)
+    if ($providerName !== '') {
+        $provStmt = $pdo->prepare(
+            "SELECT email FROM staff WHERE full_name = ? AND role = 'provider' AND active = 1 AND email IS NOT NULL AND email != '' LIMIT 1"
+        );
+        $provStmt->execute([$providerName]);
+        $provEmail = (string)($provStmt->fetchColumn() ?: '');
+        if ($provEmail && !in_array($provEmail, $recipients, true)) {
+            $recipients[] = $provEmail;
+        }
+    }
+
+    // Notify all admins
+    foreach (_notifGetEmails($pdo, ['admin']) as $e) {
+        if (!in_array($e, $recipients, true)) $recipients[] = $e;
+    }
+
+    if (empty($recipients)) return;
+
+    $subject = "New visit scheduled — {$patientName} on {$visitDate_f}";
+    sendMail($recipients, $subject, $html);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6. Account locked → notify admins
 // ─────────────────────────────────────────────────────────────────────────────
 function notifyAccountLocked(PDO $pdo, string $lockedName, string $lockedUsername, string $lockedRole, string $lockUntil, string $ip): void
 {

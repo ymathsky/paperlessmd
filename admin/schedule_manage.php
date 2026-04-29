@@ -46,6 +46,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'add')
                                VALUES (?,?,?,?,?,?,?,?,?)");
         $ins->execute([$visitDate, $maId, $patientId, $visitTime, $nextOrder, $visitType, $notes ?: null, $providerName ?: null, $_SESSION['user_id']]);
         $date = $visitDate;
+
+        require_once __DIR__ . '/../includes/mailer.php';
+        require_once __DIR__ . '/../includes/notifications.php';
+        notifyScheduleAssigned($pdo, $maId, $patientId, $visitDate, $visitType, $providerName, (int)$_SESSION['user_id']);
+
         header('Location: ' . BASE_URL . '/admin/schedule_manage.php?date=' . $date . '&saved=1');
         exit;
     }
