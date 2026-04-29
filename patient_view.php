@@ -1211,15 +1211,41 @@ function completeVisit(visitId) {
         </div>
     </div>
 
-    <?php if ($patient['address'] || $patient['pcp'] || $patient['email']): ?>
+    <?php if ($patient['address'] || $patient['pcp'] || $patient['email'] || !empty($patient['race']) || !empty($patient['insurance_id']) || !empty($patient['pharmacy_name'])): ?>
     <div class="mt-4 pt-4 border-t border-slate-100 flex flex-wrap gap-x-6 gap-y-1 text-sm text-slate-500">
         <?php if ($patient['email']): ?><span><i class="bi bi-envelope mr-1"></i><?= h($patient['email']) ?></span><?php endif; ?>
         <?php if ($patient['address']): ?><span><i class="bi bi-geo-alt mr-1"></i><?= h($patient['address']) ?></span><?php endif; ?>
         <?php if ($patient['pcp']): ?><span><i class="bi bi-person-badge mr-1"></i>PCP: <?= h($patient['pcp']) ?></span><?php endif; ?>
+        <?php if (!empty($patient['race'])): ?><span><i class="bi bi-people mr-1"></i><?= h($patient['race']) ?></span><?php endif; ?>
+        <?php if (!empty($patient['insurance_id'])): ?><span><i class="bi bi-credit-card mr-1"></i>ID: <?= h($patient['insurance_id']) ?></span><?php endif; ?>
+        <?php if (!empty($patient['pharmacy_name'])): ?><span><i class="bi bi-prescription2 mr-1 text-emerald-500"></i><?= h($patient['pharmacy_name']) ?><?php if (!empty($patient['pharmacy_phone'])): ?> &middot; <?= h($patient['pharmacy_phone']) ?><?php endif; ?></span><?php endif; ?>
         <?php if (!empty($patient['discharged_at']) && ($patient['status'] ?? '') === 'discharged'): ?>
         <span class="text-red-500"><i class="bi bi-calendar-x mr-1"></i>Discharged: <?= date('M j, Y', strtotime($patient['discharged_at'])) ?></span>
         <?php endif; ?>
     </div>
+
+    <?php if (!empty($patient['insurance_photo']) || !empty($patient['insurance_photo_back']) || !empty($patient['sss_photo'])): ?>
+    <div class="mt-3 pt-3 border-t border-slate-100">
+        <p class="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">Documents on file</p>
+        <div class="flex flex-wrap gap-3">
+            <?php foreach ([
+                ['insurance_photo',      'Insurance Front'],
+                ['insurance_photo_back', 'Insurance Back'],
+                ['sss_photo',            'SSS / Gov ID'],
+            ] as [$field, $docLabel]): ?>
+            <?php if (!empty($patient[$field])): ?>
+            <div class="text-center">
+                <img src="<?= h($patient[$field]) ?>"
+                     class="h-16 w-24 object-cover rounded-xl border border-slate-200 cursor-pointer hover:opacity-80 transition"
+                     onclick="document.getElementById('docViewer').src=this.src; document.getElementById('docViewerModal').classList.remove('hidden');"
+                     title="<?= h($docLabel) ?>">
+                <p class="text-xs text-slate-400 mt-1"><?= h($docLabel) ?></p>
+            </div>
+            <?php endif; ?>
+            <?php endforeach; ?>
+        </div>
+    </div>
+    <?php endif; ?>
     <?php endif; ?>
 
     <?php if (canAccessClinical()): ?>
@@ -1249,6 +1275,13 @@ function completeVisit(visitId) {
         </div>
     </div>
     <?php endif; ?>
+</div>
+
+<!-- ── Document Viewer Modal ──────────────────────────────────────────────── -->
+<div id="docViewerModal"
+     class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 no-print"
+     onclick="this.classList.add('hidden')">
+    <img id="docViewer" src="" class="max-h-[90vh] max-w-full rounded-2xl shadow-2xl" alt="Document">
 </div>
 
 <!-- ── Password Confirmation Modal ────────────────────────────────────────── -->

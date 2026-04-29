@@ -42,29 +42,53 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     $vals = [
-        'first_name'    => trim($_POST['first_name'] ?? ''),
-        'last_name'     => trim($_POST['last_name']  ?? ''),
-        'dob'           => trim($_POST['dob']         ?? ''),
-        'phone'         => trim($_POST['phone']       ?? ''),
-        'email'         => trim($_POST['email']       ?? ''),
-        'address'       => trim($_POST['address']     ?? ''),
-        'insurance'     => trim($_POST['insurance']   ?? ''),
-        'pcp'           => trim($_POST['pcp']         ?? ''),
-        'status'        => $newStatus,
-        'discharged_at' => $newDischargedAt,
-        'assigned_ma'   => isAdmin() ? ((int)($_POST['assigned_ma'] ?? 0) ?: null) : ($patient['assigned_ma'] ?: null),
+        'first_name'           => trim($_POST['first_name'] ?? ''),
+        'last_name'            => trim($_POST['last_name']  ?? ''),
+        'dob'                  => trim($_POST['dob']         ?? ''),
+        'phone'                => trim($_POST['phone']       ?? ''),
+        'email'                => trim($_POST['email']       ?? ''),
+        'address'              => trim($_POST['address']     ?? ''),
+        'insurance'            => trim($_POST['insurance']   ?? ''),
+        'insurance_id'         => trim($_POST['insurance_id'] ?? ''),
+        'pcp'                  => trim($_POST['pcp']         ?? ''),
+        'race'                 => trim($_POST['race']        ?? ''),
+        'pharmacy_name'        => trim($_POST['pharmacy_name']    ?? ''),
+        'pharmacy_phone'       => trim($_POST['pharmacy_phone']   ?? ''),
+        'pharmacy_address'     => trim($_POST['pharmacy_address'] ?? ''),
+        'status'               => $newStatus,
+        'discharged_at'        => $newDischargedAt,
+        'assigned_ma'          => isAdmin() ? ((int)($_POST['assigned_ma'] ?? 0) ?: null) : ($patient['assigned_ma'] ?: null),
     ];
+
+    // Photo uploads — keep existing if no new file sent
+    foreach (['insurance_photo', 'insurance_photo_back', 'sss_photo'] as $_pk) {
+        $raw = trim($_POST[$_pk] ?? '');
+        if ($raw && preg_match('/^data:image\/(jpeg|png|webp|gif);base64,[A-Za-z0-9+\/=]+$/', $raw)) {
+            $vals[$_pk] = $raw;
+        } else {
+            $vals[$_pk] = $patient[$_pk] ?? null; // keep existing
+        }
+    }
+    // Allow explicit removal
+    if (isset($_POST['remove_insurance_photo']))      $vals['insurance_photo']      = null;
+    if (isset($_POST['remove_insurance_photo_back'])) $vals['insurance_photo_back'] = null;
+    if (isset($_POST['remove_sss_photo']))             $vals['sss_photo']            = null;
     if (!$vals['first_name'] || !$vals['last_name']) {
         $error = 'First and last name are required.';
     } else {
         $stmt = $pdo->prepare("UPDATE patients
-            SET first_name=?, last_name=?, dob=?, phone=?, email=?, address=?, insurance=?, pcp=?,
+            SET first_name=?, last_name=?, dob=?, phone=?, email=?, address=?,
+                insurance=?, insurance_id=?, pcp=?, race=?,
+                pharmacy_name=?, pharmacy_phone=?, pharmacy_address=?,
+                insurance_photo=?, insurance_photo_back=?, sss_photo=?,
                 status=?, discharged_at=?, assigned_ma=?
             WHERE id=?");
         $stmt->execute([
             $vals['first_name'], $vals['last_name'], $vals['dob'] ?: null,
             $vals['phone'], $vals['email'], $vals['address'],
-            $vals['insurance'], $vals['pcp'],
+            $vals['insurance'], $vals['insurance_id'], $vals['pcp'], $vals['race'],
+            $vals['pharmacy_name'], $vals['pharmacy_phone'], $vals['pharmacy_address'],
+            $vals['insurance_photo'], $vals['insurance_photo_back'], $vals['sss_photo'],
             $vals['status'], $vals['discharged_at'],
             $vals['assigned_ma'],
             $id
@@ -185,10 +209,124 @@ include __DIR__ . '/includes/header.php';
                                       focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition">
                     </div>
                     <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Insurance Member ID</label>
+                        <input type="text" name="insurance_id" value="<?= h($vals['insurance_id'] ?? '') ?>"
+                               class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
+                                      focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition"
+                               placeholder="Member / policy number">
+                    </div>
+                </div>
+
+                <!-- Insurance Card Photos -->
+                <div class="mb-4 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                    <p class="text-sm font-bold text-slate-700"><i class="bi bi-credit-card-2-front text-blue-500 mr-1"></i> Insurance Card Photos</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <?php foreach ([
+                            ['insurance_photo',      'Front of Card', 'insPhotoFront', 'insPhotoFrontThumb'],
+                            ['insurance_photo_back', 'Back of Card',  'insPhotoBack',  'insPhotoBackThumb'],
+                        ] as [$field, $label, $inputId, $thumbId]): ?>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5"><?= $label ?></label>
+                            <?php if (!empty($vals[$field])): ?>
+                            <div class="mb-2 flex items-center gap-2">
+                                <img src="<?= h($vals[$field]) ?>" class="h-14 rounded-lg border border-slate-200 object-cover cursor-pointer"
+                                     onclick="this.classList.toggle('h-14'); this.classList.toggle('h-auto');" title="Click to expand">
+                                <label class="text-xs text-red-400 hover:text-red-600 cursor-pointer">
+                                    <input type="checkbox" name="remove_<?= $field ?>" value="1" class="sr-only">
+                                    <i class="bi bi-trash"></i> Remove
+                                </label>
+                            </div>
+                            <?php endif; ?>
+                            <input type="hidden" name="<?= $field ?>" id="<?= $inputId ?>Data" value="">
+                            <label class="inline-flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-xl
+                                          text-xs font-semibold text-slate-600 cursor-pointer hover:bg-blue-50 hover:border-blue-300 transition-colors">
+                                <i class="bi bi-camera text-blue-500"></i> <?= $vals[$field] ? 'Replace' : 'Upload' ?> Photo
+                                <input type="file" accept="image/*" class="sr-only pat-photo-input"
+                                       data-target="<?= $inputId ?>Data" data-thumb="<?= $thumbId ?>">
+                            </label>
+                            <img id="<?= $thumbId ?>" src="" class="hidden h-14 mt-2 rounded-lg border border-slate-200 object-cover">
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+
+                <!-- SSS / Government ID Photo -->
+                <div class="mb-4 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                    <p class="text-sm font-bold text-slate-700"><i class="bi bi-person-vcard text-indigo-500 mr-1"></i> SSS / Government ID Card</p>
+                    <?php if (!empty($vals['sss_photo'])): ?>
+                    <div class="flex items-center gap-2 mb-2">
+                        <img src="<?= h($vals['sss_photo']) ?>" class="h-14 rounded-lg border border-slate-200 object-cover cursor-pointer"
+                             onclick="this.classList.toggle('h-14'); this.classList.toggle('h-auto');" title="Click to expand">
+                        <label class="text-xs text-red-400 hover:text-red-600 cursor-pointer">
+                            <input type="checkbox" name="remove_sss_photo" value="1" class="sr-only">
+                            <i class="bi bi-trash"></i> Remove
+                        </label>
+                    </div>
+                    <?php endif; ?>
+                    <input type="hidden" name="sss_photo" id="sssPhotoData" value="">
+                    <label class="inline-flex items-center gap-2 px-3 py-2 bg-white border border-slate-200 rounded-xl
+                                  text-xs font-semibold text-slate-600 cursor-pointer hover:bg-indigo-50 hover:border-indigo-300 transition-colors">
+                        <i class="bi bi-camera text-indigo-500"></i> <?= !empty($vals['sss_photo']) ? 'Replace' : 'Upload' ?> Photo
+                        <input type="file" accept="image/*" class="sr-only pat-photo-input"
+                               data-target="sssPhotoData" data-thumb="sssPhotoThumb">
+                    </label>
+                    <img id="sssPhotoThumb" src="" class="hidden h-14 mt-2 rounded-lg border border-slate-200 object-cover">
+                </div>
+
+                <!-- Race / Ethnicity -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Race / Ethnicity</label>
+                        <select name="race"
+                                class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
+                                       focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition">
+                            <option value="">— Select —</option>
+                            <?php foreach ([
+                                'American Indian or Alaska Native',
+                                'Asian','Black or African American',
+                                'Hispanic or Latino',
+                                'Native Hawaiian or Other Pacific Islander',
+                                'White / Caucasian',
+                                'Two or More Races',
+                                'Other','Unknown / Declined to State',
+                            ] as $r): ?>
+                            <option value="<?= h($r) ?>" <?= ($vals['race'] ?? '') === $r ? 'selected' : '' ?>><?= h($r) ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div>
                         <label class="block text-sm font-semibold text-slate-700 mb-1.5">PCP</label>
                         <input type="text" name="pcp" value="<?= h($vals['pcp']) ?>"
                                class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
                                       focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition">
+                    </div>
+                </div>
+
+                <!-- Pharmacy -->
+                <div class="mb-4 p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                    <p class="text-sm font-bold text-slate-700"><i class="bi bi-prescription2 text-emerald-500 mr-1"></i> Pharmacy Details</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Pharmacy Name</label>
+                            <input type="text" name="pharmacy_name" value="<?= h($vals['pharmacy_name'] ?? '') ?>"
+                                   class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white
+                                          focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                                   placeholder="CVS, Walgreens…">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Pharmacy Phone</label>
+                            <input type="tel" name="pharmacy_phone" value="<?= h($vals['pharmacy_phone'] ?? '') ?>"
+                                   class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white
+                                          focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                                   placeholder="(555) 555-5555">
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5">Pharmacy Address</label>
+                            <input type="text" name="pharmacy_address" value="<?= h($vals['pharmacy_address'] ?? '') ?>"
+                                   class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white
+                                          focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                                   placeholder="Street, City, State ZIP">
+                        </div>
                     </div>
                 </div>
 
@@ -276,3 +414,29 @@ include __DIR__ . '/includes/header.php';
 </div>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>
+<script>
+(function () {
+    document.querySelectorAll('.pat-photo-input').forEach(function (input) {
+        input.addEventListener('change', function () {
+            var file = input.files[0];
+            if (!file || !file.type.startsWith('image/')) return;
+            if (file.size > 8 * 1024 * 1024) { alert('Image must be under 8 MB.'); input.value = ''; return; }
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                var targetInput = document.getElementById(input.dataset.target);
+                var thumb       = document.getElementById(input.dataset.thumb);
+                if (targetInput) targetInput.value = e.target.result;
+                if (thumb) { thumb.src = e.target.result; thumb.classList.remove('hidden'); }
+            };
+            reader.readAsDataURL(file);
+        });
+    });
+    // Remove-photo checkboxes: show visual feedback
+    document.querySelectorAll('[name^="remove_"]').forEach(function (cb) {
+        cb.addEventListener('change', function () {
+            var img = cb.closest('div').querySelector('img');
+            if (img) img.style.opacity = cb.checked ? '0.3' : '1';
+        });
+    });
+})();
+</script>

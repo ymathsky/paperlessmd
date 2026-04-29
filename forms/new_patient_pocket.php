@@ -46,6 +46,12 @@ $prevDate = $prevRow ? $prevRow['created_at'] : null;
 function pv(array $prev, string $key): string {
     return isset($prev[$key]) ? htmlspecialchars((string)$prev[$key], ENT_QUOTES, 'UTF-8') : '';
 }
+// Merge patient record fields as fallback for pre-fill
+foreach (['pharmacy_name','pharmacy_phone','pharmacy_address','race','insurance_id'] as $_pk) {
+    if (empty($prev[$_pk]) && !empty($patient[$_pk])) {
+        $prev[$_pk] = $patient[$_pk];
+    }
+}
 $prevRace = [];
 if (isset($prev['race'])) {
     $prevRace = is_array($prev['race']) ? $prev['race'] : explode(',', $prev['race']);
