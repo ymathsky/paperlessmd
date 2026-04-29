@@ -10,10 +10,22 @@ include __DIR__ . '/includes/header.php';
 
 $releases = [
     [
-        'version' => 'v1.8',
-        'date'    => 'May 2, 2026',
+        'version' => 'v1.9',
+        'date'    => 'April 30, 2026',
         'label'   => 'Latest',
         'color'   => 'emerald',
+        'items'   => [
+            ['icon' => 'bi-envelope-fill',       'tag' => 'New',     'tag_color' => 'blue',    'title' => 'Email Notifications (SMTP)',            'desc' => 'PaperlessMD now sends real-time email alerts via SMTP for key events: a new form awaiting provider countersignature, a form countersigned by a provider, a new internal message or broadcast, a new visit scheduled, and account lockout after too many failed logins. All email is handled through a centralized PHPMailer helper — no @mail() calls.'],
+            ['icon' => 'bi-calendar-check-fill', 'tag' => 'New',     'tag_color' => 'blue',    'title' => 'Schedule Assignment Notifications',    'desc' => 'When a visit is added in Manage Schedule, the assigned MA, the matching provider (looked up by full name), and all admins receive an email notification with the patient name, visit date, visit type, and who scheduled it.'],
+            ['icon' => 'bi-camera-fill',         'tag' => 'New',     'tag_color' => 'blue',    'title' => 'Wound Photo Portal',                   'desc' => 'New Admin / MA / Provider portal (Admin → Wound Photos) showing all wound photos across all patients in a date-grouped gallery. Includes a stats bar (total photos, unique patients, this week, today), 5-way filtering (patient, MA, wound site, date range), a full-screen lightbox with prev/next arrow and keyboard navigation, and per-photo download.'],
+            ['icon' => 'bi-at',                  'tag' => 'New',     'tag_color' => 'blue',    'title' => 'Staff Email Addresses',                'desc' => 'Staff accounts now have an email address field. Emails can be set in Admin → Manage Staff → Edit. A one-click migration page (migrate_staff_email.php) adds the column to existing installations. Email addresses are required for notification delivery.'],
+        ],
+    ],
+    [
+        'version' => 'v1.8',
+        'date'    => 'May 2, 2026',
+        'label'   => null,
+        'color'   => 'blue',
         'items'   => [
             ['icon' => 'bi-person-badge-fill',  'tag' => 'New',     'tag_color' => 'blue',    'title' => 'Provider Role',                         'desc' => 'New "Provider" user role for physicians and nurse practitioners. Providers have full read access to clinical data (vitals, medications, wounds, SOAP notes, diagnoses), can view and sign the e-signature queue, view the daily schedule, and use internal messaging — without schedule management or admin functions.'],
             ['icon' => 'bi-pen-fill',            'tag' => 'New',     'tag_color' => 'blue',    'title' => 'E-Sign Queue: Provider Access',          'desc' => 'Provider-role users now see all pending provider signatures across every MA in the E-Sign queue — not just forms belonging to their own MA. Admins retain the same all-access view.'],
