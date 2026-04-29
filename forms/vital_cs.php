@@ -316,9 +316,8 @@ include __DIR__ . '/../includes/header.php';
                            class="w-full pl-8 pr-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
                                   focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition focus:bg-white">
                     <div id="icdDropdown"
-                         class="hidden absolute z-40 left-0 right-0 top-full mt-1
-                                bg-white border border-slate-200 rounded-xl shadow-2xl overflow-y-auto text-sm"
-                         style="max-height:280px"></div>
+                         class="hidden bg-white border border-slate-200 rounded-xl shadow-2xl overflow-y-auto text-sm"
+                         style="position:fixed;z-index:9999"></div>
                 </div>
                 <p id="icdMaxMsg" class="hidden text-xs text-amber-600 mt-1.5 font-semibold">
                     Maximum of 6 codes reached.
@@ -601,8 +600,19 @@ $extraJs = <<<JSBLOCK
     /* â”€â”€ Dropdown â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
     function closeDropdown() { dropdown.classList.add('hidden'); }
 
+    /* Position the fixed dropdown below the search input (escapes overflow:hidden) */
+    function positionDropdown() {
+        var rect = searchEl.getBoundingClientRect();
+        var maxH = Math.min(280, window.innerHeight - rect.bottom - 16);
+        dropdown.style.top       = (rect.bottom + 4) + 'px';
+        dropdown.style.left      = rect.left + 'px';
+        dropdown.style.width     = rect.width + 'px';
+        dropdown.style.maxHeight = maxH + 'px';
+    }
+
     function showResults(items) {
         dropdown.innerHTML = '';
+        positionDropdown();
         if (!items.length) {
             var empty = document.createElement('div');
             empty.className = 'px-4 py-3 text-slate-400 text-xs italic';
@@ -654,8 +664,17 @@ $extraJs = <<<JSBLOCK
 
     searchEl.addEventListener('focus', function () {
         if (searchEl.value.trim().length >= 2) {
+            positionDropdown();
             dropdown.classList.remove('hidden');
         }
+    });
+
+    /* Reposition on scroll / resize so the dropdown tracks the input */
+    window.addEventListener('scroll', function () {
+        if (!dropdown.classList.contains('hidden')) positionDropdown();
+    }, true);
+    window.addEventListener('resize', function () {
+        if (!dropdown.classList.contains('hidden')) positionDropdown();
     });
 
     document.addEventListener('click', function (e) {

@@ -307,9 +307,8 @@ include __DIR__ . '/../includes/header.php';
                            class="w-full pl-8 pr-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
                                   focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition focus:bg-white">
                     <div id="icdDropdown"
-                         class="hidden absolute z-40 left-0 right-0 top-full mt-1
-                                bg-white border border-slate-200 rounded-xl shadow-2xl overflow-y-auto text-sm"
-                         style="max-height:280px"></div>
+                         class="hidden bg-white border border-slate-200 rounded-xl shadow-2xl overflow-y-auto text-sm"
+                         style="position:fixed;z-index:9999"></div>
                 </div>
                 <p id="icdMaxMsg" class="hidden text-xs text-amber-600 mt-1.5 font-semibold">Maximum of 6 codes reached.</p>
                 <p class="text-xs text-slate-400 mt-1.5">
@@ -1056,8 +1055,19 @@ $extraJs = <<<JSBLOCK
         searchEl.focus();
     }
 
+    /* Position the fixed dropdown below the search input (escapes overflow:hidden) */
+    function positionDropdown() {
+        var rect = searchEl.getBoundingClientRect();
+        var maxH = Math.min(280, window.innerHeight - rect.bottom - 16);
+        dropdown.style.top       = (rect.bottom + 4) + 'px';
+        dropdown.style.left      = rect.left + 'px';
+        dropdown.style.width     = rect.width + 'px';
+        dropdown.style.maxHeight = maxH + 'px';
+    }
+
     function showResults(items) {
         dropdown.innerHTML = '';
+        positionDropdown();
         if (!items.length) {
             var empty = document.createElement('div');
             empty.className = 'px-4 py-3 text-slate-400 text-xs italic';
@@ -1085,11 +1095,19 @@ $extraJs = <<<JSBLOCK
         var q = searchEl.value.trim();
         if (q.length < 2) { dropdown.classList.add('hidden'); return; }
         debTimer = setTimeout(function () {
-            fetch(BASE + '/api/icd_search.php?q=' + encodeURIComponent(q))
+            fetch(BASE + '/api/icd10_search.php?q=' + encodeURIComponent(q))
                 .then(function (r) { return r.json(); })
                 .then(showResults)
                 .catch(function () { dropdown.classList.add('hidden'); });
         }, 220);
+    });
+
+    /* Reposition on scroll / resize so the dropdown tracks the input */
+    window.addEventListener('scroll', function () {
+        if (!dropdown.classList.contains('hidden')) positionDropdown();
+    }, true);
+    window.addEventListener('resize', function () {
+        if (!dropdown.classList.contains('hidden')) positionDropdown();
     });
 
     document.addEventListener('click', function (e) {
