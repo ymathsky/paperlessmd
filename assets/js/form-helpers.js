@@ -17,7 +17,7 @@
         return String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
     }
 
-    document.addEventListener('DOMContentLoaded', function () {
+    function init() {
 
         /* ── 1. Auto-fill Time In ────────────────────────────────────────── */
         var timeInField  = document.querySelector('[name="time_in"]');
@@ -281,5 +281,13 @@
             input.parentNode.insertBefore(wrap, input.nextSibling);
         }
 
-    });
+    }
+
+    // defer guarantees DOM is ready; fall back to DOMContentLoaded just in case
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+
 })();
