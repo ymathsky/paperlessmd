@@ -10,10 +10,18 @@ $hour      = (int)date('H');
 $greeting  = $hour < 12 ? 'Good morning' : ($hour < 17 ? 'Good afternoon' : 'Good evening');
 $firstName = explode(' ', $_SESSION['full_name'] ?? 'Staff')[0];
 
-$totalPatients = (int)$pdo->query("SELECT COUNT(*) FROM patients")->fetchColumn();
-$formsToday    = (int)$pdo->query("SELECT COUNT(*) FROM form_submissions WHERE DATE(created_at) = '$today'")->fetchColumn();
-$photosToday   = (int)$pdo->query("SELECT COUNT(*) FROM wound_photos WHERE DATE(created_at) = '$today'")->fetchColumn();
-$pendingUpload = (int)$pdo->query("SELECT COUNT(*) FROM form_submissions WHERE status = 'signed'")->fetchColumn();
+if (isAdmin() || isBilling()) {
+    $totalPatients = (int)$pdo->query("SELECT COUNT(*) FROM patients")->fetchColumn();
+    $formsToday    = (int)$pdo->query("SELECT COUNT(*) FROM form_submissions WHERE DATE(created_at) = '$today'")->fetchColumn();
+    $photosToday   = (int)$pdo->query("SELECT COUNT(*) FROM wound_photos WHERE DATE(created_at) = '$today'")->fetchColumn();
+    $pendingUpload = (int)$pdo->query("SELECT COUNT(*) FROM form_submissions WHERE status = 'signed'")->fetchColumn();
+} else {
+    $maId = (int)$_SESSION['user_id'];
+    $s1 = $pdo->prepare("SELECT COUNT(*) FROM patients WHERE assigned_ma = ?"); $s1->execute([$maId]); $totalPatients = (int)$s1->fetchColumn();
+    $s2 = $pdo->prepare("SELECT COUNT(*) FROM form_submissions WHERE ma_id = ? AND DATE(created_at) = ?"); $s2->execute([$maId, $today]); $formsToday = (int)$s2->fetchColumn();
+    $s3 = $pdo->prepare("SELECT COUNT(*) FROM wound_photos WHERE uploaded_by = ? AND DATE(created_at) = ?"); $s3->execute([$maId, $today]); $photosToday = (int)$s3->fetchColumn();
+    $s4 = $pdo->prepare("SELECT COUNT(*) FROM form_submissions WHERE ma_id = ? AND status = 'signed'"); $s4->execute([$maId]); $pendingUpload = (int)$s4->fetchColumn();
+}
 
 // Billing-specific stats
 $billingSignedForms   = (int)$pdo->query("SELECT COUNT(*) FROM form_submissions WHERE status IN ('signed','uploaded')")->fetchColumn();
@@ -219,15 +227,29 @@ try {
 // CSRF for admin note API calls
 $noteCsrf = csrfToken();
 
-$stmt = $pdo->query("
-    SELECT fs.id, fs.form_type, fs.status, fs.created_at,
-           CONCAT(p.first_name,' ',p.last_name) AS patient_name, p.id AS patient_id,
-           s.full_name AS ma_name
-    FROM form_submissions fs
-    JOIN patients p ON p.id = fs.patient_id
-    LEFT JOIN staff s ON s.id = fs.ma_id
-    ORDER BY fs.created_at DESC LIMIT 12
-");
+if (isAdmin() || isBilling()) {
+    $stmt = $pdo->query("
+        SELECT fs.id, fs.form_type, fs.status, fs.created_at,
+               CONCAT(p.first_name,' ',p.last_name) AS patient_name, p.id AS patient_id,
+               s.full_name AS ma_name
+        FROM form_submissions fs
+        JOIN patients p ON p.id = fs.patient_id
+        LEFT JOIN staff s ON s.id = fs.ma_id
+        ORDER BY fs.created_at DESC LIMIT 12
+    ");
+} else {
+    $stmt = $pdo->prepare("
+        SELECT fs.id, fs.form_type, fs.status, fs.created_at,
+               CONCAT(p.first_name,' ',p.last_name) AS patient_name, p.id AS patient_id,
+               s.full_name AS ma_name
+        FROM form_submissions fs
+        JOIN patients p ON p.id = fs.patient_id
+        LEFT JOIN staff s ON s.id = fs.ma_id
+        WHERE fs.ma_id = ?
+        ORDER BY fs.created_at DESC LIMIT 12
+    ");
+    $stmt->execute([(int)$_SESSION['user_id']]);
+}
 $recent = $stmt->fetchAll();
 
 $formMeta = [
