@@ -10,10 +10,21 @@ include __DIR__ . '/includes/header.php';
 
 $releases = [
     [
-        'version' => 'v1.6',
+        'version' => 'v1.7',
         'date'    => 'April 29, 2026',
         'label'   => 'Latest',
         'color'   => 'emerald',
+        'items'   => [
+            ['icon' => 'bi-calendar-week-fill', 'tag' => 'New',     'tag_color' => 'blue',    'title' => 'Scheduler Role',                        'desc' => 'New "Scheduler" user role for staff who manage scheduling only. Schedulers can view the daily schedule, add/edit visits, and manage recurring schedules — without access to clinical data, forms, or admin functions.'],
+            ['icon' => 'bi-calendar-plus-fill', 'tag' => 'New',     'tag_color' => 'blue',    'title' => 'Schedule Management for Schedulers',   'desc' => 'Manage Schedule and Recurring Schedule pages are now accessible to both Admins and Schedulers. Schedulers see a dedicated "Scheduling" section in the sidebar navigation.'],
+            ['icon' => 'bi-person-badge-fill',  'tag' => 'Improve', 'tag_color' => 'teal',    'title' => 'Roles & Permissions Matrix Updated',   'desc' => 'The Roles & Permissions page now shows all four roles — Admin, Medical Assistant, Scheduler, and Billing — with a full permission matrix for each.'],
+        ],
+    ],
+    [
+        'version' => 'v1.6',
+        'date'    => 'April 29, 2026',
+        'label'   => null,
+        'color'   => 'blue',
         'items'   => [
             ['icon' => 'bi-pencil-square',     'tag' => 'New',     'tag_color' => 'blue',    'title' => 'Handwriting Pad for Medications',       'desc' => 'Draw medication names, doses, and frequencies with a tablet stylus or finger directly on the Medications step of Visit Consent and New Patient Pocket forms. Saved as an image and printed on the document.'],
             ['icon' => 'bi-geo-alt-fill',       'tag' => 'New',     'tag_color' => 'blue',    'title' => 'MA Location Monitor',                   'desc' => 'Admins can now view the real-time GPS location of all active MAs on an interactive map (Admin → MA Locations). MAs are automatically tracked every 5 minutes while logged in. Color-coded status: green = online (<10 min), amber = away (10–60 min), grey = offline (>60 min).'],
