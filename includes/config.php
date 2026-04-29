@@ -14,6 +14,14 @@ define('DB_USER', 'mdoffic1_pduser');
 define('DB_PASS', 'Ym@thsky12101992');
 define('BASE_URL', '');
 
+// ── SMTP / Mail settings ─────────────────────────────────────────────────────
+define('MAIL_HOST',      'docs.md-officesupport.com');
+define('MAIL_USER',      'support@docs.md-officesupport.com');
+define('MAIL_PASS',      'Ym@thsky12101992');
+define('MAIL_PORT',      465);
+define('MAIL_FROM',      'support@docs.md-officesupport.com');
+define('MAIL_FROM_NAME', 'PaperlessMD — Beyond Wound Care Inc.');
+
 // ── Shared constants (same on all environments) ──────────────────────────────
 define('APP_NAME',          'PaperlessMD');
 define('PRACTICE_NAME',     'Beyond Wound Care Inc.');

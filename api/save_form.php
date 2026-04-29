@@ -136,6 +136,11 @@ $newId = $pdo->lastInsertId();
 require_once __DIR__ . '/../includes/audit.php';
 auditLog($pdo, 'form_create', 'form', (int)$newId, $formType, 'patient_id=' . $patientId);
 
+// Email notification — new form awaiting provider countersignature
+require_once __DIR__ . '/../includes/mailer.php';
+require_once __DIR__ . '/../includes/notifications.php';
+notifyFormSigned($pdo, (int)$newId, $patientId, $formType, (int)$_SESSION['user_id']);
+
 // ── Medication reconciliation for Visit Consent forms ─────────────────────
 if ($formType === 'vital_cs' || $formType === 'new_patient_pocket') {
     $staffId  = (int)$_SESSION['user_id'];

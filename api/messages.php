@@ -140,6 +140,15 @@ try {
         $msgId = $pdo->lastInsertId();
         
         $pdo->prepare("INSERT INTO message_reads (message_id, user_id) VALUES (?, ?)")->execute([$msgId, $me]);
+
+        // Email notification to recipient(s)
+        require_once __DIR__ . '/../includes/mailer.php';
+        require_once __DIR__ . '/../includes/notifications.php';
+        if ($toId === null) {
+            notifyBroadcastMessage($pdo, $me, $body);
+        } else {
+            notifyNewMessage($pdo, $toId, $me, $body);
+        }
         
         if (!empty($_FILES["attachments"]["name"][0])) {
             $dir = __DIR__ . "/../uploads/messages";

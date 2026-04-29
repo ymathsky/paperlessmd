@@ -62,4 +62,9 @@ $upd->execute([$signature, $provName ?: null, $formId]);
 require_once __DIR__ . '/../includes/audit.php';
 auditLog($pdo, 'provider_sign', 'form', $formId, $provName);
 
+// Email notification — form countersigned by provider
+require_once __DIR__ . '/../includes/mailer.php';
+require_once __DIR__ . '/../includes/notifications.php';
+notifyProviderSigned($pdo, $formId, $provName ?: 'Provider');
+
 echo json_encode(['ok' => true]);

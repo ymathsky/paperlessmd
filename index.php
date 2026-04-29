@@ -95,21 +95,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                          'attempt=' . $newAttempts . ($justLocked ? ' locked=1' : ''));
 
                 if ($justLocked) {
-                    // Notify admin by email
-                    $adminEmail = PRACTICE_EMAIL;
-                    $subject    = '[' . APP_NAME . '] Account locked — ' . $user['full_name'];
-                    $body       = "A staff account has been automatically locked after "
-                                . LOCKOUT_MAX_ATTEMPTS . " consecutive failed login attempts.\n\n"
-                                . "Account  : " . $user['full_name'] . " (" . $user['username'] . ")\n"
-                                . "Role     : " . $user['role'] . "\n"
-                                . "Locked   : " . date('Y-m-d H:i:s T') . "\n"
-                                . "Unlocks  : " . $lockUntil . "\n"
-                                . "IP addr  : " . ($_SERVER['REMOTE_ADDR'] ?? 'unknown') . "\n"
-                                . "User-agent: " . ($_SERVER['HTTP_USER_AGENT'] ?? 'unknown') . "\n\n"
-                                . "— " . APP_NAME . " security system";
-                    $headers    = "From: noreply@md-officesupport.com\r\n"
-                                . "X-Mailer: " . APP_NAME;
-                    @mail($adminEmail, $subject, $body, $headers);
+                    require_once __DIR__ . '/includes/mailer.php';
+                    require_once __DIR__ . '/includes/notifications.php';
+                    notifyAccountLocked(
+                        $pdo,
+                        $user['full_name'],
+                        $user['username'],
+                        $user['role'],
+                        $lockUntil,
+                        $_SERVER['REMOTE_ADDR'] ?? 'unknown'
+                    );
 
                     $error  = 'Account locked for ' . LOCKOUT_MINUTES . ' minutes due to too many failed attempts. '
                             . 'The administrator has been notified.';
