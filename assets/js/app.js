@@ -293,18 +293,14 @@ document.addEventListener('DOMContentLoaded', function () {
         mainForm.submit();
     }
 
-    if (submitBtn) {
-        submitBtn.addEventListener('click', captureAndSubmit);
-    }
-
+    // ── Gate all form submission through captureAndSubmit ────────────
+    // submitBtn (type="submit") click fires the native 'submit' event;
+    // we intercept it here. captureAndSubmit() calls mainForm.submit()
+    // programmatically, which does NOT re-fire this event — no loop.
     if (mainForm) {
-        mainForm.addEventListener('submit', function () {
-            if (sigPad && sigData && !sigPad.isEmpty()) {
-                sigData.value = sigPad.toDataURL('image/png');
-            }
-            if (maSigPad && maSigData && !maSigPad.isEmpty()) {
-                maSigData.value = maSigPad.toDataURL('image/png');
-            }
+        mainForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            captureAndSubmit();
         });
     }
 });

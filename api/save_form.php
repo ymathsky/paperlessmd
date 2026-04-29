@@ -62,6 +62,11 @@ if ($maSig && !preg_match('/^data:image\/png;base64,[A-Za-z0-9+\/=]+$/', $maSig)
     $maSig = '';
 }
 
+// Validate patient_signature format if provided
+if ($signature && !preg_match('/^data:image\/png;base64,[A-Za-z0-9+\/=]+$/', $signature)) {
+    $signature = '';
+}
+
 // Validate med_handwriting if provided (strip if invalid)
 if (!empty($formData['med_handwriting'])) {
     if (!preg_match('/^data:image\/png;base64,[A-Za-z0-9+\/=]+$/', $formData['med_handwriting'])) {
