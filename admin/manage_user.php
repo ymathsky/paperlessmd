@@ -8,7 +8,7 @@ $id      = (int)($_GET['id'] ?? 0);
 $isEdit  = $id > 0;
 $user    = null;
 $error   = '';
-$vals    = ['username' => '', 'full_name' => '', 'role' => 'ma'];
+$vals    = ['username' => '', 'full_name' => '', 'email' => '', 'role' => 'ma'];
 $pageTitle = $isEdit ? 'Edit Staff Member' : 'Add Staff Member';
 $activeNav = '';
 
@@ -17,7 +17,7 @@ if ($isEdit) {
     $s->execute([$id]);
     $user = $s->fetch();
     if (!$user) { header('Location: ' . BASE_URL . '/admin/users.php'); exit; }
-    $vals = ['username' => $user['username'], 'full_name' => $user['full_name'], 'role' => $user['role']];
+    $vals = ['username' => $user['username'], 'full_name' => $user['full_name'], 'email' => $user['email'] ?? '', 'role' => $user['role']];
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -25,6 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $vals = [
         'username'  => trim($_POST['username']  ?? ''),
         'full_name' => trim($_POST['full_name'] ?? ''),
+        'email'     => trim($_POST['email'] ?? ''),
         'role'      => in_array($_POST['role'] ?? '', ['admin','ma','billing','scheduler','provider']) ? $_POST['role'] : 'ma',
     ];
     $password  = $_POST['password']  ?? '';
@@ -32,6 +33,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!$vals['username'] || !$vals['full_name']) {
         $error = 'Username and full name are required.';
+    } elseif ($vals['email'] !== '' && !filter_var($vals['email'], FILTER_VALIDATE_EMAIL)) {
+        $error = 'Please enter a valid email address.';
     } elseif (!$isEdit && !$password) {
         $error = 'Password is required for new staff.';
     } elseif ($password && $password !== $password2) {
@@ -42,16 +45,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($isEdit) {
             if ($password) {
                 $hash = password_hash($password, PASSWORD_DEFAULT);
-                $pdo->prepare("UPDATE staff SET username=?, full_name=?, role=?, password_hash=? WHERE id=?")
-                    ->execute([$vals['username'], $vals['full_name'], $vals['role'], $hash, $id]);
+                $pdo->prepare("UPDATE staff SET username=?, full_name=?, email=?, role=?, password_hash=? WHERE id=?")
+                    ->execute([$vals['username'], $vals['full_name'], $vals['email'] ?: null, $vals['role'], $hash, $id]);
             } else {
-                $pdo->prepare("UPDATE staff SET username=?, full_name=?, role=? WHERE id=?")
-                    ->execute([$vals['username'], $vals['full_name'], $vals['role'], $id]);
+                $pdo->prepare("UPDATE staff SET username=?, full_name=?, email=?, role=? WHERE id=?")
+                    ->execute([$vals['username'], $vals['full_name'], $vals['email'] ?: null, $vals['role'], $id]);
             }
         } else {
             $hash = password_hash($password, PASSWORD_DEFAULT);
-            $pdo->prepare("INSERT INTO staff (username, full_name, role, password_hash, active) VALUES (?,?,?,?,1)")
-                ->execute([$vals['username'], $vals['full_name'], $vals['role'], $hash]);
+            $pdo->prepare("INSERT INTO staff (username, full_name, email, role, password_hash, active) VALUES (?,?,?,?,?,1)")
+                ->execute([$vals['username'], $vals['full_name'], $vals['email'] ?: null, $vals['role'], $hash]);
         }
         header('Location: ' . BASE_URL . '/admin/users.php?msg=updated');
         exit;
@@ -90,6 +93,16 @@ include __DIR__ . '/../includes/header.php';
 
         <form method="POST" novalidate>
             <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+
+            <div class="mb-4">
+                <label class="block text-sm font-semibold text-slate-700 mb-1.5">
+                    Email Address <span class="text-slate-400 text-xs font-normal">(for notifications)</span>
+                </label>
+                <input type="email" name="email" value="<?= h($vals['email']) ?>"
+                       class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
+                              focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition focus:bg-white"
+                       placeholder="jsmith@example.com" autocomplete="email">
+            </div>
 
             <div class="mb-4">
                 <label class="block text-sm font-semibold text-slate-700 mb-1.5">
