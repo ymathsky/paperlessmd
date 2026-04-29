@@ -1081,9 +1081,9 @@ $extraJs = <<<JSBLOCK
             row.className = 'px-4 py-3 cursor-pointer hover:bg-indigo-50 flex items-baseline gap-2 border-b border-slate-100 last:border-0';
             row.innerHTML = '<span class="font-mono text-xs font-bold text-indigo-600 shrink-0">'
                 + escHtml(item.code) + '</span>'
-                + '<span class="text-slate-700 text-xs truncate">' + escHtml(item.description) + '</span>';
+                + '<span class="text-slate-700 text-xs truncate">' + escHtml(item.desc || item.description || '') + '</span>';
             row.addEventListener('click', function () {
-                addCode({code: item.code, desc: item.description, cat: item.category || ''});
+                addCode({code: item.code, desc: item.desc || item.description || '', cat: item.cat || ''});
             });
             dropdown.appendChild(row);
         });
