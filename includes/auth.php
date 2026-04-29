@@ -64,6 +64,11 @@ function isProvider(): bool
     return ($_SESSION['role'] ?? '') === 'provider';
 }
 
+function isPcc(): bool
+{
+    return ($_SESSION['role'] ?? '') === 'pcc';
+}
+
 /**
  * Allows admin or scheduler — used on schedule management pages.
  */
@@ -94,7 +99,7 @@ function requireNotBilling(): void
  */
 function canAccessClinical(): bool
 {
-    return in_array($_SESSION['role'] ?? '', ['admin', 'ma', 'provider'], true);
+    return in_array($_SESSION['role'] ?? '', ['admin', 'ma', 'provider', 'pcc'], true);
 }
 
 /**

@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'username'  => trim($_POST['username']  ?? ''),
         'full_name' => trim($_POST['full_name'] ?? ''),
         'email'     => trim($_POST['email'] ?? ''),
-        'role'      => in_array($_POST['role'] ?? '', ['admin','ma','billing','scheduler','provider']) ? $_POST['role'] : 'ma',
+        'role'      => in_array($_POST['role'] ?? '', ['admin','ma','billing','scheduler','provider','pcc']) ? $_POST['role'] : 'ma',
     ];
     $password  = $_POST['password']  ?? '';
     $password2 = $_POST['password2'] ?? '';
@@ -149,6 +149,14 @@ include __DIR__ . '/../includes/header.php';
                         <div>
                             <div class="text-sm font-semibold text-slate-700">Scheduler</div>
                             <div class="text-xs text-slate-500">Schedule management only</div>
+                        </div>
+                    </label>
+                    <label class="flex items-center gap-3 p-3.5 border border-slate-200 rounded-xl cursor-pointer transition-colors has-[:checked]:border-teal-400 has-[:checked]:bg-teal-50">
+                        <input type="radio" name="role" value="pcc" <?= $vals['role'] === 'pcc' ? 'checked' : '' ?>
+                               class="w-4 h-4 text-teal-600 border-slate-300 focus:ring-teal-400">
+                        <div>
+                            <div class="text-sm font-semibold text-slate-700">PCC <span class="text-xs font-normal text-slate-400">Patient Care Coordinator</span></div>
+                            <div class="text-xs text-slate-500">Clinical access — same as MA</div>
                         </div>
                     </label>
                     <label class="flex items-center gap-3 p-3.5 border border-slate-200 rounded-xl cursor-pointer transition-colors has-[:checked]:border-amber-400 has-[:checked]:bg-amber-50">
