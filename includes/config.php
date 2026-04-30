@@ -4,7 +4,6 @@
 
 if (file_exists(__DIR__ . '/config.local.php')) {
     require_once __DIR__ . '/config.local.php';
-    return;
 }
 
 // ── Railway / generic env-var support ───────────────────────────────────────
