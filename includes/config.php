@@ -9,7 +9,7 @@ if (file_exists(__DIR__ . '/config.local.php')) {
 // ── Railway / generic env-var support ───────────────────────────────────────
 // Railway MySQL plugin injects MYSQL_HOST, MYSQL_PORT, MYSQL_DATABASE, MYSQL_USER, MYSQL_PASSWORD
 // BASE_URL must be set manually as a Railway environment variable.
-if (getenv('MYSQL_HOST') !== false) {
+if (!defined('DB_HOST') && getenv('MYSQL_HOST') !== false) {
     define('DB_HOST', getenv('MYSQL_HOST') . ':' . (getenv('MYSQL_PORT') ?: '3306'));
     define('DB_NAME', getenv('MYSQL_DATABASE'));
     define('DB_USER', getenv('MYSQL_USER'));
@@ -22,8 +22,7 @@ if (getenv('MYSQL_HOST') !== false) {
     define('MAIL_PORT',      (int)(getenv('MAIL_PORT') ?: 587));
     define('MAIL_FROM',      getenv('MAIL_FROM')      ?: '');
     define('MAIL_FROM_NAME', getenv('MAIL_FROM_NAME') ?: 'PaperlessMD');
-} else {
-    // ── Production settings (cPanel) ─────────────────────────────────────────
+} else if (!defined('DB_HOST')) {
     define('DB_HOST', 'localhost');
     define('DB_NAME', 'mdoffic1_pd');
     define('DB_USER', 'mdoffic1_pduser');
