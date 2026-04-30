@@ -2,8 +2,14 @@
 require_once __DIR__ . '/config.php';
 
 try {
+    // DB_HOST may be "host:port" (Railway) or plain "localhost"
+    $dbHostStr = DB_HOST;
+    $dbPort    = '3306';
+    if (strpos($dbHostStr, ':') !== false) {
+        list($dbHostStr, $dbPort) = explode(':', $dbHostStr, 2);
+    }
     $pdo = new PDO(
-        'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4',
+        'mysql:host=' . $dbHostStr . ';port=' . $dbPort . ';dbname=' . DB_NAME . ';charset=utf8mb4',
         DB_USER,
         DB_PASS,
         [

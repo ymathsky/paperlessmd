@@ -1,26 +1,43 @@
 <?php
 // ── Environment detection ────────────────────────────────────────────────────
-// Local override file (gitignored) takes priority when present.
-// On production (cPanel) this file won't exist, so production values below are used.
+// Priority: local override file → Railway env vars → production hard-coded values
+
 if (file_exists(__DIR__ . '/config.local.php')) {
     require_once __DIR__ . '/config.local.php';
     return;
 }
 
-// ── Production settings ──────────────────────────────────────────────────────
-define('DB_HOST', 'localhost');
-define('DB_NAME', 'mdoffic1_pd');
-define('DB_USER', 'mdoffic1_pduser');
-define('DB_PASS', 'Ym@thsky12101992');
-define('BASE_URL', '');
+// ── Railway / generic env-var support ───────────────────────────────────────
+// Railway MySQL plugin injects MYSQL_HOST, MYSQL_PORT, MYSQL_DATABASE, MYSQL_USER, MYSQL_PASSWORD
+// BASE_URL must be set manually as a Railway environment variable.
+if (getenv('MYSQL_HOST') !== false) {
+    define('DB_HOST', getenv('MYSQL_HOST') . ':' . (getenv('MYSQL_PORT') ?: '3306'));
+    define('DB_NAME', getenv('MYSQL_DATABASE'));
+    define('DB_USER', getenv('MYSQL_USER'));
+    define('DB_PASS', getenv('MYSQL_PASSWORD'));
+    define('BASE_URL', rtrim(getenv('BASE_URL') ?: '', '/'));
 
-// ── SMTP / Mail settings ─────────────────────────────────────────────────────
-define('MAIL_HOST',      'docs.md-officesupport.com');
-define('MAIL_USER',      'support@docs.md-officesupport.com');
-define('MAIL_PASS',      'Ym@thsky12101992');
-define('MAIL_PORT',      465);
-define('MAIL_FROM',      'support@docs.md-officesupport.com');
-define('MAIL_FROM_NAME', 'PaperlessMD — Beyond Wound Care Inc.');
+    define('MAIL_HOST',      getenv('MAIL_HOST')      ?: '');
+    define('MAIL_USER',      getenv('MAIL_USER')      ?: '');
+    define('MAIL_PASS',      getenv('MAIL_PASS')      ?: '');
+    define('MAIL_PORT',      (int)(getenv('MAIL_PORT') ?: 587));
+    define('MAIL_FROM',      getenv('MAIL_FROM')      ?: '');
+    define('MAIL_FROM_NAME', getenv('MAIL_FROM_NAME') ?: 'PaperlessMD');
+} else {
+    // ── Production settings (cPanel) ─────────────────────────────────────────
+    define('DB_HOST', 'localhost');
+    define('DB_NAME', 'mdoffic1_pd');
+    define('DB_USER', 'mdoffic1_pduser');
+    define('DB_PASS', 'Ym@thsky12101992');
+    define('BASE_URL', '');
+
+    define('MAIL_HOST',      'docs.md-officesupport.com');
+    define('MAIL_USER',      'support@docs.md-officesupport.com');
+    define('MAIL_PASS',      'Ym@thsky12101992');
+    define('MAIL_PORT',      465);
+    define('MAIL_FROM',      'support@docs.md-officesupport.com');
+    define('MAIL_FROM_NAME', 'PaperlessMD — Beyond Wound Care Inc.');
+}
 
 // ── Shared constants (same on all environments) ──────────────────────────────
 define('APP_NAME',          'PaperlessMD');

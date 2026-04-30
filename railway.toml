@@ -1,0 +1,7 @@
+[deploy]
+startCommand = "apache2ctl -D FOREGROUND"
+healthcheckPath = "/index.php"
+healthcheckTimeout = 30
+
+[build]
+builder = "NIXPACKS"
