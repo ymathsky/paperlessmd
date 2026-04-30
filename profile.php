@@ -35,6 +35,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $user = $stmt->fetch();
             }
 
+        } elseif ($action === 'update_email') {
+            $email = trim($_POST['email'] ?? '');
+            if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $error = 'Please enter a valid email address.';
+            } elseif (strlen($email) > 200) {
+                $error = 'Email address is too long.';
+            } else {
+                $pdo->prepare("UPDATE staff SET email = ? WHERE id = ?")
+                    ->execute([$email ?: null, (int)$_SESSION['user_id']]);
+                $success = 'Email address updated.';
+                $stmt->execute([$_SESSION['user_id']]);
+                $user = $stmt->fetch();
+            }
+
         } elseif ($action === 'change_password') {
             $current = $_POST['current_password'] ?? '';
             $new     = $_POST['new_password']     ?? '';
@@ -144,6 +158,15 @@ include __DIR__ . '/includes/header.php';
                 </div>
                 <div class="flex items-center gap-3">
                     <div class="w-8 h-8 bg-slate-100 rounded-lg grid place-items-center shrink-0">
+                        <i class="bi bi-envelope text-slate-500"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <p class="text-xs text-slate-400">Email</p>
+                        <p class="font-semibold text-slate-800 truncate"><?= $user['email'] ? h($user['email']) : '<span class="text-slate-400 font-normal">Not set</span>' ?></p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 bg-slate-100 rounded-lg grid place-items-center shrink-0">
                         <i class="bi bi-shield-fill text-slate-500"></i>
                     </div>
                     <div>
@@ -236,6 +259,41 @@ include __DIR__ . '/includes/header.php';
                             class="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700
                                    active:scale-95 text-white font-semibold rounded-xl text-sm transition-all shadow-sm">
                         <i class="bi bi-check-lg"></i> Save Name
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Update email -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="bg-gradient-to-r from-emerald-600 to-emerald-500 px-6 py-4 flex items-center gap-3">
+                <div class="bg-white/20 p-2 rounded-xl shrink-0">
+                    <i class="bi bi-envelope-fill text-white text-lg"></i>
+                </div>
+                <div>
+                    <h3 class="text-white font-bold">Email Address</h3>
+                    <p class="text-emerald-200 text-xs">Used for system notifications</p>
+                </div>
+            </div>
+            <div class="p-6">
+                <form method="POST" novalidate>
+                    <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
+                    <input type="hidden" name="action" value="update_email">
+                    <div class="mb-4">
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Email Address</label>
+                        <input type="email" name="email"
+                               value="<?= h($user['email'] ?? '') ?>"
+                               maxlength="200"
+                               class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
+                                      focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent
+                                      transition focus:bg-white"
+                               placeholder="you@example.com">
+                        <p class="mt-1.5 text-xs text-slate-400">Leave blank to remove your email address.</p>
+                    </div>
+                    <button type="submit"
+                            class="inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700
+                                   active:scale-95 text-white font-semibold rounded-xl text-sm transition-all shadow-sm">
+                        <i class="bi bi-check-lg"></i> Save Email
                     </button>
                 </form>
             </div>
