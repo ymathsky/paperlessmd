@@ -70,16 +70,18 @@ $weekCount      = count(array_filter($photos, function($p) { return strtotime($p
 
 // ── Dropdown data (unfiltered) ────────────────────────────────────────────────
 $allPatients   = $pdo->query("
-    SELECT DISTINCT p.id, CONCAT(p.first_name,' ',p.last_name) AS full_name
+    SELECT p.id, CONCAT(p.first_name,' ',p.last_name) AS full_name, p.last_name, p.first_name
     FROM wound_photos wp
     JOIN patients p ON p.id = wp.patient_id
+    GROUP BY p.id, p.first_name, p.last_name
     ORDER BY p.last_name, p.first_name
 ")->fetchAll();
 
 $allMas = $pdo->query("
-    SELECT DISTINCT s.id, s.full_name
+    SELECT s.id, s.full_name
     FROM wound_photos wp
     JOIN staff s ON s.id = wp.uploaded_by
+    GROUP BY s.id, s.full_name
     ORDER BY s.full_name
 ")->fetchAll();
 
