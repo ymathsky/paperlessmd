@@ -220,6 +220,12 @@ if (!empty($_SESSION['user_id'])) {
             <i class="bi bi-person-circle text-base w-5 shrink-0 text-center"></i>
             <span>My Profile</span>
         </a>
+        <button id="sidebarDarkToggle"
+                onclick="sidebarToggleDark()"
+                class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-blue-200 hover:bg-white/10 hover:text-white transition-all duration-150 w-full text-left">
+            <i id="sidebarDarkIcon" class="bi <?= $_darkMode ? 'bi-sun-fill' : 'bi-moon-fill' ?> text-base w-5 shrink-0 text-center"></i>
+            <span id="sidebarDarkLabel"><?= $_darkMode ? 'Light Mode' : 'Dark Mode' ?></span>
+        </button>
         <a href="<?= BASE_URL ?>/logout.php"
            class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-blue-200 hover:bg-red-500/20 hover:text-red-300 transition-all duration-150">
             <i class="bi bi-box-arrow-right text-base w-5 shrink-0 text-center"></i>
@@ -372,6 +378,32 @@ if (!empty($_SESSION['user_id'])) {
 
     scheduleTimers();
 })();
+
+async function sidebarToggleDark() {
+    const html  = document.documentElement;
+    const isOn  = html.classList.contains('dark');
+    const newVal = !isOn;
+    const icon  = document.getElementById('sidebarDarkIcon');
+    const label = document.getElementById('sidebarDarkLabel');
+    // Optimistic UI
+    html.classList.toggle('dark', newVal);
+    if (icon)  { icon.className  = 'bi ' + (newVal ? 'bi-sun-fill' : 'bi-moon-fill') + ' text-base w-5 shrink-0 text-center'; }
+    if (label) { label.textContent = newVal ? 'Light Mode' : 'Dark Mode'; }
+    try {
+        const fd = new FormData();
+        fd.append('action',     'toggle_dark_mode');
+        fd.append('dark_mode',  newVal ? '1' : '0');
+        fd.append('csrf_token', CSRF);
+        const res  = await fetch(BASE + '/profile.php', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!data.ok) throw new Error();
+    } catch (e) {
+        // Rollback
+        html.classList.toggle('dark', isOn);
+        if (icon)  { icon.className  = 'bi ' + (isOn ? 'bi-sun-fill' : 'bi-moon-fill') + ' text-base w-5 shrink-0 text-center'; }
+        if (label) { label.textContent = isOn ? 'Light Mode' : 'Dark Mode'; }
+    }
+}
 </script>
 <?php endif; ?>
 <?php if (!empty($fullHeight)): ?>
