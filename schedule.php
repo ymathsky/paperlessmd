@@ -335,6 +335,12 @@ include __DIR__ . '/includes/header.php';
 // ── Visit card border colours keyed by status ─────────────────────────────
 $_sbc = ['pending'=>'#94a3b8','en_route'=>'#3b82f6','completed'=>'#22c55e','missed'=>'#ef4444'];
 $_vtl = ['routine'=>'Follow-Up','new_patient'=>'New Patient','wound_care'=>'Wound Care','awv'=>'Annual Wellness','ccm'=>'CCM','il'=>'IL Disc.'];
+$statusDefs = [
+    'pending'   => ['label'=>'Pending',   'bg'=>'bg-slate-100',   'text'=>'text-slate-600',   'border'=>'border-slate-200',   'icon'=>'bi-clock'],
+    'en_route'  => ['label'=>'En Route',  'bg'=>'bg-blue-50',     'text'=>'text-blue-700',    'border'=>'border-blue-200',    'icon'=>'bi-car-front-fill'],
+    'completed' => ['label'=>'Completed', 'bg'=>'bg-emerald-50',  'text'=>'text-emerald-700', 'border'=>'border-emerald-200', 'icon'=>'bi-check-circle-fill'],
+    'missed'    => ['label'=>'Missed',    'bg'=>'bg-rose-50',     'text'=>'text-rose-700',    'border'=>'border-rose-200',    'icon'=>'bi-x-circle-fill'],
+];
 
 /** Renders one compact visit card. $showMaName=true → show MA; false → show Provider */
 $renderVisitCard = function(array $v, int $idx, bool $showMaName) use ($statusDefs, $_sbc, $_vtl): void {
@@ -633,12 +639,6 @@ $renderVisitCard = function(array $v, int $idx, bool $showMaName) use ($statusDe
 <!-- Status summary bar (single compact row of 4 pills) -->
 <div class="flex items-center gap-2 mb-4 print-stat-bar">
     <?php
-    $statusDefs = [
-        'pending'   => ['label'=>'Pending',   'bg'=>'bg-slate-100',   'text'=>'text-slate-600',   'border'=>'border-slate-200',   'icon'=>'bi-clock'],
-        'en_route'  => ['label'=>'En Route',  'bg'=>'bg-blue-50',     'text'=>'text-blue-700',    'border'=>'border-blue-200',    'icon'=>'bi-car-front-fill'],
-        'completed' => ['label'=>'Completed', 'bg'=>'bg-emerald-50',  'text'=>'text-emerald-700', 'border'=>'border-emerald-200', 'icon'=>'bi-check-circle-fill'],
-        'missed'    => ['label'=>'Missed',    'bg'=>'bg-rose-50',     'text'=>'text-rose-700',    'border'=>'border-rose-200',    'icon'=>'bi-x-circle-fill'],
-    ];
     $displayCounts = ($view === 'week') ? $weekCounts : $counts;
     foreach ($statusDefs as $key => $def): ?>
     <div class="flex-1 flex flex-col items-center justify-center gap-0.5 <?= $def['bg'] ?> border <?= $def['border'] ?> rounded-xl py-2 shadow-sm">
