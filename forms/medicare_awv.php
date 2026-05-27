@@ -4,6 +4,7 @@ require_once __DIR__ . '/../includes/db.php';
 requireNotBilling();
 
 $patient_id = (int)($_GET['patient_id'] ?? 0);
+$visit_id   = (int)($_GET['visit_id']   ?? 0);
 if (!$patient_id) { header('Location: ' . BASE_URL . '/patients.php'); exit; }
 $pStmt = $pdo->prepare("SELECT * FROM patients WHERE id = ?");
 $pStmt->execute([$patient_id]);
@@ -463,6 +464,7 @@ function sectionHeader($num, $title, $icon='bi-circle-fill', $color='sky') {
             <?php
             $accentClass = 'bg-sky-600 hover:bg-sky-700';
             $cancelUrl   = BASE_URL . '/patient_view.php?id=' . $patient_id;
+            $endVisitId  = $visit_id;
             include __DIR__ . '/../includes/wiz_nav.php';
             ?>
 
