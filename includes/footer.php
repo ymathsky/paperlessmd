@@ -1094,15 +1094,16 @@ $_bnItems = [
      x-transition:leave="transition ease-in duration-100"
      x-transition:leave-start="opacity-100"
      x-transition:leave-end="opacity-0"
-     class="fixed inset-0 flex items-center justify-center p-6 no-print"
-     style="background:rgba(0,0,0,0.45);display:none;z-index:99999;"
+     class="fixed inset-0 flex items-center justify-center no-print"
+     style="background:rgba(0,0,0,0.45);display:none;z-index:99999;padding:16px;"
      @keydown.escape.window="$store.pdConfirm.answer(false)">
     <div x-show="$store.pdConfirm.visible"
          x-transition:enter="transition ease-out duration-150"
          x-transition:enter-start="opacity-0 scale-95"
          x-transition:enter-end="opacity-100 scale-100"
-         style="background:#fff;border-radius:16px;max-width:360px;width:100%;
-                box-shadow:0 8px 40px rgba(0,0,0,0.18);position:relative;padding:28px 24px 22px;">
+         style="background:#fff;border-radius:16px;max-width:340px;width:100%;
+                box-shadow:0 8px 40px rgba(0,0,0,0.18);position:relative;padding:24px 20px 20px;
+                box-sizing:border-box;">
 
         <!-- Close × -->
         <button @click="$store.pdConfirm.answer(false)"
@@ -1129,9 +1130,10 @@ $_bnItems = [
         <!-- Buttons -->
         <div style="display:flex;gap:10px;margin-top:20px;">
             <button @click="$store.pdConfirm.answer(false)"
-                    style="flex:1;padding:11px 16px;background:#fff;
+                    style="flex:1;min-width:0;padding:11px 12px;background:#fff;
                            border:1.5px solid #d1d5db;border-radius:50px;
                            font-size:14px;font-weight:600;color:#374151;cursor:pointer;
+                           overflow:hidden;white-space:nowrap;
                            transition:background 0.12s;"
                     onmouseover="this.style.background='#f9fafb'"
                     onmouseout="this.style.background='#fff'">
@@ -1139,8 +1141,9 @@ $_bnItems = [
             </button>
             <button @click="$store.pdConfirm.answer(true)"
                     :style="$store.pdConfirm.confirmStyle || 'background:#2563eb;'"
-                    style="flex:1;padding:11px 16px;border:none;border-radius:50px;
+                    style="flex:1;min-width:0;padding:11px 12px;border:none;border-radius:50px;
                            font-size:14px;font-weight:700;cursor:pointer;color:#fff;
+                           overflow:hidden;white-space:nowrap;
                            box-shadow:0 4px 14px rgba(0,0,0,0.22);
                            transition:filter 0.12s,transform 0.1s;"
                     onmouseover="this.style.filter='brightness(1.1)';this.style.transform='translateY(-1px)'"
