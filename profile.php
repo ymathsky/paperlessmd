@@ -11,6 +11,15 @@ $stmt = $pdo->prepare("SELECT * FROM staff WHERE id = ?");
 $stmt->execute([$_SESSION['user_id']]);
 $user = $stmt->fetch();
 
+// User row missing (e.g. account deleted) — force re-login
+if (!$user) {
+    session_unset();
+    session_destroy();
+    session_start();
+    header('Location: ' . BASE_URL . '/index.php?msg=timeout');
+    exit;
+}
+
 $success = '';
 $error   = '';
 
@@ -169,7 +178,7 @@ include __DIR__ . '/includes/header.php';
         <div class="relative mb-4 group cursor-pointer" id="avatarUploadZone" title="Click to change photo">
             <div class="w-28 h-28 rounded-full overflow-hidden ring-4 ring-white shadow-2xl avatar-ring-anim flex items-center justify-center select-none" id="avatarCircle">
                 <?php if ($hasAvatar): ?>
-                <img src="<?= h($user['avatar_url']) ?>?v=<?= time() ?>" alt="Profile photo" id="avatarImg" class="w-full h-full object-cover">
+                <img src="<?= h($user['avatar_url'] ?? '') ?>?v=<?= time() ?>" alt="Profile photo" id="avatarImg" class="w-full h-full object-cover">
                 <?php else: ?>
                 <div id="avatarInitials" class="w-full h-full bg-gradient-to-br <?= $rc['light'] ?> flex items-center justify-center text-white text-3xl font-black tracking-tight"><?= $initials ?></div>
                 <?php endif; ?>
