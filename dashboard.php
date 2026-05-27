@@ -639,9 +639,20 @@ include __DIR__ . '/includes/header.php';
                 <div class="text-xs font-medium text-slate-400"><?= date('g:i A', strtotime($sv['visit_time'])) ?></div>
                 <?php endif; ?>
                 <?php if ($sv['status'] === 'pending'): ?>
-                <button onclick="dashStartVisit(<?= $sv['id'] ?>, <?= $sv['patient_id'] ?>, '<?= h($sv['visit_type'] ?? 'routine') ?>', '<?= h($sv['visit_subtype'] ?? '') ?>', this)"
-                        class="flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-sm transition-all whitespace-nowrap">
-                    <i class="bi bi-play-fill"></i> Start
+                <?php
+                    $svAddr   = $sv['patient_address'] ?? '';
+                    $svGmUrl  = $svAddr ? 'https://www.google.com/maps/dir/?api=1&destination=' . rawurlencode($svAddr) : '#';
+                    $svVisitJson = htmlspecialchars(json_encode([
+                        'id'          => $sv['id'],
+                        'patient_id'  => $sv['patient_id'],
+                        'visit_type'  => $sv['visit_type'] ?? 'routine',
+                        'visit_subtype' => $sv['visit_subtype'] ?? '',
+                        'startFn'     => 'dashStartVisit',
+                    ]), ENT_QUOTES);
+                ?>
+                <button onclick="openMapPanel(<?= htmlspecialchars(json_encode($svAddr), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($sv['patient_name']), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($svGmUrl), ENT_QUOTES) ?>, <?= $svVisitJson ?>)"
+                        class="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-sm transition-all whitespace-nowrap">
+                    <i class="bi bi-compass-fill"></i> Navigate
                 </button>
                 <?php elseif ($sv['status'] === 'en_route'): ?>
                 <button onclick="dashResetVisit(<?= $sv['id'] ?>, this)"
@@ -1818,4 +1829,5 @@ function dashUndoEndVisit(visitId, btn) {
     });
 }
 </script>
+<?php include __DIR__ . '/includes/map_panel.php'; ?>
 <?php include __DIR__ . '/includes/footer.php'; ?>
