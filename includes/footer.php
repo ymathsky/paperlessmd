@@ -1094,8 +1094,10 @@ $_bnItems = [
      x-transition:leave="transition ease-in duration-100"
      x-transition:leave-start="opacity-100"
      x-transition:leave-end="opacity-0"
-     class="fixed inset-0 flex items-center justify-center no-print"
-     style="background:rgba(0,0,0,0.45);display:none;z-index:99999;padding:16px;"
+     class="fixed no-print"
+     :style="$store.pdConfirm.visible
+         ? 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,0.45);'
+         : 'display:none;'"
      @keydown.escape.window="$store.pdConfirm.answer(false)">
     <div x-show="$store.pdConfirm.visible"
          x-transition:enter="transition ease-out duration-150"
