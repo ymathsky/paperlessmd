@@ -1232,6 +1232,7 @@ async function startVisit(visitId, patientId, visitType, visitSubtype, btn) {
     .then(r => r.json())
     .then(data => {
         if (data.ok) {
+            if (window.closeMapPanel) window.closeMapPanel();
             window.location.href = BASE + formPath + '?patient_id=' + patientId + '&visit_id=' + visitId + '&sched_visit_type=' + encodeURIComponent(visitType) + npParam;
         } else {
             btn.disabled = false;

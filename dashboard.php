@@ -1773,6 +1773,7 @@ async function dashStartVisit(visitId, patientId, visitType, visitSubtype, btn) 
     .then(r => r.json())
     .then(data => {
         if (data.ok) {
+            if (window.closeMapPanel) window.closeMapPanel();
             window.location.href = window._pdBase + formPath
                 + '?patient_id=' + patientId
                 + '&visit_id=' + visitId

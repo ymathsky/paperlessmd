@@ -111,7 +111,6 @@ window.openMapPanel = function (address, name, gmUrl, visitData) {
     var btn = document.getElementById('mapStartVisitBtn');
     if (visitData && visitData.id) {
         btn.onclick = function () {
-            closeMapPanel();
             var fn = (visitData.startFn && window[visitData.startFn]) || window.startVisit;
             if (fn) fn(visitData.id, visitData.patient_id, visitData.visit_type, visitData.visit_subtype || '', btn);
         };
@@ -137,7 +136,10 @@ window.closeMapPanel = function () {
 };
 
 document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') closeMapPanel();
+    if (e.key !== 'Escape') return;
+    // Don't close the map while a confirm dialog is open
+    if (window.Alpine && Alpine.store && Alpine.store('pdConfirm') && Alpine.store('pdConfirm').visible) return;
+    closeMapPanel();
 });
 
 function setMapStatus(html) {
