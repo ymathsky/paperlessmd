@@ -643,19 +643,23 @@ window._pdCsrf = '<?= htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8') ?>';
 <script>
 (function () {
     'use strict';
-    var TIMEOUT_MS  = <?= (int)SESSION_TIMEOUT ?> * 1000;
-    var WARN_MS     = 120 * 1000; // show warning 2 min before expiry
-    var lastActive  = <?= (int)($_SESSION['last_active'] ?? time()) ?> * 1000;
-    var csrf        = '<?= htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8') ?>';
+    // Show warning modal after 15 min of user inactivity,
+    // provided at least 2 min remain on the server session.
+    var TIMEOUT_MS      = <?= (int)SESSION_TIMEOUT ?> * 1000;
+    var INACTIVITY_MS   = 15 * 60 * 1000; // 15 min idle → show modal
+    var GRACE_MS        =  2 * 60 * 1000; // 2 min countdown once modal appears
+    var lastActive      = <?= (int)($_SESSION['last_active'] ?? time()) ?> * 1000;
+    var csrf            = '<?= htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8') ?>';
 
-    var modal       = document.getElementById('sessionTimeoutModal');
-    var countdownEl = document.getElementById('sessionCountdown');
-    var stayBtn     = document.getElementById('sessionStayBtn');
-    var intervalId  = null;
-    var isVisible   = false;
+    var modal           = document.getElementById('sessionTimeoutModal');
+    var countdownEl     = document.getElementById('sessionCountdown');
+    var stayBtn         = document.getElementById('sessionStayBtn');
+    var tickId          = null;    // 1-second server-expiry watchdog
+    var inactivityTimer = null;   // fires after INACTIVITY_MS of idle
+    var graceDeadline   = null;   // Date.now() + GRACE_MS when modal shown
+    var isVisible       = false;
 
-    function expiresAt() { return lastActive + TIMEOUT_MS; }
-    function msLeft()    { return expiresAt() - Date.now(); }
+    function msLeft() { return (lastActive + TIMEOUT_MS) - Date.now(); }
 
     function fmt(ms) {
         if (ms <= 0) return '0:00';
@@ -667,29 +671,38 @@ window._pdCsrf = '<?= htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8') ?>';
 
     function showModal() {
         if (!modal || isVisible) return;
+        // Guard: only show if at least GRACE_MS remain on the server session
+        if (msLeft() < GRACE_MS) {
+            window.location.href = (window._pdBase || '') + '/index.php?msg=timeout';
+            return;
+        }
         modal.classList.remove('hidden');
-        isVisible = true;
+        isVisible    = true;
+        graceDeadline = Date.now() + GRACE_MS;
     }
 
     function hideModal() {
         if (!modal) return;
         modal.classList.add('hidden');
-        isVisible = false;
+        isVisible     = false;
+        graceDeadline = null;
         if (countdownEl) {
+            countdownEl.textContent = '2:00';
             countdownEl.classList.remove('text-red-500');
             countdownEl.classList.add('text-amber-500');
         }
     }
 
+    // 1-second watchdog: enforces hard server-expiry redirect
+    // and updates the countdown while the modal is visible.
     function tick() {
-        var left = msLeft();
-        if (left <= 0) {
-            clearInterval(intervalId);
+        if (msLeft() <= 0) {
+            clearInterval(tickId);
             window.location.href = (window._pdBase || '') + '/index.php?msg=timeout';
             return;
         }
-        if (left <= WARN_MS) {
-            showModal();
+        if (isVisible && graceDeadline) {
+            var left = Math.max(0, graceDeadline - Date.now());
             if (countdownEl) {
                 countdownEl.textContent = fmt(left);
                 if (left <= 30000) {
@@ -697,13 +710,31 @@ window._pdCsrf = '<?= htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8') ?>';
                     countdownEl.classList.add('text-red-500');
                 }
             }
+            if (left <= 0) {
+                clearInterval(tickId);
+                window.location.href = (window._pdBase || '') + '/index.php?msg=timeout';
+            }
         }
+    }
+
+    // Schedule the inactivity alarm
+    function scheduleAlarm() {
+        clearTimeout(inactivityTimer);
+        inactivityTimer = setTimeout(function () {
+            if (!isVisible) showModal();
+        }, INACTIVITY_MS);
+    }
+
+    // Any user interaction resets the idle clock (but not while modal is open)
+    function onActivity() {
+        if (isVisible) return;
+        scheduleAlarm();
     }
 
     if (stayBtn) {
         stayBtn.addEventListener('click', async function () {
-            var btn   = stayBtn;
-            var orig  = btn.innerHTML;
+            var btn  = stayBtn;
+            var orig = btn.innerHTML;
             btn.disabled = true;
             btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Extending…';
             try {
@@ -716,21 +747,25 @@ window._pdCsrf = '<?= htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8') ?>';
                 if (json.ok && json.lastActive) {
                     lastActive = json.lastActive * 1000;
                     hideModal();
-                    btn.disabled = false;
+                    btn.disabled  = false;
                     btn.innerHTML = orig;
+                    scheduleAlarm();
                 } else {
-                    // Session truly expired — go to login
                     window.location.href = (window._pdBase || '') + '/index.php?msg=timeout';
                 }
             } catch (e) {
-                btn.disabled = false;
+                btn.disabled  = false;
                 btn.innerHTML = orig;
             }
         });
     }
 
-    intervalId = setInterval(tick, 1000);
-    tick();
+    ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'].forEach(function (evt) {
+        document.addEventListener(evt, onActivity, { passive: true });
+    });
+
+    tickId = setInterval(tick, 1000);
+    scheduleAlarm(); // start idle countdown
 }());
 </script>
 <script>
