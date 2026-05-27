@@ -1095,61 +1095,71 @@ $_bnItems = [
      x-transition:leave-start="opacity-100"
      x-transition:leave-end="opacity-0"
      class="fixed inset-0 flex items-center justify-center p-5 no-print"
-     style="background:rgba(10,18,35,0.72);backdrop-filter:blur(6px);display:none;z-index:99999;"
+     style="background:rgba(8,15,30,0.78);backdrop-filter:blur(8px);display:none;z-index:99999;"
      @keydown.escape.window="$store.pdConfirm.answer(false)">
     <div x-show="$store.pdConfirm.visible"
-         x-transition:enter="transition ease-out duration-200"
-         x-transition:enter-start="opacity-0 scale-95 translate-y-3"
+         x-transition:enter="transition ease-out duration-220"
+         x-transition:enter-start="opacity-0 scale-90 translate-y-6"
          x-transition:enter-end="opacity-100 scale-100 translate-y-0"
-         style="background:#fff;border-radius:28px;max-width:400px;width:100%;
-                box-shadow:0 40px 100px rgba(0,0,0,0.35);overflow:hidden;">
+         style="background:#fff;border-radius:32px;max-width:380px;width:100%;
+                box-shadow:0 48px 120px rgba(0,0,0,0.45);overflow:hidden;">
 
-        <!-- Coloured accent stripe (matches confirm button colour) -->
-        <div style="height:5px;" :style="$store.pdConfirm.confirmStyle || 'background:#2563eb;'"></div>
+        <!-- ── Hero header: tinted panel + large icon ── -->
+        <div style="padding:44px 32px 32px;text-align:center;position:relative;"
+             :style="'background:' + ($store.pdConfirm.iconBg || '#f0f4ff') + ';'">
+            <!-- soft radial glow behind icon -->
+            <div style="position:absolute;top:0;left:50%;transform:translateX(-50%);
+                        width:240px;height:140px;border-radius:50%;
+                        filter:blur(40px);opacity:0.35;pointer-events:none;"
+                 :style="$store.pdConfirm.confirmStyle || 'background:#2563eb;'"></div>
 
-        <div style="padding:32px 28px 28px;text-align:center;">
-
-            <!-- Icon bubble — background is a tint of the action colour -->
-            <div style="width:64px;height:64px;border-radius:50%;display:flex;align-items:center;
-                        justify-content:center;margin:0 auto 20px;"
-                 :style="'background:' + ($store.pdConfirm.iconBg || '#eff6ff') + ';'">
-                <i :class="$store.pdConfirm.confirmIcon || 'bi bi-question-circle-fill'"
-                   style="font-size:28px;"
-                   :style="'color:' + ($store.pdConfirm.iconColor || '#2563eb') + ';'"></i>
+            <!-- Icon circle (filled with confirm colour) -->
+            <div style="position:relative;width:80px;height:80px;border-radius:50%;
+                        display:flex;align-items:center;justify-content:center;
+                        margin:0 auto 22px;"
+                 :style="($store.pdConfirm.confirmStyle || 'background:#2563eb;') + 'box-shadow:0 10px 32px rgba(0,0,0,0.22);'">
+                <i :class="$store.pdConfirm.confirmIcon || 'bi bi-check-lg'"
+                   style="font-size:34px;color:#fff;"></i>
             </div>
 
             <!-- Title -->
             <p x-text="$store.pdConfirm.message"
-               style="font-size:18px;font-weight:800;color:#0f172a;margin:0 0 8px;line-height:1.35;"></p>
+               style="font-size:20px;font-weight:800;color:#0f172a;margin:0 0 10px;
+                      line-height:1.3;letter-spacing:-0.01em;"></p>
 
             <!-- Subtext -->
             <p x-text="$store.pdConfirm.subtext"
                x-show="$store.pdConfirm.subtext"
-               style="font-size:13.5px;color:#64748b;margin:0 0 4px;line-height:1.55;"></p>
+               style="font-size:13.5px;color:#64748b;margin:0;line-height:1.6;
+                      max-width:290px;display:block;margin-left:auto;margin-right:auto;"></p>
+        </div>
 
-            <!-- Confirm button (full width, prominent) -->
+        <!-- ── Action area ── -->
+        <div style="padding:22px 24px 26px;background:#fff;display:flex;flex-direction:column;gap:10px;">
+
+            <!-- Confirm (primary, full-width) -->
             <button @click="$store.pdConfirm.answer(true)"
                     :style="$store.pdConfirm.confirmStyle || 'background:#2563eb;'"
-                    style="display:flex;align-items:center;justify-content:center;gap:8px;
-                           width:100%;margin-top:24px;padding:15px 20px;border:none;
-                           border-radius:50px;font-size:15px;font-weight:800;
-                           cursor:pointer;color:#fff;
-                           box-shadow:0 4px 18px rgba(0,0,0,0.18);
-                           transition:filter 0.15s;"
-                    onmouseover="this.style.filter='brightness(1.1)'"
-                    onmouseout="this.style.filter=''">
-                <i :class="$store.pdConfirm.confirmIcon"></i>
+                    style="display:flex;align-items:center;justify-content:center;gap:9px;
+                           width:100%;padding:16px 24px;border:none;border-radius:18px;
+                           font-size:15.5px;font-weight:800;cursor:pointer;color:#fff;
+                           letter-spacing:0.01em;
+                           box-shadow:0 6px 22px rgba(0,0,0,0.20);
+                           transition:filter 0.15s,transform 0.12s;"
+                    onmouseover="this.style.filter='brightness(1.1)';this.style.transform='translateY(-1px)'"
+                    onmouseout="this.style.filter='';this.style.transform=''">
+                <i :class="$store.pdConfirm.confirmIcon" style="font-size:16px;"></i>
                 <span x-text="$store.pdConfirm.confirmLabel"></span>
             </button>
 
-            <!-- Cancel (ghost, below) -->
+            <!-- Cancel (subtle) -->
             <button @click="$store.pdConfirm.answer(false)"
-                    style="display:block;width:100%;margin-top:10px;padding:13px 20px;
-                           background:transparent;border:1.5px solid #e2e8f0;border-radius:50px;
-                           font-size:14px;font-weight:600;color:#64748b;cursor:pointer;
+                    style="display:block;width:100%;padding:14px 24px;
+                           background:#f8fafc;border:none;border-radius:18px;
+                           font-size:14.5px;font-weight:600;color:#64748b;cursor:pointer;
                            transition:background 0.12s,color 0.12s;"
                     onmouseover="this.style.background='#f1f5f9';this.style.color='#334155'"
-                    onmouseout="this.style.background='transparent';this.style.color='#64748b'">
+                    onmouseout="this.style.background='#f8fafc';this.style.color='#64748b'">
                 Cancel
             </button>
         </div>
@@ -1200,8 +1210,18 @@ document.addEventListener('alpine:init', () => {
             this.confirmLabel = opts.confirmLabel  || 'Confirm';
             this.confirmIcon  = opts.confirmIcon   || 'bi bi-check-lg';
             this.confirmStyle = opts.confirmStyle  || 'background:#2563eb;';
-            this.iconBg       = opts.iconBg        || '#eff6ff';
             this.iconColor    = opts.iconColor     || '#2563eb';
+            // Auto-derive iconBg tint from confirmStyle colour if not explicitly provided
+            if (opts.iconBg) {
+                this.iconBg = opts.iconBg;
+            } else {
+                const cs = (opts.confirmStyle || '').toLowerCase();
+                if      (cs.includes('#dc2626') || cs.includes('#ef4444') || cs.includes('#b91c1c')) this.iconBg = '#fef2f2';
+                else if (cs.includes('#059669') || cs.includes('#10b981') || cs.includes('#16a34a')) this.iconBg = '#f0fdf4';
+                else if (cs.includes('#d97706') || cs.includes('#f59e0b') || cs.includes('#b45309')) this.iconBg = '#fffbeb';
+                else if (cs.includes('#7c3aed') || cs.includes('#8b5cf6') || cs.includes('#6d28d9')) this.iconBg = '#f5f3ff';
+                else this.iconBg = '#eff6ff';
+            }
             this.visible      = true;
             return new Promise(resolve => { this._resolve = resolve; });
         },
