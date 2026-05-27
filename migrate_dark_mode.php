@@ -4,9 +4,14 @@
  * Adds dark_mode column to the staff table (used by sidebar dark/light toggle).
  * Run once: https://ecpaperlessmd.com/migrate_dark_mode.php
  */
-require_once __DIR__ . '/includes/auth.php';
-require_once __DIR__ . '/includes/db.php';
-requireAdmin();
+// When run via CLI deploy script, bypass HTTP auth
+if (PHP_SAPI !== 'cli') {
+    require_once __DIR__ . '/includes/auth.php';
+    require_once __DIR__ . '/includes/db.php';
+    requireAdmin();
+} else {
+    require_once __DIR__ . '/includes/db.php';
+}
 
 $steps = [];
 
