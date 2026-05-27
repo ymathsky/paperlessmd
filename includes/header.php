@@ -380,11 +380,11 @@ if (!empty($_SESSION['user_id'])) {
 })();
 
 async function sidebarToggleDark() {
-    const html  = document.documentElement;
-    const isOn  = html.classList.contains('dark');
+    const html   = document.documentElement;
+    const isOn   = html.classList.contains('dark');
     const newVal = !isOn;
-    const icon  = document.getElementById('sidebarDarkIcon');
-    const label = document.getElementById('sidebarDarkLabel');
+    const icon   = document.getElementById('sidebarDarkIcon');
+    const label  = document.getElementById('sidebarDarkLabel');
     // Optimistic UI
     html.classList.toggle('dark', newVal);
     if (icon)  { icon.className  = 'bi ' + (newVal ? 'bi-sun-fill' : 'bi-moon-fill') + ' text-base w-5 shrink-0 text-center'; }
@@ -393,8 +393,8 @@ async function sidebarToggleDark() {
         const fd = new FormData();
         fd.append('action',     'toggle_dark_mode');
         fd.append('dark_mode',  newVal ? '1' : '0');
-        fd.append('csrf_token', CSRF);
-        const res  = await fetch(BASE + '/profile.php', { method: 'POST', body: fd });
+        fd.append('csrf_token', <?= json_encode(csrfToken(), JSON_HEX_TAG) ?>);
+        const res  = await fetch(<?= json_encode(BASE_URL . '/profile.php', JSON_HEX_TAG) ?>, { method: 'POST', body: fd });
         const data = await res.json();
         if (!data.ok) throw new Error();
     } catch (e) {
