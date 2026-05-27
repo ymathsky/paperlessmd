@@ -22,13 +22,25 @@ if (!isBilling()) {
         $_oldDrafts     = (int)$pdo->query("SELECT COUNT(*) FROM form_submissions WHERE status = 'draft' AND created_at < DATE_SUB(NOW(), INTERVAL 24 HOUR)")->fetchColumn();
     } catch (PDOException $e) {}
 }
-// Always read dark mode from DB to ensure it reflects the latest toggle
-$_darkMode = false;
+// Always read dark mode + signature status from DB
+$_darkMode      = false;
+$_promptSavedSig = false;
 if (!empty($_SESSION['user_id'])) {
-    $__dmStmt = $pdo->prepare("SELECT dark_mode FROM staff WHERE id = ?");
-    $__dmStmt->execute([$_SESSION['user_id']]);
-    $__dmRow = $__dmStmt->fetch(PDO::FETCH_ASSOC);
-    $_darkMode = !empty($__dmRow['dark_mode']);
+    try {
+        $__dmStmt = $pdo->prepare("SELECT dark_mode, saved_signature FROM staff WHERE id = ?");
+        $__dmStmt->execute([$_SESSION['user_id']]);
+        $__dmRow = $__dmStmt->fetch(PDO::FETCH_ASSOC);
+        $_darkMode = !empty($__dmRow['dark_mode']);
+        // Block navigation until MA/admin saves their pre-saved signature
+        // (skip check on profile.php so they can actually save it)
+        if (in_array($_SESSION['role'] ?? '', ['ma', 'admin'])
+            && empty($__dmRow['saved_signature'])
+            && basename($_SERVER['PHP_SELF']) !== 'profile.php') {
+            $_promptSavedSig = true;
+        }
+    } catch (PDOException $e) {
+        $_darkMode = !empty($_SESSION['dark_mode']);
+    }
 }
 ?><!DOCTYPE html>
 <html lang="en"<?= $_darkMode ? ' class="dark"' : '' ?>>
