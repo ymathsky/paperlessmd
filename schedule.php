@@ -501,13 +501,14 @@ $renderVisitCard = function(array $v, int $idx, bool $showMaName) use ($statusDe
             <!-- ── Primary action row ── -->
             <div style="display:flex;align-items:center;gap:10px;padding:14px 0 16px;" class="no-print">
                 <?php if ($v['status'] === 'pending'): ?>
-                <button onclick="startVisit(<?= $v['id'] ?>, <?= $v['patient_id'] ?>, '<?= h($v['visit_type'] ?? 'routine') ?>', '<?= h($v['visit_subtype'] ?? '') ?>', this)"
+                <?php $visitJson = htmlspecialchars(json_encode(['id'=>$v['id'],'patient_id'=>$v['patient_id'],'visit_type'=>$v['visit_type'] ?? 'routine','visit_subtype'=>$v['visit_subtype'] ?? '']), ENT_QUOTES); ?>
+                <button onclick="openMapPanel(<?= htmlspecialchars(json_encode($v['patient_address'] ?? ''), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($v['patient_name']), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($mapsUrl), ENT_QUOTES) ?>, <?= $visitJson ?>); if(window._pdSendLocation)window._pdSendLocation();"
                         style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;
                                padding:13px 20px;background:#2563eb;color:#fff;border:none;border-radius:50px;
                                font-size:15px;font-weight:800;cursor:pointer;transition:all 0.15s;letter-spacing:0.01em;
                                box-shadow:0 4px 16px rgba(37,99,235,0.45);"
                         onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#2563eb'">
-                    <i class="bi bi-play-fill"></i> Start Visit &nbsp;→
+                    <i class="bi bi-compass-fill"></i> Navigate &nbsp;→
                 </button>
                 <?php elseif ($v['status'] === 'en_route'): ?>
                 <a href="<?= BASE_URL . firstFormUrl($v['visit_type'] ?? 'routine', $v['patient_id'], $v['id'], $v['visit_subtype'] ?? '') ?>"
@@ -1562,6 +1563,17 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeEditMod
     <i class="bi bi-hourglass-split spin" style="color:#3b82f6;"></i> Loading map…
   </div>
 
+  <div id="mapStartVisitBar" style="display:none;padding:12px 16px;border-top:1px solid rgba(255,255,255,0.08);">
+    <button id="mapStartVisitBtn"
+            style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;
+                   padding:14px 20px;background:#2563eb;color:#fff;border:none;border-radius:50px;
+                   font-size:15px;font-weight:800;cursor:pointer;transition:background 0.15s;
+                   box-shadow:0 4px 16px rgba(37,99,235,0.45);"
+            onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#2563eb'">
+      <i class="bi bi-play-fill"></i> Start Visit &nbsp;→
+    </button>
+  </div>
+
 </div>
 
 <script>
@@ -1574,11 +1586,25 @@ var userMarker   = null;
 var routeLayer   = null;
 var leafletReady = false;
 
-window.openMapPanel = function (address, name, gmUrl) {
+window.openMapPanel = function (address, name, gmUrl, visitData) {
     document.getElementById('mapPanelName').textContent = name || 'Patient';
     document.getElementById('mapPanelAddr').textContent = address || '';
     document.getElementById('mapPanelGmBtn').href = gmUrl || '#';
     setMapStatus('<i class="bi bi-hourglass-split spin" style="color:#3b82f6;"></i> Loading map…');
+
+    // Start Visit button in map panel
+    var bar = document.getElementById('mapStartVisitBar');
+    var btn = document.getElementById('mapStartVisitBtn');
+    if (visitData && visitData.id) {
+        btn.onclick = function () {
+            closeMapPanel();
+            // Find the original card button and delegate, or call startVisit directly
+            startVisit(visitData.id, visitData.patient_id, visitData.visit_type, visitData.visit_subtype || '', btn);
+        };
+        bar.style.display = '';
+    } else {
+        bar.style.display = 'none';
+    }
 
     document.getElementById('mapPanel').classList.add('map-open');
     document.getElementById('mapOverlay').classList.add('map-open');
