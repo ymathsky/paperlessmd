@@ -50,6 +50,34 @@ function requireLogin(): void
         header('Location: ' . BASE_URL . '/index.php?msg=timeout');
         exit;
     }
+
+    // Verify the user still exists and is active in the DB.
+    // $pdo is set by db.php which is always included before requireLogin() is called.
+    global $pdo;
+    if (isset($pdo)) {
+        try {
+            $chk = $pdo->prepare('SELECT 1 FROM staff WHERE id = ? AND active = 1 LIMIT 1');
+            $chk->execute([(int)$_SESSION['user_id']]);
+            if (!$chk->fetchColumn()) {
+                $saveIntended = !_isApiRequest();
+                if ($saveIntended) {
+                    $intendedUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
+                        . '://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+                }
+                session_unset();
+                session_destroy();
+                session_start();
+                if ($saveIntended) {
+                    $_SESSION['intended_url'] = $intendedUrl;
+                }
+                header('Location: ' . BASE_URL . '/index.php?msg=timeout');
+                exit;
+            }
+        } catch (PDOException $e) {
+            // DB unavailable (e.g. during install) — allow through
+        }
+    }
+
     $_SESSION['last_active'] = time();
 }
 
