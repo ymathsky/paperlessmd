@@ -73,11 +73,11 @@ include __DIR__ . '/../includes/header.php';
                                   focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition focus:bg-white">
                 </div>
                 <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">C. Identification Number</label>
-                    <input type="text" name="id_number"
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">C. Medicare Beneficiary ID (MBI)</label>
+                    <input type="text" name="id_number" value="<?= h($patient['insurance_id'] ?? '') ?>"
                            class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
                                   focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition focus:bg-white"
-                           placeholder="Optional">
+                           placeholder="Patient Medicare ID">
                 </div>
             </div>
 
@@ -178,15 +178,6 @@ If secondary insurance is available will bill 20% to secondary insurance.</texta
                     </label>
                 </div>
 
-            <!-- H. Additional Information -->
-            <div>
-                <label class="block text-sm font-semibold text-slate-700 mb-1.5">H. Additional Information</label>
-                <textarea name="additional_info" rows="2"
-                          class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
-                                 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition focus:bg-white resize-none"
-                          placeholder="Additional notes..."></textarea>
-            </div>
-
             <p class="text-xs text-slate-500 leading-relaxed">
                 This notice gives our opinion, not an official Medicare decision. If you have other questions on this notice or Medicare billing, call <strong>1-800-MEDICARE</strong> (1-800-633-4227/TTY: 1-877-486-2048).
                 Signing below means that you have received and understand this notice. You may ask to receive a copy.
@@ -211,4 +202,6 @@ If secondary insurance is available will bill 20% to secondary insurance.</texta
 </div><!-- /card -->
 </div><!-- /max-w-3xl -->
 
+<?php include __DIR__ . '/../includes/wound_photo_panel.php'; ?>
+<?php include __DIR__ . '/../includes/rx_pad_panel.php'; ?>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

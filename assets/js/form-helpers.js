@@ -209,48 +209,73 @@
 
         function buildMedRow(idx, prefilled) {
             var tr = document.createElement('tr');
-            tr.className = prefilled ? 'med-prefilled' : '';
+            tr.className = (prefilled ? 'med-prefilled' : '') + ' med-row-open'; // new rows start expanded
 
             // hidden med_id
             var hidId = document.createElement('input');
             hidId.type = 'hidden'; hidId.name = 'med_id_' + idx; hidId.value = '0';
             tr.appendChild(hidId);
 
+            // Summary cell (collapsed view)
+            var tdSum = document.createElement('td');
+            tdSum.className = 'med-sum-cell';
+            tdSum.innerHTML =
+                '<div class="flex items-center gap-2">' +
+                '  <span class="med-sum-badge">&mdash;</span>' +
+                '  <span class="med-sum-name flex-1 truncate"><em class="text-slate-400">Tap to edit&hellip;</em></span>' +
+                '  <i class="bi bi-chevron-down text-slate-400 text-xs shrink-0"></i>' +
+                '</div>';
+            tdSum.addEventListener('click', function () { tr.classList.add('med-row-open'); });
+            tr.appendChild(tdSum);
+
             // Type cell
             var tdType = document.createElement('td');
-            tdType.className = 'px-3 py-2';
+            tdType.className = 'px-3 py-2 med-detail-td med-td-type';
             tdType.setAttribute('data-label', 'Type');
-            tdType.innerHTML =
-                '<select name="med_type_' + idx + '" ' +
-                '        class="w-full px-2 py-2 border border-slate-200 rounded-lg text-xs bg-white ' +
-                '               focus:outline-none focus:ring-2 focus:ring-indigo-400">' +
-                '  <option value="">&mdash;</option>' +
-                '  <option>New</option><option>Refill</option><option>D/C</option>' +
-                '</select>';
+            var typeSelect = document.createElement('select');
+            typeSelect.name = 'med_type_' + idx;
+            typeSelect.className = 'w-full px-2 py-2 border border-slate-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-red-400';
+            typeSelect.innerHTML = '<option value="">&mdash;</option><option>New</option><option>Refill</option><option>D/C</option>';
+            typeSelect.addEventListener('change', function () {
+                var badge = tr.querySelector('.med-sum-badge');
+                if (badge) badge.textContent = typeSelect.value || '\u2014';
+            });
+            tdType.appendChild(typeSelect);
 
             // Name cell
             var tdName = document.createElement('td');
-            tdName.className = 'px-3 py-2';
+            tdName.className = 'px-3 py-2 med-detail-td med-td-med';
             tdName.setAttribute('data-label', 'Medication & Dose');
-            tdName.innerHTML =
-                '<input type="text" name="med_name_' + idx + '" value="" ' +
-                '       class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white ' +
-                '              focus:outline-none focus:ring-2 focus:ring-indigo-400" ' +
-                '       placeholder="Medication name and dose">';
+            var nameInput = document.createElement('input');
+            nameInput.type = 'text'; nameInput.name = 'med_name_' + idx; nameInput.value = '';
+            nameInput.className = 'w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-400';
+            nameInput.placeholder = 'Medication name and dose';
+            nameInput.addEventListener('input', function () {
+                var nameEl = tr.querySelector('.med-sum-name');
+                if (nameEl) nameEl.textContent = nameInput.value || '';
+            });
+            tdName.appendChild(nameInput);
 
             // Freq cell
             var tdFreq = document.createElement('td');
-            tdFreq.className = 'px-3 py-2';
+            tdFreq.className = 'px-3 py-2 med-detail-td med-td-freq';
             tdFreq.setAttribute('data-label', 'Frequency');
             tdFreq.innerHTML =
                 '<input type="text" name="med_freq_' + idx + '" value="" ' +
                 '       class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-white ' +
-                '              focus:outline-none focus:ring-2 focus:ring-indigo-400" ' +
+                '              focus:outline-none focus:ring-2 focus:ring-red-400" ' +
                 '       placeholder="e.g. BID">';
 
-            // Remove cell
+            // Actions cell (collapse + remove)
             var tdRm = document.createElement('td');
-            tdRm.className = 'px-2 py-2 w-8';
+            tdRm.className = 'px-2 py-2 no-print med-detail-td med-td-actions';
+            var collapseBtn = document.createElement('button');
+            collapseBtn.type = 'button';
+            collapseBtn.className = 'med-collapse-btn';
+            collapseBtn.title = 'Minimize';
+            collapseBtn.innerHTML = '<i class="bi bi-chevron-up"></i>';
+            collapseBtn.addEventListener('click', function () { tr.classList.remove('med-row-open'); });
+            tdRm.appendChild(collapseBtn);
             var rmBtn = document.createElement('button');
             rmBtn.type = 'button';
             rmBtn.className = 'med-remove-btn text-slate-300 hover:text-red-500 transition-colors no-print';

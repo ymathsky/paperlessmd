@@ -16,7 +16,8 @@ $activeNav = 'patients';
 
 /* ── All form submissions (ASC for trend charts) ── */
 $formsStmt = $pdo->prepare("
-    SELECT fs.*, s.full_name AS ma_name
+    SELECT fs.*, s.full_name AS ma_name,
+           COALESCE(NULLIF(fs.provider_name,''), s.full_name) AS display_provider
     FROM form_submissions fs
     LEFT JOIN staff s ON s.id = fs.ma_id
     WHERE fs.patient_id = ?
@@ -516,9 +517,9 @@ include __DIR__ . '/includes/header.php';
                                 <span class="text-xs text-slate-400">
                                     <i class="bi bi-clock mr-0.5"></i><?= date('g:i a', strtotime($f['created_at'])) ?>
                                 </span>
-                                <?php if ($f['ma_name']): ?>
+                                <?php if ($f['display_provider']): ?>
                                 <span class="text-xs text-slate-400">
-                                    <i class="bi bi-person mr-0.5"></i><?= h($f['ma_name']) ?>
+                                    <i class="bi bi-person mr-0.5"></i><?= h($f['display_provider']) ?>
                                 </span>
                                 <?php endif; ?>
                             </div>

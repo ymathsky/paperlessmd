@@ -35,3 +35,15 @@ try {
 }
 date_default_timezone_set($tz);
 define('APP_TIMEZONE', $tz);
+
+/* ── Sync MySQL session timezone so NOW() matches the app timezone ── */
+try {
+    $now    = new DateTime('now', new DateTimeZone($tz));
+    $offset = $now->getOffset(); // seconds from UTC (e.g. -18000 for CDT)
+    $sign   = $offset >= 0 ? '+' : '-';
+    $absOff = abs($offset);
+    $tzOffset = sprintf("%s%02d:%02d", $sign, intdiv($absOff, 3600), ($absOff % 3600) / 60);
+    $pdo->exec("SET time_zone = '$tzOffset'");
+} catch (Exception $e) {
+    // Non-fatal — timestamps may be off if this fails
+}

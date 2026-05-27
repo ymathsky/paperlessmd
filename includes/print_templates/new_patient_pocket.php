@@ -1,6 +1,6 @@
-﻿<?php
+<?php
 /**
- * Print Template: New Patient Pocket
+ * Print Template: New Patient Packet
  * Renders as 6 SEPARATE forms, each with its own header + signature block.
  * Forms: 1-CS  2-CCM  3-ABN  4-Wound Care  5-PHI  6-Patient Fusion
  */
@@ -9,6 +9,13 @@ $ptDob   = !empty($patient['dob']) ? date('m/d/Y', strtotime($patient['dob'])) :
 $sigDate = date('m/d/Y', strtotime($f['created_at']));
 $fd      = is_string($f['form_data']) ? (json_decode($f['form_data'], true) ?? []) : ($f['form_data'] ?? []);
 $visitDate = !empty($fd['form_date']) ? date('m/d/Y', strtotime($fd['form_date'])) : $sigDate;
+
+$_coFd   = is_array($fd) ? ($fd['company'] ?? '') : '';
+$_coPt   = $patient['company'] ?? '';
+$_coSrc  = $_coFd ?: $_coPt;
+$_coName = ($_coSrc === 'Visiting Medical Physician Inc.') ? 'Visiting Medical Physician Inc.' : 'Beyond Wound Care Inc.';
+$_coUC   = strtoupper($_coName);
+$_coAbb  = ($_coName === 'Visiting Medical Physician Inc.') ? 'VMP' : 'BWC';
 
 /* ΓöÇΓöÇ Helpers ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
 function _npp(array $fd, string $k, string $fb = '&nbsp;'): string {
@@ -121,19 +128,24 @@ function nppSigBlock(array $f, array $fd, string $sigDate): void { ?>
             </td>
         </tr>
     </table>
-    <!-- Provider -->
+</div>
+<?php }
+
+function nppProviderSigBlock(array $f, array $fd): void { ?>
+<?php if (empty($f['provider_signature']) && empty($fd['provider_print_name']) && empty($f['provider_name']) && empty($fd['provider_name']) && empty($fd['provider_npi'])) return; ?>
+<div style="margin-top:12pt;">
     <table style="width:100%;border-collapse:collapse;font-size:9pt;">
         <tr>
             <td style="width:44%;padding-right:16pt;vertical-align:bottom;">
                 <div style="position:relative;min-height:54pt;border-bottom:1px solid #000;">
-                    <?php if (!empty($fd['provider_signature'])): ?>
-                    <img src="<?= h($fd['provider_signature']) ?>" class="bwc-sig-img" alt="Provider Signature">
+                    <?php if (!empty($f['provider_signature'])): ?>
+                    <img src="<?= h($f['provider_signature']) ?>" class="bwc-sig-img" alt="Provider Signature">
                     <?php endif; ?>
                 </div>
                 <div class="bwc-sig-label">Provider / Physician Signature</div>
             </td>
             <td style="width:30%;padding-right:16pt;vertical-align:bottom;">
-                <div style="min-height:54pt;border-bottom:1px solid #000;display:flex;align-items:flex-end;padding-bottom:2pt;"><?= h($fd['provider_print_name'] ?? $fd['provider_name'] ?? '') ?></div>
+                <div style="min-height:54pt;border-bottom:1px solid #000;display:flex;align-items:flex-end;padding-bottom:2pt;"><?= h($fd['provider_print_name'] ?? $f['provider_name'] ?? $fd['provider_name'] ?? '') ?></div>
                 <div class="bwc-sig-label">Provider Name (Print)</div>
             </td>
             <td style="width:26%;vertical-align:bottom;">
@@ -147,15 +159,23 @@ function nppSigBlock(array $f, array $fd, string $sigDate): void { ?>
 </div>
 <?php }
 
-function nppFooter(string $formTitle, string $ptName, string $sigDate): void { ?>
+function nppFooter(string $formTitle, string $ptName, string $sigDate, string $coName = ''): void { ?>
 <p style="font-size:7pt;color:#aaa;text-align:center;margin-top:8pt;border-top:.5pt solid #e2e8f0;padding-top:3pt;">
-    <?= h($formTitle) ?> &mdash; <?= h(PRACTICE_NAME) ?> &mdash; <?= $sigDate ?> &mdash; <?= $ptName ?>
+    <?= h($formTitle) ?> &mdash; <?= h($coName ?: PRACTICE_NAME) ?> &mdash; <?= $sigDate ?> &mdash; <?= $ptName ?>
 </p>
 <?php }
 ?>
 
 <style>
   @page { size: letter; margin: 0.4in 0.5in; }
+    @media print {
+        html, body { background: #fff !important; color: #000 !important; }
+        .bwc-form, .bwc-form * { color-scheme: light !important; }
+        .bwc-form { background: #fff !important; color: #000 !important; }
+        .bwc-form * { background-color: transparent !important; }
+        .bwc-form table, .bwc-form td, .bwc-form th { color: #000 !important; }
+        .bwc-form img { background: #fff !important; }
+    }
   .bwc-sig-img { max-height: 50pt; max-width: 220pt; object-fit: contain; position: absolute; bottom: 2pt; }
   .npp-doc { page-break-after: always; }
   .npp-doc:last-child { page-break-after: auto; }
@@ -253,7 +273,8 @@ function nppFooter(string $formTitle, string $ptName, string $sigDate): void { ?
 <?php endif; ?>
 
 <?php nppSigBlock($f, $fd, $sigDate); ?>
-<?php nppFooter('Visit Consent / CS', $ptName, $sigDate); ?>
+<?php nppProviderSigBlock($f, $fd); ?>
+<?php nppFooter('Visit Consent / CS', $ptName, $sigDate, $_coName); ?>
 </div>
 
 
@@ -264,7 +285,7 @@ function nppFooter(string $formTitle, string $ptName, string $sigDate): void { ?
 <?php nppFormHeader('Chronic Care Management (CCM) Consent', $ptName, $ptDob, $visitDate, $patient); ?>
 
 <p class="npp-body" style="margin-bottom:6pt;text-align:justify;">
-    By signing this form, I consent to <strong><?= h(PRACTICE_NAME) ?></strong> providing Chronic Care Management (CCM) Services.
+    By signing this form, I consent to <strong><?= h($_coName) ?></strong> providing Chronic Care Management (CCM) Services.
     CCM Services are available because I have been diagnosed with two (2) or more chronic conditions expected to last at least twelve (12) months.
     CCM Services include 24/7 access to a health care provider, systematic assessment of health care needs, medication reviews, a plan of care, and management of care transitions.
 </p>
@@ -295,7 +316,7 @@ function nppFooter(string $formTitle, string $ptName, string $sigDate): void { ?
 
 <div style="background:#f0fdf4;border:.5pt solid #bbf7d0;padding:5pt;font-size:8pt;color:#166534;margin-bottom:7pt;">
     <strong>Beneficiary Rights:</strong> You have the right to stop CCM Services at any time by revoking this Agreement, effective at the end of the then-current month.
-    You may revoke verbally or in writing to <strong><?= h(PRACTICE_NAME) ?></strong>.
+    You may revoke verbally or in writing to <strong><?= h($_coName) ?></strong>.
 </div>
 
 <div class="npp-g2" style="margin-bottom:6pt;">
@@ -304,7 +325,7 @@ function nppFooter(string $formTitle, string $ptName, string $sigDate): void { ?
 </div>
 
 <?php nppSigBlock($f, $fd, $sigDate); ?>
-<?php nppFooter('CCM Consent', $ptName, $sigDate); ?>
+<?php nppFooter('CCM Consent', $ptName, $sigDate, $_coName); ?>
 </div>
 
 
@@ -315,7 +336,7 @@ function nppFooter(string $formTitle, string $ptName, string $sigDate): void { ?
 <?php nppFormHeader('Advance Beneficiary Notice of Non-Coverage (ABN) — Form CMS-R-131', $ptName, $ptDob, $visitDate, $patient); ?>
 
 <div class="npp-g2" style="margin-bottom:6pt;">
-    <div><span class="npp-lbl">A. Notifier</span><span class="npp-fld"><?= _npp($fd,'notifier', h(PRACTICE_NAME)) ?></span></div>
+    <div><span class="npp-lbl">A. Notifier</span><span class="npp-fld"><?= _npp($fd,'notifier', h($_coName)) ?></span></div>
     <div><span class="npp-lbl">B. Patient Name</span><span class="npp-fld"><?= $ptName ?></span></div>
 </div>
 <div class="npp-g2" style="margin-bottom:6pt;">
@@ -362,7 +383,7 @@ foreach ($abnOpts as $opt => $text): ?>
 <?php endif; ?>
 
 <?php nppSigBlock($f, $fd, $sigDate); ?>
-<?php nppFooter('Advance Beneficiary Notice (ABN)', $ptName, $sigDate); ?>
+<?php nppFooter('Advance Beneficiary Notice (ABN)', $ptName, $sigDate, $_coName); ?>
 </div>
 
 
@@ -378,8 +399,8 @@ foreach ($abnOpts as $opt => $text): ?>
 </div>
 
 <p style="font-size:7.8pt;line-height:1.4;color:#1e293b;margin:0 0 4pt;text-align:justify;">
-    Patient/caregiver hereby voluntarily consents to wound care treatment by the provider (MD/NP) of <strong>BEYOND WOUND CARE INC.</strong>
-    Patient/Caregiver understands that this consent form will be valid and remain in effect as long as the patient remains active and receives services and treatments at BEYOND WOUND CARE INC.
+    Patient/caregiver hereby voluntarily consents to wound care treatment by the provider (MD/NP) of <strong><?= $_coUC ?></strong>
+    Patient/Caregiver understands that this consent form will be valid and remain in effect as long as the patient remains active and receives services and treatments at <?= $_coUC ?>.
     <strong>Patient has the right to give or refuse consent to any proposed service or treatment.</strong>
 </p>
 
@@ -418,7 +439,7 @@ foreach ($abnOpts as $opt => $text): ?>
 </p>
 
 <?php nppSigBlock($f, $fd, $sigDate); ?>
-<?php nppFooter('Informed Consent for Wound Care Treatment', $ptName, $sigDate); ?>
+<?php nppFooter('Informed Consent for Wound Care Treatment', $ptName, $sigDate, $_coName); ?>
 </div>
 
 
@@ -429,7 +450,7 @@ foreach ($abnOpts as $opt => $text): ?>
 <?php nppFormHeader('Authorization to Disclose / Obtain PHI — Illinois DHS', $ptName, $ptDob, $visitDate, $patient); ?>
 
 <p class="npp-body" style="margin-bottom:5pt;">
-    I authorize <strong><?= h(PRACTICE_NAME) ?></strong> to
+    I authorize <strong><?= h($_coName) ?></strong> to
     <strong><?= isset($fd['auth_type']) ? h(ucwords(str_replace('_', ' ', $fd['auth_type']))) : '_______________' ?></strong>
     the following types of records:
 </p>
@@ -459,13 +480,13 @@ foreach ($abnOpts as $opt => $text): ?>
 <?php endfor; ?>
 
 <div style="background:#f8fafc;border:.5pt solid #e2e8f0;padding:5pt;font-size:7.5pt;color:#64748b;line-height:1.5;margin-top:5pt;margin-bottom:6pt;">
-    <strong style="color:#475569;">Right to Revoke:</strong> You may revoke this authorization in writing at any time to <?= h(PRACTICE_NAME) ?>.
+    <strong style="color:#475569;">Right to Revoke:</strong> You may revoke this authorization in writing at any time to <?= h($_coName) ?>.
     &nbsp;<strong style="color:#475569;">Consequences:</strong> Treatment may not be conditioned on signing this authorization.
     &nbsp;<strong style="color:#475569;">Re-disclosure:</strong> Information disclosed may be subject to re-disclosure by the recipient unless prohibited by law.
 </div>
 
 <?php nppSigBlock($f, $fd, $sigDate); ?>
-<?php nppFooter('PHI Authorization (IL DHS)', $ptName, $sigDate); ?>
+<?php nppFooter('PHI Authorization (IL DHS)', $ptName, $sigDate, $_coName); ?>
 </div>
 
 
@@ -510,5 +531,5 @@ foreach ($abnOpts as $opt => $text): ?>
 <?php endif; ?>
 
 <?php nppSigBlock($f, $fd, $sigDate); ?>
-<?php nppFooter('Patient Fusion Portal Consent', $ptName, $sigDate); ?>
+<?php nppFooter('Patient Fusion Portal Consent', $ptName, $sigDate, $_coName); ?>
 </div>

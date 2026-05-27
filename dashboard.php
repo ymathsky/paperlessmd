@@ -17,7 +17,7 @@ if (isAdmin() || isBilling()) {
     $pendingUpload = (int)$pdo->query("SELECT COUNT(*) FROM form_submissions WHERE status = 'signed'")->fetchColumn();
 } else {
     $maId = (int)$_SESSION['user_id'];
-    $s1 = $pdo->prepare("SELECT COUNT(*) FROM patients WHERE assigned_ma = ?"); $s1->execute([$maId]); $totalPatients = (int)$s1->fetchColumn();
+    $s1 = $pdo->prepare("SELECT COUNT(DISTINCT patient_id) FROM `schedule` WHERE ma_id = ?"); $s1->execute([$maId]); $totalPatients = (int)$s1->fetchColumn();
     $s2 = $pdo->prepare("SELECT COUNT(*) FROM form_submissions WHERE ma_id = ? AND DATE(created_at) = ?"); $s2->execute([$maId, $today]); $formsToday = (int)$s2->fetchColumn();
     $s3 = $pdo->prepare("SELECT COUNT(*) FROM wound_photos WHERE uploaded_by = ? AND DATE(created_at) = ?"); $s3->execute([$maId, $today]); $photosToday = (int)$s3->fetchColumn();
     $s4 = $pdo->prepare("SELECT COUNT(*) FROM form_submissions WHERE ma_id = ? AND status = 'signed'"); $s4->execute([$maId]); $pendingUpload = (int)$s4->fetchColumn();
@@ -28,24 +28,57 @@ $billingSignedForms   = (int)$pdo->query("SELECT COUNT(*) FROM form_submissions 
 $billingSignedToday   = (int)$pdo->query("SELECT COUNT(*) FROM form_submissions WHERE status IN ('signed','uploaded') AND DATE(created_at) = '$today'")->fetchColumn();
 $billingPendingUpload = $pendingUpload;
 
-// Today's schedule for current user (MAs see own; admins see all)
-$myScheduleStmt = $pdo->prepare("
-    SELECT sc.*,
-           CONCAT(p.first_name,' ',p.last_name) AS patient_name,
-           p.address AS patient_address,
-           p.id AS patient_id
-    FROM `schedule` sc
-    JOIN patients p ON p.id = sc.patient_id
-    WHERE sc.visit_date = ? AND sc.ma_id = ?
-    ORDER BY sc.visit_order ASC, sc.visit_time ASC
-    LIMIT 6
+// Provider filter — MAs can pin a specific provider's route
+if (array_key_exists('filter_provider', $_GET)) {
+    $_SESSION['dash_provider_filter'] = $_GET['filter_provider']; // '' clears it
+}
+$providerFilter = $_SESSION['dash_provider_filter'] ?? '';
+
+// All active providers (for the filter dropdown)
+$_pvStmt = $pdo->query("
+    SELECT full_name FROM staff
+    WHERE active = 1 AND role = 'provider'
+    ORDER BY full_name ASC
 ");
-$myScheduleStmt->execute([$today, $_SESSION['user_id']]);
+$providerList = $_pvStmt->fetchAll(PDO::FETCH_COLUMN);
+
+// Today's schedule for current user (MAs filter by provider when set, else own visits)
+if (!isAdmin() && $providerFilter !== '') {
+    $myScheduleStmt = $pdo->prepare("
+        SELECT sc.*,
+               CONCAT(p.first_name,' ',p.last_name) AS patient_name,
+               p.address AS patient_address,
+               p.id AS patient_id
+        FROM `schedule` sc
+        JOIN patients p ON p.id = sc.patient_id
+        WHERE sc.visit_date = ? AND sc.provider_name = ?
+        ORDER BY sc.visit_order ASC, sc.visit_time ASC
+        LIMIT 6
+    ");
+    $myScheduleStmt->execute([$today, $providerFilter]);
+} else {
+    $myScheduleStmt = $pdo->prepare("
+        SELECT sc.*,
+               CONCAT(p.first_name,' ',p.last_name) AS patient_name,
+               p.address AS patient_address,
+               p.id AS patient_id
+        FROM `schedule` sc
+        JOIN patients p ON p.id = sc.patient_id
+        WHERE sc.visit_date = ? AND sc.ma_id = ?
+        ORDER BY sc.visit_order ASC, sc.visit_time ASC
+        LIMIT 6
+    ");
+    $myScheduleStmt->execute([$today, $_SESSION['user_id']]);
+}
 $mySchedule = $myScheduleStmt->fetchAll();
-$scheduleTotalToday = (int)$pdo->prepare("SELECT COUNT(*) FROM `schedule` WHERE visit_date=? AND ma_id=?")->execute([$today,$_SESSION['user_id']]) ? $pdo->prepare("SELECT COUNT(*) FROM `schedule` WHERE visit_date=? AND ma_id=?")->execute([$today,$_SESSION['user_id']]) : 0;
-// simpler count
-$scCountStmt = $pdo->prepare("SELECT COUNT(*) FROM `schedule` WHERE visit_date=? AND ma_id=?");
-$scCountStmt->execute([$today, $_SESSION['user_id']]);
+
+if (!isAdmin() && $providerFilter !== '') {
+    $scCountStmt = $pdo->prepare("SELECT COUNT(*) FROM `schedule` WHERE visit_date=? AND provider_name=?");
+    $scCountStmt->execute([$today, $providerFilter]);
+} else {
+    $scCountStmt = $pdo->prepare("SELECT COUNT(*) FROM `schedule` WHERE visit_date=? AND ma_id=?");
+    $scCountStmt->execute([$today, $_SESSION['user_id']]);
+}
 $scheduleTotalToday = (int)$scCountStmt->fetchColumn();
 
 // Unsigned (draft) forms — admins see all, MAs see only their own
@@ -263,6 +296,26 @@ $formMeta = [
     'il_disclosure'      => ['label' => 'IL Disclosure Auth.',       'icon' => 'bi-file-earmark-text',   'bg' => 'bg-slate-100',   'text' => 'text-slate-600'],
 ];
 
+// ── FAB context: en_route patient first, then first scheduled, then no-patient
+$_fabPid  = 0;
+$_fabPArr = ['first_name' => '', 'last_name' => '', 'dob' => ''];
+foreach ($mySchedule as $_fSv) {
+    if ($_fSv['status'] === 'en_route') { $_fabPid = (int)$_fSv['patient_id']; break; }
+}
+if (!$_fabPid && !empty($mySchedule)) {
+    $_fabPid = (int)$mySchedule[0]['patient_id'];
+}
+if ($_fabPid) {
+    try {
+        $_fpStmt = $pdo->prepare("SELECT first_name, last_name, dob FROM patients WHERE id = ? LIMIT 1");
+        $_fpStmt->execute([$_fabPid]);
+        $_fpRow = $_fpStmt->fetch(PDO::FETCH_ASSOC);
+        if ($_fpRow) $_fabPArr = $_fpRow;
+    } catch (PDOException $e) { /* non-fatal */ }
+}
+$patient_id = $_fabPid;
+$patient    = $_fabPArr;
+
 include __DIR__ . '/includes/header.php';
 ?>
 
@@ -276,36 +329,460 @@ include __DIR__ . '/includes/header.php';
 <!-- ═══════════════ LEFT / MAIN COLUMN ═══════════════════════════════════ -->
 <div class="flex-1 min-w-0">
 
-<!-- Stats -->
-<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-7">
+<!-- ── Today's Route ── TOP of main column ─────────────────────────── -->
+<?php if (canAccessClinical()): ?>
+<div class="bg-white rounded-2xl shadow-sm mb-7 <?= $scheduleTotalToday > 0 ? 'border-2 border-indigo-200 shadow-indigo-50' : 'border border-slate-100' ?>" style="overflow:visible">
+
+    <!-- Header -->
+    <div class="px-5 py-4 flex items-center gap-3 <?= $scheduleTotalToday > 0 ? 'bg-gradient-to-r from-indigo-600 to-violet-600' : 'bg-slate-50 border-b border-slate-100' ?>">
+        <!-- Icon -->
+        <div class="w-10 h-10 <?= $scheduleTotalToday > 0 ? 'bg-white/20' : 'bg-indigo-100' ?> rounded-xl grid place-items-center shrink-0">
+            <i class="bi bi-calendar3 <?= $scheduleTotalToday > 0 ? 'text-white' : 'text-indigo-500' ?> text-lg"></i>
+        </div>
+        <!-- Title -->
+        <div class="flex-1 min-w-0">
+            <h3 class="font-extrabold <?= $scheduleTotalToday > 0 ? 'text-white' : 'text-slate-800' ?> text-base leading-tight flex items-center gap-2">
+                Today's Route
+                <?php if ($scheduleTotalToday): ?>
+                <span class="px-2 py-0.5 <?= $scheduleTotalToday > 0 ? 'bg-white/25 text-white' : 'bg-indigo-100 text-indigo-700' ?> text-xs font-bold rounded-full">
+                    <?= $scheduleTotalToday ?>
+                </span>
+                <?php endif; ?>
+            </h3>
+            <p class="text-xs <?= $scheduleTotalToday > 0 ? 'text-indigo-200' : 'text-slate-400' ?> mt-0.5"><?= date('l, F j') ?></p>
+        </div>
+        <!-- Full schedule link -->
+        <a href="<?= BASE_URL ?>/schedule.php"
+           class="text-xs font-semibold whitespace-nowrap transition shrink-0
+                  <?= $scheduleTotalToday > 0 ? 'text-indigo-200 hover:text-white' : 'text-indigo-500 hover:text-indigo-700' ?>">
+            Full schedule →
+        </a>
+    </div>
+
+    <!-- Provider filter (MA only) -->
+    <?php if (!isAdmin() && !empty($providerList)):
+        $pvParts    = $providerFilter !== '' ? explode(' ', $providerFilter) : [];
+        $pvInitials = $providerFilter !== '' ? strtoupper(substr($pvParts[0],0,1).(isset($pvParts[1])?substr($pvParts[1],0,1):'')) : '';
+        $pvCount    = count($providerList);
+    ?>
+    <div class="px-4 pt-2 pb-3 border-b border-slate-100" id="pvFilterWrap">
+
+        <!-- Trigger button -->
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Viewing schedule for</p>
+        <button type="button" id="pvTriggerBtn" onclick="togglePvDropdown()"
+                class="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border-2 transition-all duration-200 group
+                       <?= $providerFilter !== ''
+                           ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200'
+                           : 'bg-white border-slate-200 text-slate-700 hover:border-indigo-400 hover:shadow-sm' ?>">
+            <?php if ($providerFilter !== ''): ?>
+            <!-- Selected provider avatar -->
+            <span class="w-10 h-10 rounded-xl bg-white/25 text-white font-extrabold text-sm grid place-items-center shrink-0 ring-2 ring-white/30">
+                <?= h($pvInitials) ?>
+            </span>
+            <span class="flex-1 text-left">
+                <span class="block font-extrabold text-sm leading-tight"><?= h($providerFilter) ?></span>
+                <span class="block text-xs text-indigo-200 mt-0.5">Active filter — tap to change</span>
+            </span>
+            <a href="?filter_provider=" onclick="event.stopPropagation()"
+               class="shrink-0 w-8 h-8 rounded-xl bg-white/20 hover:bg-white/35 grid place-items-center transition-colors" title="Clear">
+                <i class="bi bi-x-lg text-white text-sm"></i>
+            </a>
+            <?php else: ?>
+            <!-- Default: my visits -->
+            <span class="w-10 h-10 rounded-xl bg-indigo-50 group-hover:bg-indigo-100 grid place-items-center shrink-0 transition-colors">
+                <i class="bi bi-calendar-check-fill text-indigo-500 text-base"></i>
+            </span>
+            <span class="flex-1 text-left">
+                <span class="block font-extrabold text-sm leading-tight text-slate-800">My Visits</span>
+                <span class="block text-xs text-slate-400 mt-0.5"><?= $pvCount ?> provider<?= $pvCount !== 1 ? 's' : '' ?> available</span>
+            </span>
+            <i class="bi bi-chevron-down text-slate-400 text-sm shrink-0 transition-transform duration-200" id="pvChevron"></i>
+            <?php endif; ?>
+        </button>
+
+        <!-- Dropdown panel — fixed-position, escapes card overflow -->
+        <div id="pvDropdown"
+             class="z-[999] bg-white rounded-2xl border border-slate-200 overflow-hidden"
+             style="position:fixed;display:none;opacity:0;transform:translateY(-6px);
+                    transition:opacity .15s ease,transform .15s ease;
+                    box-shadow:0 24px 64px -8px rgba(0,0,0,.22),0 4px 16px -4px rgba(0,0,0,.12);
+                    width:340px;max-width:calc(100vw - 32px)">
+
+            <!-- Panel header -->
+            <div class="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
+                <div class="flex items-center gap-2">
+                    <i class="bi bi-people-fill text-indigo-500 text-sm"></i>
+                    <span class="text-sm font-bold text-slate-700">Select Provider</span>
+                    <span class="px-2 py-0.5 bg-indigo-100 text-indigo-600 text-xs font-bold rounded-full"><?= $pvCount ?></span>
+                </div>
+                <button type="button" onclick="closePvDropdown()"
+                        class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 grid place-items-center transition-colors">
+                    <i class="bi bi-x text-slate-500 text-base"></i>
+                </button>
+            </div>
+
+            <!-- Search -->
+            <div class="px-3 py-2.5 border-b border-slate-100">
+                <div class="relative">
+                    <i class="bi bi-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm pointer-events-none"></i>
+                    <input type="text" id="pvSearch" placeholder="Search by name…"
+                           oninput="filterPvList(this.value)" autocomplete="off"
+                           class="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200
+                                  text-sm text-slate-700 placeholder-slate-400
+                                  focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent focus:bg-white transition">
+                </div>
+            </div>
+
+            <!-- Options -->
+            <div id="pvOptionsList" style="overflow-y:auto;max-height:min(420px, 60vh)">
+
+                <!-- My Visits row -->
+                <a href="?filter_provider=" data-name="my visits"
+                   class="pv-option flex items-center gap-3 px-4 py-3.5 transition-colors
+                          <?= $providerFilter === '' ? 'bg-indigo-50' : 'hover:bg-slate-50' ?>">
+                    <span class="w-11 h-11 rounded-2xl grid place-items-center shrink-0
+                                 <?= $providerFilter === '' ? 'bg-indigo-600 shadow-md shadow-indigo-300' : 'bg-slate-100' ?>">
+                        <i class="bi bi-calendar-check-fill text-base <?= $providerFilter === '' ? 'text-white' : 'text-slate-500' ?>"></i>
+                    </span>
+                    <div class="flex-1 min-w-0">
+                        <div class="font-bold text-sm <?= $providerFilter === '' ? 'text-indigo-700' : 'text-slate-800' ?>">My Visits</div>
+                        <div class="text-xs <?= $providerFilter === '' ? 'text-indigo-400' : 'text-slate-400' ?> mt-0.5">Only my assigned patients</div>
+                    </div>
+                    <?php if ($providerFilter === ''): ?>
+                    <span class="shrink-0 w-6 h-6 bg-indigo-600 rounded-full grid place-items-center">
+                        <i class="bi bi-check2 text-white text-xs"></i>
+                    </span>
+                    <?php endif; ?>
+                </a>
+
+                <!-- Divider -->
+                <div class="flex items-center gap-2 px-4 py-1.5">
+                    <div class="flex-1 h-px bg-slate-100"></div>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Providers</span>
+                    <div class="flex-1 h-px bg-slate-100"></div>
+                </div>
+
+                <?php foreach ($providerList as $pv):
+                    $isSel  = ($providerFilter === $pv);
+                    $p2     = explode(' ', $pv);
+                    $ini2   = strtoupper(substr($p2[0],0,1).(isset($p2[1])?substr($p2[1],0,1):''));
+                    // Pick a consistent color per initials
+                    $hues   = ['bg-violet-100 text-violet-700','bg-pink-100 text-pink-700','bg-sky-100 text-sky-700','bg-teal-100 text-teal-700','bg-amber-100 text-amber-700','bg-rose-100 text-rose-700'];
+                    $hue    = $isSel ? '' : $hues[abs(crc32($pv)) % count($hues)];
+                ?>
+                <a href="?filter_provider=<?= urlencode($pv) ?>"
+                   data-name="<?= strtolower(h($pv)) ?>"
+                   class="pv-option flex items-center gap-3 px-4 py-3 transition-colors
+                          <?= $isSel ? 'bg-indigo-50' : 'hover:bg-slate-50' ?>">
+                    <span class="w-11 h-11 rounded-2xl font-extrabold text-sm grid place-items-center shrink-0
+                                 <?= $isSel ? 'bg-indigo-600 text-white shadow-md shadow-indigo-300' : $hue ?>">
+                        <?= h($ini2) ?>
+                    </span>
+                    <div class="flex-1 min-w-0">
+                        <div class="font-semibold text-sm <?= $isSel ? 'text-indigo-700' : 'text-slate-800' ?> truncate"><?= h($pv) ?></div>
+                        <div class="text-xs text-slate-400 mt-0.5">Provider</div>
+                    </div>
+                    <?php if ($isSel): ?>
+                    <span class="shrink-0 w-6 h-6 bg-indigo-600 rounded-full grid place-items-center">
+                        <i class="bi bi-check2 text-white text-xs"></i>
+                    </span>
+                    <?php endif; ?>
+                </a>
+                <?php endforeach; ?>
+
+                <!-- No results -->
+                <div id="pvNoResults" class="hidden px-4 py-8 text-center">
+                    <i class="bi bi-search text-slate-300 text-3xl block mb-2"></i>
+                    <p class="text-sm font-semibold text-slate-500">No providers found</p>
+                    <p class="text-xs text-slate-400 mt-0.5">Try a different name</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+    (function () {
+        var _open = false;
+        function openPvDropdown() {
+            var dd  = document.getElementById('pvDropdown');
+            var btn = document.getElementById('pvTriggerBtn');
+            var chv = document.getElementById('pvChevron');
+            if (!dd || !btn || _open) return;
+            // Position fixed relative to trigger button
+            var r = btn.getBoundingClientRect();
+            var w = 340;
+            var spaceRight = window.innerWidth - r.left;
+            var left = spaceRight >= w ? r.left : Math.max(8, r.right - w);
+            dd.style.left  = left + 'px';
+            dd.style.top   = (r.bottom + 6) + 'px';
+            dd.style.width = Math.min(w, window.innerWidth - 16) + 'px';
+            _open = true;
+            dd.style.display = 'block';
+            requestAnimationFrame(function () {
+                dd.style.opacity = '1';
+                dd.style.transform = 'translateY(0)';
+            });
+            if (chv) chv.style.transform = 'rotate(180deg)';
+            var inp = document.getElementById('pvSearch');
+            if (inp) { inp.value = ''; filterPvList(''); setTimeout(function(){ inp.focus(); }, 80); }
+        }
+        function closePvDropdown() {
+            var dd  = document.getElementById('pvDropdown');
+            var chv = document.getElementById('pvChevron');
+            if (!dd || !_open) return;
+            _open = false;
+            dd.style.opacity = '0';
+            dd.style.transform = 'translateY(-6px)';
+            setTimeout(function () { if (!_open) dd.style.display = 'none'; }, 150);
+            if (chv) chv.style.transform = '';
+        }
+        function togglePvDropdown() { _open ? closePvDropdown() : openPvDropdown(); }
+        function filterPvList(q) {
+            q = (q || '').trim().toLowerCase();
+            var opts = document.querySelectorAll('#pvOptionsList .pv-option');
+            var vis  = 0;
+            opts.forEach(function (el) {
+                var show = !q || (el.dataset.name || '').includes(q);
+                el.style.display = show ? '' : 'none';
+                if (show) vis++;
+            });
+            var nr = document.getElementById('pvNoResults');
+            if (nr) nr.classList.toggle('hidden', vis > 0);
+        }
+        window.togglePvDropdown = togglePvDropdown;
+        window.closePvDropdown  = closePvDropdown;
+        window.filterPvList     = filterPvList;
+        // Teleport dropdown to <body> so it escapes all overflow:hidden ancestors
+        (function teleport() {
+            var dd = document.getElementById('pvDropdown');
+            if (dd) { document.body.appendChild(dd); return; }
+            document.addEventListener('DOMContentLoaded', function () {
+                var dd2 = document.getElementById('pvDropdown');
+                if (dd2) document.body.appendChild(dd2);
+            });
+        }());
+        document.addEventListener('click', function (e) {
+            if (_open) {
+                var wrap = document.getElementById('pvFilterWrap');
+                if (wrap && !wrap.contains(e.target)) closePvDropdown();
+            }
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && _open) closePvDropdown();
+        });
+    }());
+    </script>
+    <?php endif; ?>
+
+    <!-- Visit rows -->
+    <?php if (empty($mySchedule)): ?>
+    <div class="px-6 py-8 flex flex-col items-center text-center gap-3">
+        <?php if ($providerFilter !== ''): ?>
+        <!-- No visits for this specific provider -->
+        <div class="w-14 h-14 bg-amber-50 rounded-2xl grid place-items-center">
+            <i class="bi bi-person-x text-amber-400 text-2xl"></i>
+        </div>
+        <div>
+            <p class="font-bold text-slate-700 text-sm">No visits for <?= h($providerFilter) ?> today</p>
+            <p class="text-xs text-slate-400 mt-1">No schedule found for this provider on <?= date('F j') ?>.</p>
+        </div>
+        <a href="?filter_provider=" class="mt-1 inline-flex items-center gap-1.5 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-bold rounded-xl transition">
+            <i class="bi bi-arrow-left text-xs"></i> Back to My Visits
+        </a>
+        <?php else: ?>
+        <!-- MA has no visits at all today -->
+        <div class="w-14 h-14 bg-indigo-50 rounded-2xl grid place-items-center">
+            <i class="bi bi-calendar2-x text-indigo-300 text-2xl"></i>
+        </div>
+        <div>
+            <p class="font-bold text-slate-700 text-sm">No visits scheduled for today</p>
+            <p class="text-xs text-slate-400 mt-1 max-w-xs">
+                <?php if (isAdmin()): ?>
+                No visits have been assigned yet for <?= date('l, F j') ?>.
+                <?php else: ?>
+                You don't have any visits assigned for <?= date('l, F j') ?>. Contact your supervisor if this seems incorrect.
+                <?php endif; ?>
+            </p>
+        </div>
+        <?php if (isAdmin()): ?>
+        <a href="<?= BASE_URL ?>/admin/schedule_manage.php"
+           class="mt-1 inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl transition shadow-sm">
+            <i class="bi bi-plus-lg"></i> Assign Visits
+        </a>
+        <?php else: ?>
+        <a href="<?= BASE_URL ?>/schedule.php"
+           class="mt-1 inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-xs font-bold rounded-xl transition">
+            <i class="bi bi-calendar3"></i> View Full Schedule
+        </a>
+        <?php endif; ?>
+        <?php endif; ?>
+    </div>
+    <?php else: ?>
+    <?php
+    $scStatusColors = [
+        'pending'   => ['bg'=>'bg-slate-100',   'text'=>'text-slate-600',   'dot'=>'bg-slate-400'],
+        'en_route'  => ['bg'=>'bg-blue-100',    'text'=>'text-blue-700',    'dot'=>'bg-blue-500'],
+        'completed' => ['bg'=>'bg-emerald-100', 'text'=>'text-emerald-700', 'dot'=>'bg-emerald-500'],
+        'missed'    => ['bg'=>'bg-red-100',     'text'=>'text-red-700',     'dot'=>'bg-red-400'],
+    ];
+    ?>
+    <div class="divide-y divide-slate-50">
+        <?php foreach ($mySchedule as $idx => $sv):
+            $sc = $scStatusColors[$sv['status']] ?? $scStatusColors['pending'];
+        ?>
+        <div class="flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50 transition-colors">
+            <!-- Step number -->
+            <div class="w-8 h-8 bg-indigo-50 text-indigo-600 font-bold text-xs rounded-xl grid place-items-center shrink-0 border border-indigo-100">
+                <?= $idx + 1 ?>
+            </div>
+            <!-- Patient info -->
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <a href="<?= BASE_URL ?>/patient_view.php?id=<?= $sv['patient_id'] ?>"
+                       class="font-bold text-slate-800 hover:text-indigo-600 text-sm transition-colors">
+                        <?= h($sv['patient_name']) ?>
+                    </a>
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold <?= $sc['bg'] ?> <?= $sc['text'] ?>">
+                        <span class="w-1.5 h-1.5 rounded-full <?= $sc['dot'] ?>"></span>
+                        <?= ucfirst(str_replace('_',' ',$sv['status'])) ?>
+                    </span>
+                </div>
+                <?php if ($sv['patient_address']): ?>
+                <div class="text-xs text-slate-400 truncate mt-0.5"><?= h($sv['patient_address']) ?></div>
+                <?php endif; ?>
+                <?php if (!isAdmin() && !empty($sv['provider_name'])): ?>
+                <div class="text-xs text-indigo-500 font-semibold truncate mt-0.5 uppercase tracking-wide" style="font-size:10px"><?= h($sv['provider_name']) ?></div>
+                <?php endif; ?>
+            </div>
+            <!-- Action buttons -->
+            <div class="flex flex-col items-end gap-1.5 shrink-0">
+                <?php if ($sv['visit_time']): ?>
+                <div class="text-xs font-medium text-slate-400"><?= date('g:i A', strtotime($sv['visit_time'])) ?></div>
+                <?php endif; ?>
+                <?php if ($sv['status'] === 'pending'): ?>
+                <button onclick="dashStartVisit(<?= $sv['id'] ?>, <?= $sv['patient_id'] ?>, '<?= h($sv['visit_type'] ?? 'routine') ?>', '<?= h($sv['visit_subtype'] ?? '') ?>', this)"
+                        class="flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-sm transition-all whitespace-nowrap">
+                    <i class="bi bi-play-fill"></i> Start
+                </button>
+                <?php elseif ($sv['status'] === 'en_route'): ?>
+                <?php
+                    $_dvt  = $sv['visit_type'] ?? 'routine';
+                    $_dvst = $sv['visit_subtype'] ?? '';
+                    $_dfp  = (str_contains(strtolower($_dvt),'new'))
+                        ? '/forms/new_patient_pocket.php'
+                        : '/forms/vital_cs.php';
+                    $_npParam = (str_contains(strtolower($_dvt),'new')) ? '&np_type=' . ($_dvst === 'primary_care' ? 'primary_care' : 'wound_care') : '';
+                ?>
+                <a href="<?= BASE_URL . $_dfp ?>?patient_id=<?= $sv['patient_id'] ?>&visit_id=<?= $sv['id'] ?>&sched_visit_type=<?= urlencode($_dvt) ?><?= $_npParam ?>"
+                   class="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all whitespace-nowrap">
+                    <i class="bi bi-file-earmark-plus-fill"></i> Open Forms
+                </a>
+                <button onclick="dashResetVisit(<?= $sv['id'] ?>, this)"
+                        class="flex items-center gap-1 px-2.5 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-xl text-xs font-semibold hover:bg-amber-100 active:scale-95 transition-all whitespace-nowrap">
+                    <i class="bi bi-arrow-counterclockwise"></i> Reset
+                </button>
+                <?php elseif ($sv['status'] === 'completed'): ?>
+                <span class="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-semibold">
+                    <i class="bi bi-check-circle-fill"></i> Done
+                </span>
+                <button onclick="dashUndoEndVisit(<?= $sv['id'] ?>, this)"
+                        class="flex items-center gap-1 px-2.5 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-xl text-xs font-semibold hover:bg-amber-100 active:scale-95 transition-all whitespace-nowrap">
+                    <i class="bi bi-arrow-counterclockwise"></i> Undo End
+                </button>
+                <?php endif; ?>
+            </div>
+        </div>
+        <?php endforeach; ?>
+    </div>
+    <?php if ($scheduleTotalToday > 6): ?>
+    <div class="px-6 py-3 bg-slate-50 border-t border-slate-100 text-center">
+        <a href="<?= BASE_URL ?>/schedule.php" class="text-xs font-semibold text-indigo-600 hover:text-indigo-700">
+            +<?= $scheduleTotalToday - 6 ?> more visit<?= ($scheduleTotalToday-6)!==1?'s':'' ?> — View full schedule
+        </a>
+    </div>
+    <?php endif; ?>
+    <?php endif; ?>
+</div>
+<?php endif; // canAccessClinical schedule widget ?>
+
+<!-- ── Today's Schedule Alert Banner ─────────────────────────────────── -->
+<?php if (!isBilling()): ?>
+<a href="<?= BASE_URL ?>/schedule.php" class="block mb-7 group">
+<?php if ($scheduleTotalToday > 0): ?>
+    <div class="relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 shadow-lg shadow-indigo-200 px-6 py-5 flex items-center gap-5">
+        <span class="absolute -left-4 -top-4 w-24 h-24 bg-white/10 rounded-full"></span>
+        <span class="absolute right-8 -bottom-6 w-32 h-32 bg-white/5 rounded-full"></span>
+        <div class="relative z-10 w-14 h-14 bg-white/20 rounded-2xl grid place-items-center shrink-0">
+            <i class="bi bi-calendar2-check-fill text-white text-2xl"></i>
+        </div>
+        <div class="relative z-10 flex-1 min-w-0">
+            <p class="text-white font-extrabold text-lg leading-tight">
+                You have <span class="underline decoration-white/60"><?= $scheduleTotalToday ?> visit<?= $scheduleTotalToday !== 1 ? 's' : '' ?></span> scheduled today
+            </p>
+            <p class="text-indigo-200 text-sm mt-0.5">Tap to view your full route for <?= date('l, F j') ?></p>
+        </div>
+        <div class="relative z-10 shrink-0">
+            <span class="inline-flex items-center gap-1.5 bg-white/20 group-hover:bg-white/30 transition text-white text-sm font-bold px-4 py-2 rounded-xl">
+                View Route <i class="bi bi-arrow-right"></i>
+            </span>
+        </div>
+    </div>
+<?php else: ?>
+    <div class="rounded-2xl border-2 border-slate-200 group-hover:border-indigo-300 bg-white px-6 py-4 flex items-center gap-4 transition-colors shadow-sm">
+        <div class="w-12 h-12 bg-indigo-50 group-hover:bg-indigo-100 rounded-xl grid place-items-center shrink-0 transition-colors">
+            <i class="bi bi-calendar2-week-fill text-indigo-500 text-xl"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+            <p class="font-bold text-slate-700 text-sm">View Today's Schedule</p>
+            <p class="text-slate-400 text-xs mt-0.5"><?= date('l, F j') ?> &mdash; no visits assigned yet</p>
+        </div>
+        <span class="inline-flex items-center gap-1 text-indigo-500 group-hover:text-indigo-700 text-sm font-semibold transition-colors">
+            Open <i class="bi bi-arrow-right"></i>
+        </span>
+    </div>
+<?php endif; ?>
+</a>
+<?php endif; ?>
+
+<div class="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-7">
     <?php if (canAccessClinical()):
     $stats = [
-        ['val' => $totalPatients, 'label' => 'Total Patients',  'icon' => 'bi-people-fill',          'bg' => 'bg-blue-500',    'ring' => 'bg-blue-100',   'txt' => 'text-blue-600',  'alert' => 0],
-        ['val' => $formsToday,    'label' => 'Forms Today',      'icon' => 'bi-file-earmark-check',   'bg' => 'bg-emerald-500', 'ring' => 'bg-emerald-100','txt' => 'text-emerald-600','alert' => 0],
-        ['val' => $draftCount,    'label' => 'Needs Signature',  'icon' => 'bi-pen-fill',             'bg' => 'bg-rose-500',    'ring' => 'bg-rose-100',   'txt' => 'text-rose-600',  'alert' => $draftCount],
-        ['val' => $pendingUpload, 'label' => 'Pending Upload',   'icon' => 'bi-cloud-arrow-up-fill',  'bg' => 'bg-amber-500',   'ring' => 'bg-amber-100',  'txt' => 'text-amber-600', 'alert' => 0],
+        ['val' => $totalPatients, 'label' => 'Total Patients',  'icon' => 'bi-people-fill',          'bg' => 'bg-blue-500',    'ring' => 'bg-blue-100',   'txt' => 'text-blue-600',  'alert' => 0,              'alertStyle' => 'rose', 'link' => BASE_URL.'/patients.php'],
+        ['val' => $formsToday,    'label' => 'Forms Today',      'icon' => 'bi-file-earmark-check',   'bg' => 'bg-emerald-500', 'ring' => 'bg-emerald-100','txt' => 'text-emerald-600','alert' => 0,              'alertStyle' => 'rose', 'link' => BASE_URL.'/patients.php'],
+        ['val' => $draftCount,    'label' => 'Needs Signature',  'icon' => 'bi-pen-fill',             'bg' => 'bg-rose-500',    'ring' => 'bg-rose-100',   'txt' => 'text-rose-600',  'alert' => $draftCount,    'alertStyle' => 'rose', 'link' => '#draft-forms'],
     ];
     else:
     $stats = [
-        ['val' => $totalPatients,       'label' => 'Total Patients',        'icon' => 'bi-people-fill',         'bg' => 'bg-blue-500',    'ring' => 'bg-blue-100',   'txt' => 'text-blue-600',  'alert' => 0],
-        ['val' => $billingSignedForms,  'label' => 'Signed Forms',          'icon' => 'bi-file-earmark-check',  'bg' => 'bg-emerald-500', 'ring' => 'bg-emerald-100','txt' => 'text-emerald-600','alert' => 0],
-        ['val' => $billingPendingUpload,'label' => 'Pending Upload to PF',  'icon' => 'bi-cloud-arrow-up-fill', 'bg' => 'bg-amber-500',   'ring' => 'bg-amber-100',  'txt' => 'text-amber-600', 'alert' => $billingPendingUpload],
-        ['val' => $billingSignedToday,  'label' => 'Signed Today',          'icon' => 'bi-calendar-check-fill', 'bg' => 'bg-indigo-500',  'ring' => 'bg-indigo-100', 'txt' => 'text-indigo-600','alert' => 0],
+        ['val' => $totalPatients,       'label' => 'Total Patients',        'icon' => 'bi-people-fill',         'bg' => 'bg-blue-500',    'ring' => 'bg-blue-100',   'txt' => 'text-blue-600',  'alert' => 0,                      'alertStyle' => 'rose', 'link' => BASE_URL.'/patients.php'],
+        ['val' => $billingSignedForms,  'label' => 'Signed Forms',          'icon' => 'bi-file-earmark-check',  'bg' => 'bg-emerald-500', 'ring' => 'bg-emerald-100','txt' => 'text-emerald-600','alert' => 0,                     'alertStyle' => 'rose', 'link' => ''],
+        ['val' => $billingSignedToday,  'label' => 'Signed Today',          'icon' => 'bi-calendar-check-fill', 'bg' => 'bg-indigo-500',  'ring' => 'bg-indigo-100', 'txt' => 'text-indigo-600','alert' => 0,                     'alertStyle' => 'rose', 'link' => ''],
     ];
     endif;
-    foreach ($stats as $s): ?>
-    <div class="bg-white rounded-2xl shadow-sm border <?= ($s['alert'] ?? 0) > 0 ? 'border-rose-200 shadow-rose-50' : 'border-slate-100' ?> p-5 hover:shadow-md transition-shadow">
+    foreach ($stats as $s):
+        $hasAlert = ($s['alert'] ?? 0) > 0;
+        $isAmber  = ($s['alertStyle'] ?? 'rose') === 'amber';
+        $borderCls = $hasAlert ? ($isAmber ? 'border-amber-200 shadow-amber-50' : 'border-rose-200 shadow-rose-50') : 'border-slate-100';
+        $numCls    = $hasAlert ? ($isAmber ? 'text-amber-600' : 'text-rose-600') : 'text-slate-800';
+        $pulseCls  = $isAmber ? 'bg-amber-400' : 'bg-rose-500';
+        $cardTag   = !empty($s['link']) ? 'a' : 'div';
+        $cardAttr  = !empty($s['link']) ? 'href="'.h($s['link']).'"' : '';
+    ?>
+    <<?= $cardTag ?> <?= $cardAttr ?> class="bg-white rounded-2xl shadow-sm border <?= $borderCls ?> p-5 hover:shadow-md transition-all group<?= !empty($s['link']) ? ' cursor-pointer hover:-translate-y-0.5' : '' ?>">
         <div class="flex items-start justify-between mb-4">
             <div class="<?= $s['ring'] ?> p-3 rounded-xl">
                 <i class="bi <?= $s['icon'] ?> <?= $s['txt'] ?> text-xl leading-none"></i>
             </div>
-            <?php if (($s['alert'] ?? 0) > 0): ?>
-            <span class="w-2.5 h-2.5 bg-rose-500 rounded-full mt-1 animate-pulse"></span>
+            <?php if ($hasAlert): ?>
+            <span class="w-2.5 h-2.5 <?= $pulseCls ?> rounded-full mt-1 animate-pulse"></span>
             <?php endif; ?>
         </div>
-        <div class="text-3xl font-extrabold <?= ($s['alert'] ?? 0) > 0 ? 'text-rose-600' : 'text-slate-800' ?>"><?= number_format((int)$s['val']) ?></div>
-        <div class="text-sm text-slate-500 mt-1 font-medium"><?= $s['label'] ?></div>
-    </div>
+        <div class="text-3xl font-extrabold <?= $numCls ?>"><?= number_format((int)$s['val']) ?></div>
+        <div class="flex items-center justify-between mt-1">
+            <div class="text-sm text-slate-500 font-medium"><?= $s['label'] ?></div>
+            <?php if (!empty($s['link'])): ?>
+            <i class="bi bi-arrow-right text-xs text-slate-300 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all"></i>
+            <?php endif; ?>
+        </div>
+    </<?= $cardTag ?>>
     <?php endforeach; ?>
 </div>
 
@@ -335,8 +812,8 @@ include __DIR__ . '/includes/header.php';
     <h3 class="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4">
         <i class="bi bi-lightning-charge-fill text-amber-400 mr-1"></i> Quick Actions
     </h3>
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <?php if (canAccessClinical()): ?>
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        <?php if (canAccessClinical() && !isMa()): ?>
         <a href="<?= BASE_URL ?>/patient_add.php"
            class="flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-blue-100 hover:border-blue-400 hover:bg-blue-50 transition-all group">
             <div class="w-12 h-12 bg-blue-100 group-hover:bg-blue-200 rounded-xl grid place-items-center transition-colors">
@@ -351,13 +828,6 @@ include __DIR__ . '/includes/header.php';
                 <i class="bi bi-search text-slate-600 text-xl"></i>
             </div>
             <span class="text-sm font-semibold text-slate-700">Find Patient</span>
-        </a>
-        <a href="<?= BASE_URL ?>/patients.php?filter=pending"
-           class="flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-amber-100 hover:border-amber-400 hover:bg-amber-50 transition-all group">
-            <div class="w-12 h-12 bg-amber-100 group-hover:bg-amber-200 rounded-xl grid place-items-center transition-colors">
-                <i class="bi bi-cloud-upload-fill text-amber-600 text-xl"></i>
-            </div>
-            <span class="text-sm font-semibold text-slate-700">Pending Upload</span>
         </a>
         <a href="<?= BASE_URL ?>/patients.php"
            class="flex flex-col items-center gap-2 p-4 rounded-2xl border-2 border-emerald-100 hover:border-emerald-400 hover:bg-emerald-50 transition-all group">
@@ -376,81 +846,9 @@ include __DIR__ . '/includes/header.php';
     </div>
 </div>
 
-<!-- Today's Schedule Widget -->
-<?php if (canAccessClinical()): ?>
-<div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-7">
-    <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-        <h3 class="font-bold text-slate-700 flex items-center gap-2">
-            <i class="bi bi-calendar3 text-indigo-500"></i> Today's Route
-            <?php if ($scheduleTotalToday): ?>
-            <span class="ml-1 px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-full"><?= $scheduleTotalToday ?></span>
-            <?php endif; ?>
-        </h3>
-        <a href="<?= BASE_URL ?>/schedule.php" class="text-xs text-indigo-600 hover:text-indigo-700 font-semibold">Full schedule →</a>
-    </div>
-    <?php if (empty($mySchedule)): ?>
-    <div class="flex items-center gap-4 px-6 py-5">
-        <div class="w-10 h-10 bg-indigo-50 rounded-xl grid place-items-center shrink-0">
-            <i class="bi bi-calendar-check text-indigo-400 text-lg"></i>
-        </div>
-        <div>
-            <p class="text-sm font-semibold text-slate-600">No visits assigned today</p>
-            <?php if (isAdmin()): ?>
-            <a href="<?= BASE_URL ?>/admin/schedule_manage.php" class="text-xs text-indigo-600 hover:underline">Assign visits →</a>
-            <?php endif; ?>
-        </div>
-    </div>
-    <?php else: ?>
-    <?php
-    $scStatusColors = [
-        'pending'   => ['bg'=>'bg-slate-100',   'text'=>'text-slate-600',   'dot'=>'bg-slate-400'],
-        'en_route'  => ['bg'=>'bg-blue-100',    'text'=>'text-blue-700',    'dot'=>'bg-blue-500'],
-        'completed' => ['bg'=>'bg-emerald-100', 'text'=>'text-emerald-700', 'dot'=>'bg-emerald-500'],
-        'missed'    => ['bg'=>'bg-red-100',     'text'=>'text-red-700',     'dot'=>'bg-red-400'],
-    ];
-    ?>
-    <div class="divide-y divide-slate-50">
-        <?php foreach ($mySchedule as $idx => $sv):
-            $sc = $scStatusColors[$sv['status']] ?? $scStatusColors['pending'];
-        ?>
-        <div class="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 transition-colors">
-            <div class="w-7 h-7 bg-indigo-50 text-indigo-600 font-bold text-xs rounded-lg grid place-items-center shrink-0">
-                <?= $idx + 1 ?>
-            </div>
-            <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-2 flex-wrap">
-                    <a href="<?= BASE_URL ?>/patient_view.php?id=<?= $sv['patient_id'] ?>"
-                       class="font-semibold text-slate-800 hover:text-indigo-600 text-sm transition-colors">
-                        <?= h($sv['patient_name']) ?>
-                    </a>
-                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold <?= $sc['bg'] ?> <?= $sc['text'] ?>">
-                        <span class="w-1.5 h-1.5 rounded-full <?= $sc['dot'] ?>"></span>
-                        <?= ucfirst(str_replace('_',' ',$sv['status'])) ?>
-                    </span>
-                </div>
-                <?php if ($sv['patient_address']): ?>
-                <div class="text-xs text-slate-400 truncate"><?= h($sv['patient_address']) ?></div>
-                <?php endif; ?>
-            </div>
-            <?php if ($sv['visit_time']): ?>
-            <div class="text-xs font-medium text-slate-500 shrink-0"><?= date('g:i A', strtotime($sv['visit_time'])) ?></div>
-            <?php endif; ?>
-        </div>
-        <?php endforeach; ?>
-    </div>
-    <?php if ($scheduleTotalToday > 6): ?>
-    <div class="px-6 py-3 bg-slate-50 border-t border-slate-100 text-center">
-        <a href="<?= BASE_URL ?>/schedule.php" class="text-xs font-semibold text-indigo-600 hover:text-indigo-700">
-            +<?= $scheduleTotalToday - 6 ?> more visit<?= ($scheduleTotalToday-6)!==1?'s':'' ?> — View full schedule
-        </a>
-    </div>
-    <?php endif; ?>
-    <?php endif; ?>
-</div>
-<?php endif; // canAccessClinical schedule widget ?>
-
 <!-- ─── Unsigned Forms Alert ────────────────────────────────────── -->
 <?php if (canAccessClinical()): ?>
+<div id="draft-forms">
 <?php if ($draftCount === 0): ?>
 <div class="flex items-center gap-4 bg-emerald-50 border border-emerald-200 rounded-2xl px-6 py-4 mb-7">
     <div class="w-10 h-10 bg-emerald-100 rounded-xl grid place-items-center flex-shrink-0">
@@ -544,6 +942,7 @@ include __DIR__ . '/includes/header.php';
 </div>
 <?php endif; ?>
 <?php endif; // canAccessClinical unsigned forms ?>
+</div><!-- #draft-forms -->
 
 <?php if (isAdmin()): ?>
 <!-- ═══════════════ ANALYTICS SECTION ══════════════════════════════════════ -->
@@ -1367,5 +1766,90 @@ $extraJs .= <<<NOTEJS
 </script>
 NOTEJS;
 endif;
+?>
+<script>
+// ── Dashboard: one-tap Start Visit ───────────────────────────────────────────
+function dashStartVisit(visitId, patientId, visitType, visitSubtype, btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split animate-spin"></i>';
 
-include __DIR__ . '/includes/footer.php'; ?>
+    const isNew   = visitType.toLowerCase().includes('new');
+    const npType  = (visitSubtype === 'primary_care') ? 'primary_care' : 'wound_care';
+    const formPath = isNew ? '/forms/new_patient_pocket.php' : '/forms/vital_cs.php';
+    const npParam  = isNew ? '&np_type=' + npType : '';
+
+    fetch(window._pdBase + '/api/schedule_update.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csrf: window._pdCsrf, id: visitId, action: 'status', status: 'en_route' })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
+            window.location.href = window._pdBase + formPath
+                + '?patient_id=' + patientId
+                + '&visit_id=' + visitId
+                + '&sched_visit_type=' + encodeURIComponent(visitType)
+                + npParam;
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-play-fill"></i> Start';
+        }
+    })
+    .catch(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-play-fill"></i> Start';
+    });
+}
+
+function dashResetVisit(visitId, btn) {
+    if (!confirm('Reset this visit to Pending and clear the start time?')) return;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split animate-spin"></i>';
+    fetch(window._pdBase + '/api/schedule_update.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csrf: window._pdCsrf, id: visitId, action: 'reset_visit' })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
+            location.reload();
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i> Reset';
+        }
+    })
+    .catch(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i> Reset';
+    });
+}
+
+function dashUndoEndVisit(visitId, btn) {
+    if (!confirm('Undo the End Visit and set this visit back to In Progress?')) return;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split animate-spin"></i>';
+    fetch(window._pdBase + '/api/schedule_update.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csrf: window._pdCsrf, id: visitId, action: 'undo_end' })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
+            location.reload();
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i> Undo End';
+        }
+    })
+    .catch(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i> Undo End';
+    });
+}
+</script>
+<?php include __DIR__ . '/includes/wound_photo_panel.php'; ?>
+<?php include __DIR__ . '/includes/rx_pad_panel.php'; ?>
+<?php include __DIR__ . '/includes/footer.php'; ?>

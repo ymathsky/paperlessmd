@@ -6,6 +6,7 @@
 <title>PaperlessMD — User Manual</title>
 <style>
   :root {
+    --sidebar-w: 272px;
     --indigo: #4f46e5;
     --indigo-light: #eef2ff;
     --slate: #334155;
@@ -16,59 +17,223 @@
     --sky: #0284c7;
     --emerald: #059669;
   }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
   body {
     font-family: 'Segoe UI', system-ui, sans-serif;
     color: #1e293b;
-    background: #f8fafc;
+    background: #f1f5f9;
     line-height: 1.7;
   }
-  /* ── Cover ── */
+
+  /* ═══ LAYOUT ═══ */
+  .layout { display: flex; min-height: 100vh; }
+
+  /* ═══ SIDEBAR ═══ */
+  .sidebar {
+    width: var(--sidebar-w);
+    flex-shrink: 0;
+    background: #0f172a;
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.28s cubic-bezier(.4,0,.2,1);
+  }
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+
+  .sidebar-header {
+    padding: 20px 18px 16px;
+    border-bottom: 1px solid #1e293b;
+    flex-shrink: 0;
+  }
+  .sidebar-logo { font-size: 1.4rem; font-weight: 800; color: white; letter-spacing: -0.5px; }
+  .sidebar-logo span { color: #818cf8; }
+  .sidebar-tagline { font-size: 0.7rem; color: #64748b; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.08em; }
+
+  /* Search */
+  .sidebar-search {
+    padding: 12px 14px;
+    border-bottom: 1px solid #1e293b;
+    flex-shrink: 0;
+  }
+  .sidebar-search input {
+    width: 100%;
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 7px 10px 7px 32px;
+    color: #e2e8f0;
+    font-size: 0.8rem;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .sidebar-search input::placeholder { color: #475569; }
+  .sidebar-search input:focus { border-color: #6366f1; }
+  .sidebar-search .search-wrap { position: relative; }
+  .sidebar-search .search-icon {
+    position: absolute; left: 9px; top: 50%; transform: translateY(-50%);
+    color: #475569; font-size: 0.85rem; pointer-events: none;
+  }
+
+  /* Nav */
+  .sidebar-nav { flex: 1; padding: 8px 0 20px; }
+  .nav-group { margin-bottom: 2px; }
+
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 16px;
+    color: #94a3b8;
+    font-size: 0.82rem;
+    font-weight: 500;
+    cursor: pointer;
+    border-radius: 0;
+    transition: background 0.12s, color 0.12s;
+    text-decoration: none;
+    user-select: none;
+    position: relative;
+  }
+  .nav-item:hover { background: #1e293b; color: #e2e8f0; }
+  .nav-item.active {
+    background: #1e3a8a;
+    color: white;
+    font-weight: 600;
+  }
+  .nav-item.active::before {
+    content: '';
+    position: absolute; left: 0; top: 0; bottom: 0;
+    width: 3px; background: #818cf8; border-radius: 0 2px 2px 0;
+  }
+  .nav-item .nav-icon { font-size: 1rem; flex-shrink: 0; width: 18px; text-align: center; }
+  .nav-item .nav-num {
+    background: #1e3a8a; color: #93c5fd;
+    font-size: 0.65rem; font-weight: 700;
+    border-radius: 4px; padding: 1px 5px;
+    flex-shrink: 0;
+  }
+  .nav-item.active .nav-num { background: #3b82f6; color: white; }
+  .nav-item .nav-arrow {
+    margin-left: auto; font-size: 0.65rem; color: #475569;
+    transition: transform 0.2s;
+  }
+  .nav-group.open .nav-arrow { transform: rotate(90deg); }
+
+  /* Sub-items */
+  .nav-sub {
+    display: none;
+    background: #080f1a;
+    border-left: 2px solid #1e3a8a;
+    margin-left: 28px;
+  }
+  .nav-group.open .nav-sub { display: block; }
+  .nav-sub a {
+    display: block;
+    padding: 6px 14px;
+    color: #64748b;
+    font-size: 0.78rem;
+    text-decoration: none;
+    transition: color 0.12s, background 0.12s;
+    border-radius: 0;
+  }
+  .nav-sub a:hover { color: #c7d2fe; background: #0f172a; }
+  .nav-sub a.active { color: #a5b4fc; font-weight: 600; }
+
+  /* Section label */
+  .nav-label {
+    padding: 14px 16px 4px;
+    font-size: 0.62rem; font-weight: 700;
+    color: #334155;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  /* ═══ MAIN CONTENT ═══ */
+  .main-content {
+    margin-left: var(--sidebar-w);
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* Cover */
   .cover {
     background: linear-gradient(135deg, #1e293b 0%, #334155 60%, #4f46e5 100%);
     color: white;
-    padding: 80px 60px;
-    min-height: 280px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
+    padding: 64px 56px;
+    display: flex; flex-direction: column; justify-content: flex-end;
+    position: relative; overflow: hidden;
   }
-  .cover .logo { font-size: 2.8rem; font-weight: 800; letter-spacing: -1px; }
+  .cover::after {
+    content: '';
+    position: absolute; right: -60px; top: -60px;
+    width: 320px; height: 320px;
+    background: radial-gradient(circle, rgba(99,102,241,0.25) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .cover .logo { font-size: 2.6rem; font-weight: 800; letter-spacing: -1px; }
   .cover .logo span { color: #818cf8; }
-  .cover .subtitle { font-size: 1.15rem; color: #cbd5e1; margin-top: 8px; }
-  .cover .meta { margin-top: 24px; font-size: 0.85rem; color: #94a3b8; }
-  /* ── Layout ── */
-  .container { max-width: 960px; margin: 0 auto; padding: 0 24px 80px; }
-  /* ── TOC ── */
-  .toc {
-    background: white;
-    border: 1px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 32px 36px;
-    margin: 40px 0;
+  .cover .subtitle { font-size: 1.05rem; color: #cbd5e1; margin-top: 6px; }
+  .cover .meta { margin-top: 20px; font-size: 0.82rem; color: #94a3b8; display: flex; gap: 16px; flex-wrap: wrap; }
+  .cover .meta-pill {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 999px;
+    padding: 3px 12px;
   }
-  .toc h2 { font-size: 1rem; font-weight: 700; text-transform: uppercase;
-            letter-spacing: 0.08em; color: #64748b; margin-bottom: 20px; }
-  .toc ol { padding-left: 20px; }
-  .toc li { margin: 6px 0; }
-  .toc a { color: var(--indigo); text-decoration: none; font-size: 0.95rem; }
-  .toc a:hover { text-decoration: underline; }
-  .toc .sub { padding-left: 20px; list-style: none; }
-  .toc .sub li::before { content: "↳ "; color: #94a3b8; }
+
+  /* Top bar (mobile hamburger) */
+  .topbar {
+    display: none;
+    position: sticky; top: 0; z-index: 100;
+    background: #0f172a;
+    padding: 12px 16px;
+    align-items: center; gap: 12px;
+    border-bottom: 1px solid #1e293b;
+  }
+  .topbar .hamburger {
+    background: none; border: none; cursor: pointer;
+    color: white; font-size: 1.3rem; line-height: 1; padding: 4px;
+  }
+  .topbar .topbar-logo { font-size: 1.1rem; font-weight: 800; color: white; }
+  .topbar .topbar-logo span { color: #818cf8; }
+
+  /* Overlay (mobile) */
+  .sidebar-overlay {
+    display: none;
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 199;
+  }
+
+  /* Content area */
+  .content-body {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 48px 40px 80px;
+  }
+
   /* ── Section headings ── */
   h1.section {
-    font-size: 1.7rem; font-weight: 800; color: #0f172a;
+    font-size: 1.65rem; font-weight: 800; color: #0f172a;
     border-bottom: 3px solid var(--indigo);
-    padding-bottom: 10px; margin: 56px 0 24px;
+    padding-bottom: 10px; margin: 64px 0 24px;
     display: flex; align-items: center; gap: 12px;
+    scroll-margin-top: 24px;
   }
+  h1.section:first-of-type { margin-top: 0; }
   h1.section .num {
     background: var(--indigo); color: white;
     border-radius: 8px; padding: 2px 10px;
-    font-size: 1rem;
+    font-size: 1rem; flex-shrink: 0;
   }
-  h2.sub { font-size: 1.2rem; font-weight: 700; color: #1e293b; margin: 32px 0 12px; }
+  h2.sub {
+    font-size: 1.15rem; font-weight: 700; color: #1e293b;
+    margin: 36px 0 12px;
+    scroll-margin-top: 24px;
+  }
   h3.sub { font-size: 1rem; font-weight: 700; color: #475569; margin: 20px 0 8px; }
+
   /* ── Prose ── */
   p { margin: 10px 0; color: #334155; }
   ul, ol { padding-left: 22px; margin: 10px 0; }
@@ -79,6 +244,15 @@
     font-family: 'Cascadia Code', 'Consolas', monospace;
     font-size: 0.875rem; color: #be185d;
   }
+  kbd {
+    display: inline-block;
+    background: #f1f5f9; border: 1px solid #cbd5e1;
+    border-bottom-width: 2px;
+    border-radius: 5px; padding: 1px 7px;
+    font-family: 'Cascadia Code', 'Consolas', monospace;
+    font-size: 0.8rem; color: #1e293b;
+  }
+
   /* ── Info boxes ── */
   .note {
     background: var(--indigo-light); border-left: 4px solid var(--indigo);
@@ -95,17 +269,21 @@
     border-radius: 0 8px 8px 0; padding: 14px 18px; margin: 16px 0;
     font-size: 0.92rem;
   }
+
   /* ── Tables ── */
-  .tbl-wrap { overflow-x: auto; margin: 16px 0; }
+  .tbl-wrap { overflow-x: auto; margin: 16px 0; border-radius: 10px; border: 1px solid #e2e8f0; }
   table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
   th {
     background: #1e293b; color: white; text-align: left;
     padding: 10px 14px; font-weight: 600; font-size: 0.82rem;
     text-transform: uppercase; letter-spacing: 0.05em;
   }
+  th:first-child { border-radius: 0; }
   td { padding: 9px 14px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
   tr:nth-child(even) td { background: #f8fafc; }
   tr:hover td { background: #eff6ff; }
+
   /* ── Badges ── */
   .badge {
     display: inline-block; border-radius: 999px; padding: 2px 10px;
@@ -119,12 +297,13 @@
   .badge-red     { background: #fee2e2; color: #991b1b; }
   .badge-blue    { background: #dbeafe; color: #1e40af; }
   .badge-amber   { background: #fef3c7; color: #92400e; }
+
   /* ── Step list ── */
   .steps { counter-reset: step; list-style: none; padding: 0; }
   .steps > li {
     counter-increment: step;
     display: flex; gap: 16px; align-items: flex-start;
-    margin: 12px 0; padding: 14px 16px;
+    margin: 10px 0; padding: 14px 16px;
     background: white; border: 1px solid #e2e8f0; border-radius: 10px;
   }
   .steps > li::before {
@@ -134,40 +313,411 @@
     display: flex; align-items: center; justify-content: center;
     font-weight: 800; font-size: 0.85rem; flex-shrink: 0;
   }
+
   /* ── Feature card grid ── */
   .features {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 16px; margin: 20px 0;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px; margin: 20px 0;
   }
   .feature-card {
     background: white; border: 1px solid #e2e8f0; border-radius: 12px;
-    padding: 20px; display: flex; flex-direction: column; gap: 8px;
+    padding: 18px; display: flex; flex-direction: column; gap: 8px;
   }
   .feature-card .icon { font-size: 1.5rem; }
-  .feature-card h3 { font-size: 0.95rem; font-weight: 700; color: #0f172a; }
-  .feature-card p { font-size: 0.85rem; color: #64748b; margin: 0; }
+  .feature-card h3 { font-size: 0.92rem; font-weight: 700; color: #0f172a; }
+  .feature-card p { font-size: 0.83rem; color: #64748b; margin: 0; }
+
   /* ── Form cards ── */
   .form-grid {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(260px,1fr));
-    gap: 14px; margin: 20px 0;
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(250px,1fr));
+    gap: 12px; margin: 20px 0;
   }
   .form-card {
     background: white; border: 1px solid #e2e8f0; border-radius: 10px;
     padding: 16px;
   }
-  .form-card h3 { font-size: 0.9rem; font-weight: 700; margin-bottom: 4px; }
-  .form-card p  { font-size: 0.82rem; color: #64748b; margin: 0; }
+  .form-card h3 { font-size: 0.88rem; font-weight: 700; margin-bottom: 4px; }
+  .form-card p  { font-size: 0.8rem; color: #64748b; margin: 0; }
+
+  /* ── Screenshot placeholders ── */
+  .screenshot {
+    margin: 20px 0;
+    border: 2px dashed #cbd5e1;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #f8fafc;
+  }
+  .screenshot-bar {
+    display: flex; align-items: center; gap: 8px;
+    background: #1e293b; padding: 8px 14px;
+  }
+  .screenshot-bar span { width: 10px; height: 10px; border-radius: 50%; }
+  .screenshot-bar .dot-r { background: #ef4444; }
+  .screenshot-bar .dot-y { background: #f59e0b; }
+  .screenshot-bar .dot-g { background: #22c55e; }
+  .screenshot-bar .url {
+    flex: 1; background: #334155; border-radius: 4px;
+    padding: 3px 10px; font-size: 0.75rem; color: #94a3b8;
+    font-family: 'Consolas', monospace;
+  }
+  .screenshot-body {
+    min-height: 160px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 10px; padding: 28px 24px;
+  }
+  .screenshot-body .cam { font-size: 2.2rem; }
+  .screenshot-body .cap {
+    font-size: 0.86rem; font-weight: 600; color: #64748b;
+    text-align: center; max-width: 380px; line-height: 1.5;
+  }
+  .screenshot-body .hint {
+    font-size: 0.73rem; color: #94a3b8;
+    background: #e2e8f0; border-radius: 999px;
+    padding: 3px 12px;
+  }
+
   /* ── HR ── */
   hr { border: none; border-top: 1px solid #e2e8f0; margin: 40px 0; }
+
   /* ── Footer ── */
   footer {
-    text-align: center; padding: 40px 20px;
-    font-size: 0.82rem; color: #94a3b8;
+    background: #0f172a;
+    color: #475569;
+    text-align: center; padding: 28px 20px;
+    font-size: 0.8rem;
+  }
+  footer a { color: #6366f1; text-decoration: none; }
+
+  /* ── "Back to top" button ── */
+  #back-top {
+    position: fixed; bottom: 28px; right: 24px;
+    background: var(--indigo); color: white;
+    border: none; border-radius: 50%;
+    width: 40px; height: 40px;
+    font-size: 1.1rem; cursor: pointer;
+    opacity: 0; transform: translateY(10px);
+    transition: opacity 0.25s, transform 0.25s;
+    z-index: 150; box-shadow: 0 4px 14px rgba(79,70,229,0.4);
+  }
+  #back-top.visible { opacity: 1; transform: translateY(0); }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 900px) {
+    .sidebar {
+      transform: translateX(calc(-1 * var(--sidebar-w)));
+    }
+    .sidebar.open { transform: translateX(0); }
+    .sidebar-overlay.open { display: block; }
+    .main-content { margin-left: 0; }
+    .topbar { display: flex; }
+    .content-body { padding: 32px 20px 60px; }
+    .cover { padding: 40px 20px 32px; }
+    .cover .logo { font-size: 2rem; }
+    h1.section { font-size: 1.4rem; }
+  }
+  @media (max-width: 600px) {
+    .features { grid-template-columns: 1fr; }
+    .form-grid  { grid-template-columns: 1fr; }
+  }
+
+  /* ── Search highlight ── */
+  mark { background: #fef9c3; color: inherit; border-radius: 2px; }
+
+  /* ── No-results message ── */
+  .search-no-results {
+    padding: 10px 16px;
+    font-size: 0.78rem;
+    color: #475569;
+    font-style: italic;
+  }
+
+  /* ── Screenshot upload interaction ── */
+  .screenshot:not(.has-image) { cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+  .screenshot:not(.has-image):hover { border-color: #6366f1; background: #eef2ff; }
+  .screenshot:not(.has-image):hover .screenshot-body .cam { display: inline-block; transform: scale(1.15); transition: transform 0.15s; }
+  .screenshot.has-image .screenshot-body { padding: 0; min-height: 0; }
+  .screenshot.has-image .screenshot-body img {
+    width: 100%; display: block;
+    max-height: 520px; object-fit: contain;
+    background: #0f172a;
+  }
+  .screenshot-actions {
+    display: flex; gap: 8px; justify-content: flex-end;
+    padding: 7px 10px; background: #f8fafc;
     border-top: 1px solid #e2e8f0;
   }
+  .btn-ss {
+    background: white; border: 1px solid #cbd5e1;
+    border-radius: 6px; padding: 4px 11px;
+    font-size: 0.75rem; cursor: pointer; color: #334155;
+    transition: background 0.12s, border-color 0.12s;
+  }
+  .btn-ss:hover { background: #f1f5f9; border-color: #94a3b8; }
+  .btn-ss-remove:hover { background: #fee2e2; border-color: #fca5a5; color: #991b1b; }
+  /* ── Sidebar footer ── */
+  .sidebar-footer {
+    padding: 14px 16px 18px; border-top: 1px solid #1e293b; flex-shrink: 0;
+  }
+  .btn-export {
+    display: flex; align-items: center; gap: 8px; width: 100%;
+    background: #1e3a8a; color: white;
+    border: none; border-radius: 8px;
+    padding: 9px 14px; font-size: 0.8rem; font-weight: 600;
+    cursor: pointer; transition: background 0.15s; text-align: left;
+  }
+  .btn-export:hover { background: #1d4ed8; }
+  .ss-status {
+    margin-top: 7px; font-size: 0.7rem; color: #475569; text-align: center;
+  }
+  .ss-status strong { color: #818cf8; }
 </style>
 </head>
 <body>
+
+<!-- ═══ MOBILE TOPBAR ═══ -->
+<header class="topbar" id="topbar">
+  <button class="hamburger" id="menuBtn" aria-label="Open navigation">&#9776;</button>
+  <div class="topbar-logo">Paperless<span>MD</span></div>
+</header>
+
+<!-- ═══ OVERLAY (mobile) ═══ -->
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<!-- ═══ LAYOUT WRAPPER ═══ -->
+<div class="layout">
+
+<!-- ═══════════════════════════════════════════════
+     SIDEBAR NAVIGATION
+═══════════════════════════════════════════════ -->
+<nav class="sidebar" id="sidebar" aria-label="Manual navigation">
+
+  <div class="sidebar-header">
+    <div class="sidebar-logo">Paperless<span>MD</span></div>
+    <div class="sidebar-tagline">User Manual &mdash; v2.4</div>
+  </div>
+
+  <div class="sidebar-search">
+    <div class="search-wrap">
+      <span class="search-icon">&#128269;</span>
+      <input type="search" id="navSearch" placeholder="Search sections…" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="search-no-results" id="searchNoResults" style="display:none">No sections found.</div>
+  </div>
+
+  <div class="sidebar-nav" id="sidebarNav">
+
+    <div class="nav-label">Core</div>
+
+    <div class="nav-group" id="ng-s1">
+      <a class="nav-item" href="#s1" data-section="s1">
+        <span class="nav-icon">&#128202;</span>
+        <span class="nav-num">1</span>
+        <span class="nav-text">System Overview</span>
+      </a>
+    </div>
+
+    <div class="nav-group" id="ng-s2">
+      <div class="nav-item nav-parent" data-group="ng-s2">
+        <span class="nav-icon">&#128274;</span>
+        <span class="nav-num">2</span>
+        <span class="nav-text">Getting Started</span>
+        <span class="nav-arrow">&#9658;</span>
+      </div>
+      <div class="nav-sub">
+        <a href="#s2a" data-section="s2a">Logging In</a>
+        <a href="#s2b" data-section="s2b">Session Timeout</a>
+        <a href="#s2c" data-section="s2c">Navigation Bar</a>
+      </div>
+    </div>
+
+    <div class="nav-group" id="ng-s3">
+      <a class="nav-item" href="#s3" data-section="s3">
+        <span class="nav-icon">&#128100;</span>
+        <span class="nav-num">3</span>
+        <span class="nav-text">Roles &amp; Permissions</span>
+      </a>
+    </div>
+
+    <div class="nav-group" id="ng-s4">
+      <a class="nav-item" href="#s4" data-section="s4">
+        <span class="nav-icon">&#127968;</span>
+        <span class="nav-num">4</span>
+        <span class="nav-text">Dashboard</span>
+      </a>
+    </div>
+
+    <div class="nav-label">Patients &amp; Forms</div>
+
+    <div class="nav-group" id="ng-s5">
+      <div class="nav-item nav-parent" data-group="ng-s5">
+        <span class="nav-icon">&#128101;</span>
+        <span class="nav-num">5</span>
+        <span class="nav-text">Patients</span>
+        <span class="nav-arrow">&#9658;</span>
+      </div>
+      <div class="nav-sub">
+        <a href="#s5a" data-section="s5a">Patient List</a>
+        <a href="#s5b" data-section="s5b">Adding a Patient</a>
+        <a href="#s5c" data-section="s5c">Patient View &mdash; Tabs</a>
+        <a href="#s5d" data-section="s5d">Medications</a>
+        <a href="#s5e" data-section="s5e">Wound Measurements</a>
+        <a href="#s5f" data-section="s5f">Wound Photos</a>
+        <a href="#s5g" data-section="s5g">Assigned MA</a>
+      </div>
+    </div>
+
+    <div class="nav-group" id="ng-s6">
+      <div class="nav-item nav-parent" data-group="ng-s6">
+        <span class="nav-icon">&#128203;</span>
+        <span class="nav-num">6</span>
+        <span class="nav-text">Forms</span>
+        <span class="nav-arrow">&#9658;</span>
+      </div>
+      <div class="nav-sub">
+        <a href="#s6a" data-section="s6a">Available Forms</a>
+        <a href="#s6b" data-section="s6b">Completing a Form</a>
+        <a href="#s6c" data-section="s6c">Auto-Save Draft</a>
+        <a href="#s6d" data-section="s6d">Voice-to-Text Dictation</a>
+        <a href="#s6e" data-section="s6e">Signing &amp; Submitting</a>
+        <a href="#s6f" data-section="s6f">Form Statuses</a>
+        <a href="#s6g" data-section="s6g">Exporting as PDF</a>
+        <a href="#s6h" data-section="s6h">Schedule Requirement</a>
+      </div>
+    </div>
+
+    <div class="nav-group" id="ng-s7">
+      <a class="nav-item" href="#s7" data-section="s7">
+        <span class="nav-icon">&#128203;</span>
+        <span class="nav-num">7</span>
+        <span class="nav-text">Visit Types</span>
+      </a>
+    </div>
+
+    <div class="nav-label">Schedule</div>
+
+    <div class="nav-group" id="ng-s8">
+      <div class="nav-item nav-parent" data-group="ng-s8">
+        <span class="nav-icon">&#128197;</span>
+        <span class="nav-num">8</span>
+        <span class="nav-text">Schedule (MA View)</span>
+        <span class="nav-arrow">&#9658;</span>
+      </div>
+      <div class="nav-sub">
+        <a href="#s8a" data-section="s8a">Navigating the Schedule</a>
+        <a href="#s8b" data-section="s8b">Visit Actions</a>
+        <a href="#s8b2" data-section="s8b2">Visit Status Flow</a>
+        <a href="#s8c" data-section="s8c">Visit Forms &amp; Notes</a>
+        <a href="#s8d" data-section="s8d">GPS Location Tracking</a>
+        <a href="#s8e" data-section="s8e">Visit Time Tracking</a>
+        <a href="#s8f" data-section="s8f">Google Maps Navigation</a>
+      </div>
+    </div>
+
+    <div class="nav-group" id="ng-s9">
+      <div class="nav-item nav-parent" data-group="ng-s9">
+        <span class="nav-icon">&#128736;</span>
+        <span class="nav-num">9</span>
+        <span class="nav-text">Admin Schedule</span>
+        <span class="nav-arrow">&#9658;</span>
+      </div>
+      <div class="nav-sub">
+        <a href="#s9a" data-section="s9a">Adding a Visit</a>
+        <a href="#s9b" data-section="s9b">Reordering Visits</a>
+        <a href="#s9c" data-section="s9c">Route Optimizer</a>
+        <a href="#s9d" data-section="s9d">Deleting a Visit</a>
+      </div>
+    </div>
+
+    <div class="nav-label">Administration</div>
+
+    <div class="nav-group" id="ng-s10">
+      <a class="nav-item" href="#s10" data-section="s10">
+        <span class="nav-icon">&#128104;</span>
+        <span class="nav-num">10</span>
+        <span class="nav-text">Staff Management</span>
+      </a>
+    </div>
+
+    <div class="nav-group" id="ng-s11">
+      <a class="nav-item" href="#s11" data-section="s11">
+        <span class="nav-icon">&#128196;</span>
+        <span class="nav-num">11</span>
+        <span class="nav-text">Audit Log</span>
+      </a>
+    </div>
+
+    <div class="nav-group" id="ng-s11b">
+      <a class="nav-item" href="#s11b" data-section="s11b">
+        <span class="nav-icon">&#9999;</span>
+        <span class="nav-num">11b</span>
+        <span class="nav-text">e-Sign Queue</span>
+      </a>
+    </div>
+
+    <div class="nav-label">More</div>
+
+    <div class="nav-group" id="ng-s12">
+      <div class="nav-item nav-parent" data-group="ng-s12">
+        <span class="nav-icon">&#128172;</span>
+        <span class="nav-num">12</span>
+        <span class="nav-text">Messages</span>
+        <span class="nav-arrow">&#9658;</span>
+      </div>
+      <div class="nav-sub">
+        <a href="#s12a" data-section="s12a">Conversation List</a>
+        <a href="#s12b" data-section="s12b">Reading &amp; Replying</a>
+        <a href="#s12c" data-section="s12c">Composing a Message</a>
+        <a href="#s12d" data-section="s12d">File Attachments</a>
+        <a href="#s12e" data-section="s12e">Deleting Messages</a>
+      </div>
+    </div>
+
+    <div class="nav-group" id="ng-s13">
+      <a class="nav-item" href="#s13" data-section="s13">
+        <span class="nav-icon">&#128246;</span>
+        <span class="nav-num">13</span>
+        <span class="nav-text">Offline Mode (PWA)</span>
+      </a>
+    </div>
+
+    <div class="nav-group" id="ng-s14">
+      <a class="nav-item" href="#s14" data-section="s14">
+        <span class="nav-icon">&#128272;</span>
+        <span class="nav-num">14</span>
+        <span class="nav-text">Security &amp; Privacy</span>
+      </a>
+    </div>
+
+    <div class="nav-group" id="ng-s15">
+      <a class="nav-item" href="#s15" data-section="s15">
+        <span class="nav-icon">&#128295;</span>
+        <span class="nav-num">15</span>
+        <span class="nav-text">Troubleshooting</span>
+      </a>
+    </div>
+
+    <div class="nav-group" id="ng-s16">
+      <a class="nav-item" href="#s16" data-section="s16">
+        <span class="nav-icon">&#9889;</span>
+        <span class="nav-num">16</span>
+        <span class="nav-text">Quick Reference</span>
+      </a>
+    </div>
+
+  </div><!-- /sidebar-nav -->
+
+  <div class="sidebar-footer">
+    <button class="btn-export" id="btnExport">
+      <span>&#11015;&#65039;</span> Export with Screenshots
+    </button>
+    <div class="ss-status"><strong id="ssCount">0</strong>&nbsp;of&nbsp;<strong id="ssTotal">15</strong>&nbsp;screenshots added</div>
+  </div>
+
+</nav><!-- /sidebar -->
+
+<!-- ═══ MAIN CONTENT ═══ -->
+<div class="main-content">
 
 <!-- ═══════════════════════════════════════════════
      COVER
@@ -176,86 +726,14 @@
   <div class="logo">Paperless<span>MD</span></div>
   <div class="subtitle">Electronic Health Record System &mdash; Complete User Manual</div>
   <div class="meta">
-    Beyond Wound Care Inc. &amp; Visiting Medical Physician Inc.<br>
-    Version 2.1 &nbsp;&middot;&nbsp; April 2026
+    <span class="meta-pill">Beyond Wound Care Inc.</span>
+    <span class="meta-pill">Visiting Medical Physician Inc.</span>
+    <span class="meta-pill">Version 2.4</span>
+    <span class="meta-pill">May 2026</span>
   </div>
 </div>
 
-<div class="container">
-
-<!-- ═══════════════════════════════════════════════
-     TABLE OF CONTENTS
-═══════════════════════════════════════════════ -->
-<div class="toc">
-  <h2>Table of Contents</h2>
-  <ol>
-    <li><a href="#s1">System Overview</a></li>
-    <li><a href="#s2">Getting Started — Login &amp; Navigation</a>
-      <ul class="sub">
-        <li><a href="#s2a">Logging In</a></li>
-        <li><a href="#s2b">Session Timeout</a></li>
-        <li><a href="#s2c">Navigation Bar</a></li>
-      </ul>
-    </li>
-    <li><a href="#s3">User Roles &amp; Permissions</a></li>
-    <li><a href="#s4">Dashboard</a></li>
-    <li><a href="#s5">Patients</a>
-      <ul class="sub">
-        <li><a href="#s5a">Patient List</a></li>
-        <li><a href="#s5b">Adding a Patient</a></li>
-        <li><a href="#s5c">Patient View — Tabs</a></li>
-        <li><a href="#s5d">Medications</a></li>
-        <li><a href="#s5e">Wound Measurements</a></li>
-        <li><a href="#s5f">Wound Photos</a></li>
-        <li><a href="#s5g">Assigned MA</a></li>
-      </ul>
-    </li>
-    <li><a href="#s6">Forms</a>
-      <ul class="sub">
-        <li><a href="#s6a">Available Forms</a></li>
-        <li><a href="#s6b">Completing a Form</a></li>
-        <li><a href="#s6c">Auto-Save Draft</a></li>
-        <li><a href="#s6d">Voice-to-Text Dictation</a></li>
-        <li><a href="#s6e">Signing &amp; Submitting</a></li>
-        <li><a href="#s6f">Form Statuses</a></li>
-        <li><a href="#s6g">Exporting as PDF</a></li>
-        <li><a href="#s6h">Form Access Gate (Schedule Requirement)</a></li>
-      </ul>
-    </li>
-    <li><a href="#s7">Visit Types &amp; Required Forms Checklist</a></li>
-    <li><a href="#s8">Schedule (MA Daily View)</a>
-      <ul class="sub">
-        <li><a href="#s8a">Navigating the Schedule</a></li>
-        <li><a href="#s8b">Visit Actions</a></li>
-        <li><a href="#s8c">Google Maps Navigation</a></li>
-      </ul>
-    </li>
-    <li><a href="#s9">Admin — Manage Schedule</a>
-      <ul class="sub">
-        <li><a href="#s9a">Adding a Visit</a></li>
-        <li><a href="#s9b">Reordering Visits</a></li>
-        <li><a href="#s9c">Route Optimizer</a></li>
-        <li><a href="#s9d">Deleting a Visit</a></li>
-      </ul>
-    </li>
-    <li><a href="#s10">Admin — Staff Management</a></li>
-    <li><a href="#s11">Admin — Audit Log</a></li>
-    <li><a href="#s11b">e-Sign Queue (Provider Countersignatures)</a></li>
-    <li><a href="#s12">Messages</a>
-      <ul class="sub">
-        <li><a href="#s12a">Conversation List</a></li>
-        <li><a href="#s12b">Reading &amp; Replying</a></li>
-        <li><a href="#s12c">Composing a New Message</a></li>
-        <li><a href="#s12d">File Attachments</a></li>
-        <li><a href="#s12e">Deleting Messages</a></li>
-      </ul>
-    </li>
-    <li><a href="#s13">Offline Mode (PWA)</a></li>
-    <li><a href="#s14">Security &amp; Privacy</a></li>
-    <li><a href="#s15">Troubleshooting</a></li>
-    <li><a href="#s16">Quick-Reference Cheat Sheet</a></li>
-  </ol>
-</div>
+<div class="content-body">
 
 
 <!-- ═══════════════════════════════════════════════
@@ -324,7 +802,7 @@ can continue working even when connectivity is temporarily lost.</p>
 <div class="tbl-wrap">
 <table>
   <tr><th>Item</th><th>Detail</th></tr>
-  <tr><td>Production URL</td><td><code>https://docs.md-officesupport.com</code></td></tr>
+  <tr><td>Production URL</td><td><code>https://ecpaperlessmd.com</code></td></tr>
   <tr><td colspan="2" style="background:#f8fafc;font-weight:700;color:#334155;">Beyond Wound Care Inc.</td></tr>
   <tr><td>Address</td><td>1340 Remington Rd, STE P, Schaumburg, IL 60173</td></tr>
   <tr><td>Phone</td><td>847-873-8693</td></tr>
@@ -348,16 +826,26 @@ can continue working even when connectivity is temporarily lost.</p>
 
 <h2 class="sub" id="s2a">2.1 Logging In</h2>
 <ul class="steps">
-  <li>Open your browser and go to <strong>https://docs.md-officesupport.com</strong></li>
+  <li>Open your browser and go to <strong>https://ecpaperlessmd.com</strong></li>
   <li>Enter your <strong>Username</strong> and <strong>Password</strong>. Use the eye icon to toggle password visibility.</li>
   <li>Click <strong>Sign In</strong>. You will be redirected to your Dashboard.</li>
 </ul>
+
+<div class="screenshot">
+  <div class="screenshot-bar"><span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span><div class="url">ecpaperlessmd.com/login.php</div></div>
+  <div class="screenshot-body"><div class="cam">📷</div><div class="cap">Login Screen — username/password fields, Sign In button, eye icon for password visibility</div><div class="hint">Replace with actual screenshot</div></div>
+</div>
 
 <div class="warn">
   <strong>⚠ Account must be active.</strong> If your account has been deactivated by an administrator, login will be refused even with correct credentials. Contact your admin.
 </div>
 <div class="note">
   <strong>Failed logins</strong> are recorded in the audit log. After too many failed attempts, contact your administrator.
+</div>
+
+<div class="screenshot">
+  <div class="screenshot-bar"><span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span><div class="url">ecpaperlessmd.com/dashboard.php</div></div>
+  <div class="screenshot-body"><div class="cam">📷</div><div class="cap">Top Navigation Bar — Dashboard, Patients, Schedule, Admin links, logout button</div><div class="hint">Replace with actual screenshot</div></div>
 </div>
 
 <h2 class="sub" id="s2b">2.2 Session Timeout</h2>
@@ -428,6 +916,11 @@ if they were saved within the last 24 hours.</p>
 
 <p>The Dashboard is the first screen after login. It provides an at-a-glance summary of today's activity.</p>
 
+<div class="screenshot">
+  <div class="screenshot-bar"><span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span><div class="url">ecpaperlessmd.com/dashboard.php</div></div>
+  <div class="screenshot-body"><div class="cam">📷</div><div class="cap">Dashboard — stat cards, today's schedule strip, and unsigned draft forms list</div><div class="hint">Replace with actual screenshot</div></div>
+</div>
+
 <h2 class="sub">4.1 Stat Cards</h2>
 <div class="tbl-wrap">
 <table>
@@ -469,6 +962,11 @@ Click any visit to jump to the patient record. For the full schedule, click <str
   <li>Each patient row shows a count of their forms and photos, plus the assigned MA's name (admin view).</li>
 </ul>
 
+<div class="screenshot">
+  <div class="screenshot-bar"><span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span><div class="url">ecpaperlessmd.com/patients.php</div></div>
+  <div class="screenshot-body"><div class="cam">📷</div><div class="cap">Patient List — search bar, patient rows with form/photo counts, assigned MA column (admin view)</div><div class="hint">Replace with actual screenshot</div></div>
+</div>
+
 <h2 class="sub" id="s5b">5.2 Adding a Patient</h2>
 <ul class="steps">
   <li>On the Patients page, click <strong>Add Patient</strong> (top-right button).</li>
@@ -488,6 +986,11 @@ Click any visit to jump to the patient record. For the full schedule, click <str
   <strong>Company branding:</strong> Once a patient's company is set, every form they sign — consent forms, CCM consent, wound care consent, PDF exports — will automatically display the correct practice logo, address, and contact information for that company. The company can be changed later via <strong>Edit Patient</strong>.
 </div>
 
+<div class="screenshot">
+  <div class="screenshot-bar"><span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span><div class="url">ecpaperlessmd.com/patients.php → Add Patient</div></div>
+  <div class="screenshot-body"><div class="cam">📷</div><div class="cap">Add Patient form — first/last name, DOB, address, company dropdown (BWC / VMP), assigned MA selector</div><div class="hint">Replace with actual screenshot</div></div>
+</div>
+
 <h2 class="sub" id="s5c">5.3 Patient View — Tabs</h2>
 <p>Click any patient name to open their record. The record has five tabs:</p>
 
@@ -500,6 +1003,11 @@ Click any visit to jump to the patient record. For the full schedule, click <str
   <tr><td><strong>Wounds</strong></td><td>Wound measurement entries with healing trend chart</td><td>Admin, MA</td></tr>
   <tr><td><strong>Last Visit</strong></td><td>Summary strip: date, MA name, vitals snapshot, form count, visit notes</td><td>Admin, MA</td></tr>
 </table>
+</div>
+
+<div class="screenshot">
+  <div class="screenshot-bar"><span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span><div class="url">ecpaperlessmd.com/patient_view.php?id=…</div></div>
+  <div class="screenshot-body"><div class="cam">📷</div><div class="cap">Patient Record — header with name, assigned MA badge, last visit strip, and the five tabs (Forms, Photos, Medications, Wounds, Last Visit)</div><div class="hint">Replace with actual screenshot</div></div>
 </div>
 
 <h3 class="sub">Last Visit Summary Card</h3>
@@ -516,13 +1024,13 @@ link to open and complete them immediately.</p>
 <p>The <strong>Medications</strong> tab shows two sections:</p>
 <ul>
   <li><strong>Active Medications</strong> — shown in sorted order. These are <strong>automatically pre-filled</strong> into the
-    Visit Consent form and New Patient Pocket form's medication list when the form is opened.
+    Visit Consent form and New Patient Packet form's medication list when the form is opened.
     The form shows a blue banner confirming the pre-fill: <em>"Pre-filled from last visit — medications carried over — update as needed."</em></li>
   <li><strong>Discontinued</strong> — historical list, ordered by the date discontinued.</li>
 </ul>
 <p>To add, edit, or discontinue a medication, use the controls on the Medications tab.
 Changes take effect on the next form that is opened for this patient.</p>
-<p><strong>Medication reconciliation on form save:</strong> Every time a Visit Consent or New Patient Pocket form is submitted, the medication list is reconciled against the patient's master record:</p>
+<p><strong>Medication reconciliation on form save:</strong> Every time a Visit Consent or New Patient Packet form is submitted, the medication list is reconciled against the patient's master record:</p>
 <ul>
   <li>Rows marked <strong>New</strong> are added to the active medication list.</li>
   <li>Rows marked <strong>Refill</strong> (default for pre-filled meds) update the name/frequency if changed.</li>
@@ -540,14 +1048,26 @@ Changes take effect on the next form that is opened for this patient.</p>
 </ul>
 
 <h2 class="sub" id="s5f">5.6 Wound Photos</h2>
+
+<div class="screenshot">
+  <div class="screenshot-bar"><span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span><div class="url">patient_view.php?id=…&tab=photos</div></div>
+  <div class="screenshot-body"><div class="cam">📷</div><div class="cap">Wound Photos tab — photos grouped by wound site, thumbnail grid, Compare button, and full-screen lightbox with zoom &amp; pan controls</div><div class="hint">Replace with actual screenshot</div></div>
+</div>
+
 <p>On the <strong>Photos</strong> tab:</p>
 <ul>
   <li>Photos are grouped by <strong>wound location</strong> (e.g., "Left heel", "Right ankle").</li>
-  <li>Click any photo for a full-screen lightbox view.</li>
+  <li>Click any photo to open it in a <strong>full-screen lightbox</strong> with a sidebar showing wound site, date, recorded-by, and notes. A <strong>Download</strong> button is available in the sidebar.</li>
+  <li><strong>Zoom:</strong> Use the − / + buttons on the photo, scroll the mouse wheel, or use a two-finger pinch gesture on mobile. Keyboard: <kbd>+</kbd> / <kbd>−</kbd> to zoom, <kbd>0</kbd> to reset.</li>
+  <li><strong>Pan / Drag:</strong> Click and drag (or single-finger drag on mobile) to pan around when zoomed in. The image can be moved freely in any direction.</li>
+  <li><strong>Navigate photos:</strong> Use the ← → arrows in the lightbox, or keyboard arrow keys. Press <kbd>Esc</kbd> to close.</li>
   <li><strong>Compare mode:</strong> Select two photos from the same wound site and click
     <em>Compare</em> to view them side by side for healing assessment.</li>
   <li>New photos are added via the <strong>Wound Care Photos</strong> form (see Forms section).</li>
 </ul>
+<div class="tip">
+  <strong>💡 Tip:</strong> Zoom in to 200–300% to examine wound edges or ruler measurements in detail. The zoom level is shown as a percentage pill at the bottom of the photo.
+</div>
 
 <h2 class="sub" id="s5g">5.7 Assigned MA</h2>
 <p>Every patient has one <strong>Assigned MA</strong> — the Medical Assistant responsible for their ongoing care.</p>
@@ -570,6 +1090,11 @@ Changes take effect on the next form that is opened for this patient.</p>
 
 <h2 class="sub" id="s6a">6.1 Available Forms</h2>
 
+<div class="screenshot">
+  <div class="screenshot-bar"><span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span><div class="url">patient_view.php?id=…&tab=forms</div></div>
+  <div class="screenshot-body"><div class="cam">📷</div><div class="cap">Forms tab — required forms checklist, form tile buttons (Visit Consent, ABN, New Patient Packet, etc.), and schedule gate overlay when no visit is scheduled</div><div class="hint">Replace with actual screenshot</div></div>
+</div>
+
 <div class="warn">
   <strong>&#x1F512; Schedule Requirement:</strong> Most visit forms can only be opened and submitted when the patient has a visit scheduled for <em>today</em>. If no visit is scheduled, the form tile panel shows a <em>"No visit scheduled for today"</em> overlay. Admins can always open forms regardless of the schedule. See <a href="#s6h">Section 6.8</a> for details.
 </div>
@@ -577,7 +1102,7 @@ Changes take effect on the next form that is opened for this patient.</p>
 <div class="form-grid">
   <div class="form-card">
     <h3>📋 Visit Consent (vital_cs)</h3>
-    <p>Captures vitals (BP, HR, temp, weight, O₂ sat), race, chief complaint, homebound reason, and active medications. Requires patient signature. Pre-fills vitals and meds from the previous visit.</p>
+    <p>Captures vitals (BP, HR, temp, weight, O₂ sat), race, homebound reason, assistive device, allergies, and active medications. Requires patient signature. Pre-fills vitals and meds from the previous visit. <strong>Pharmacy fields are not on this form</strong> — pharmacy is collected on the New Patient Packet only.</p>
   </div>
   <div class="form-card">
     <h3>👤 New Patient Consent</h3>
@@ -605,7 +1130,7 @@ Changes take effect on the next form that is opened for this patient.</p>
   </div>
   <div class="form-card">
     <h3>📜 IL DHS Disclosure Auth.</h3>
-    <p>Illinois Department of Human Services Authorization to Disclose Protected Health Information.</p>
+    <p>Illinois Department of Human Services Authorization to Disclose Protected Health Information. Includes patient name, DOB, and alias fields. <strong>SSN is not collected on this form</strong> — SSN collection is limited to the New Patient Packet.</p>
   </div>
   <div class="form-card">
     <h3>📄 Informed Consent &ndash; Wound Care</h3>
@@ -616,8 +1141,8 @@ Changes take effect on the next form that is opened for this patient.</p>
     <p>Remote Patient Monitoring consent form. Covers purpose of RPM services, equipment use and return, patient responsibilities, 30-day phone check-in communication, HIPAA privacy, and voluntary participation. Includes a field for the RPM device serial number and patient signature.</p>
   </div>
   <div class="form-card" style="border-color:#6366f1;">
-    <h3>&#x1F4C2; New Patient Pocket <span style="font-size:0.7em;background:#e0e7ff;color:#4338ca;padding:2px 8px;border-radius:12px;vertical-align:middle;">NEW</span></h3>
-    <p>Combined 9-step wizard that merges six forms into a single signing session: Visit Consent (CS), CCM Consent, ABN (CMS-R-131), Informed Consent for Wound Care, IL DHS PHI Authorization, and Patient Fusion Portal Consent. The patient, MA, and provider each sign only once on the final signature page. The provider signs <strong>inline on the form</strong> (no separate countersignature step needed). Medication reconciliation runs on save (same as standalone Visit Consent). This is an <strong>intake form</strong> — it does not require a visit to be scheduled today and is always accessible from the patient record.</p>
+    <h3>&#x1F4C2; New Patient Packet</h3>
+    <p>Combined 9-step wizard merging six forms: Visit Consent (CS), CCM Consent, ABN (CMS-R-131), Informed Consent for Wound Care, IL DHS PHI Authorization, and Patient Fusion Portal Consent. Patient, MA, and provider each sign once on the final step. Provider signature is auto-filled from the schedule. Medication reconciliation runs on save. <strong>This is the only form that collects pharmacy info and SSN (last 4 digits).</strong> Intake form — no scheduled visit required.</p>
   </div>
 </div>
 
@@ -626,7 +1151,20 @@ Changes take effect on the next form that is opened for this patient.</p>
 </div>
 
 <div class="note">
-  <strong>Intake vs Visit forms:</strong> Three forms — <em>New Patient Consent</em>, <em>New Patient Pocket</em>, and <em>PF Portal Consent</em> — are classified as <strong>intake forms</strong>. They are always accessible from the patient record even if no visit is scheduled today, because new patients may not yet have a visit entry. All other forms require a scheduled visit.
+  <strong>Pharmacy &amp; SSN collection:</strong> Pharmacy name/phone and the patient's SSN (last 4 digits) are collected <strong>only on the New Patient Packet form</strong>. These fields do not appear on the Visit Consent (CS), IL DHS Disclosure, or any other follow-up form to avoid redundant data entry and unnecessary exposure of sensitive information.
+</div>
+
+<div class="note">
+  <strong>Visit type pre-selection:</strong> When an MA taps <strong>Start Visit</strong> on the schedule, the visit type is passed to the form automatically. The matching <em>Visit Type</em> radio button (New Patient, Follow-Up, Sick, etc.) is pre-selected when the form opens. The MA can still change it before submitting.
+</div>
+
+<div class="note">
+  <strong>Intake vs Visit forms:</strong> Three forms — <em>New Patient Consent</em>, <em>New Patient Packet</em>, and <em>PF Portal Consent</em> — are classified as <strong>intake forms</strong>. They are always accessible from the patient record even if no visit is scheduled today, because new patients may not yet have a visit entry. All other forms require a scheduled visit.
+</div>
+
+<div class="screenshot">
+  <div class="screenshot-bar"><span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span><div class="url">ecpaperlessmd.com/forms/vital_cs.php?…</div></div>
+  <div class="screenshot-body"><div class="cam">📷</div><div class="cap">Visit Consent (Vital CS) form — vitals section (BP, HR, temp, O₂ sat, weight), allergies, medication list table with pre-filled medications</div><div class="hint">Replace with actual screenshot</div></div>
 </div>
 
 <h2 class="sub" id="s6b">6.2 Completing a Form</h2>
@@ -671,6 +1209,11 @@ to the device's local storage (browser storage — <em>not</em> sent to the serv
   Dictation also works on text inputs named <em>notes</em>, <em>description</em>, or <em>complaint</em>.
 </div>
 
+<div class="screenshot">
+  <div class="screenshot-bar"><span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span><div class="url">ecpaperlessmd.com/forms/…</div></div>
+  <div class="screenshot-body"><div class="cam">📷</div><div class="cap">Signature section at the bottom of a form — patient signature pad, MA signature pad, Submit Form button</div><div class="hint">Replace with actual screenshot</div></div>
+</div>
+
 <h2 class="sub" id="s6e">6.5 Signing &amp; Submitting</h2>
 <p>Every form requires a patient (or POA) signature before it can be submitted:</p>
 <ul>
@@ -689,9 +1232,12 @@ to the device's local storage (browser storage — <em>not</em> sent to the serv
 <div class="tbl-wrap">
 <table>
   <tr><th>Form</th><th>Provider Signs</th></tr>
-  <tr><td><strong>New Patient Pocket</strong></td><td>Inline on the final page of the form (Step 9). Provider draws their signature <em>before</em> the MA clicks Submit. The signed document immediately shows the provider signature when viewed.</td></tr>
+  <tr><td><strong>New Patient Packet</strong></td><td>Inline on the final page of the form (Step 9). The provider's saved signature is <strong>automatically pre-filled</strong> based on who is assigned to the patient's visit in today's schedule — no manual signing needed if the provider has a saved signature on their profile. A "Sign manually" option is available to override.</td></tr>
   <tr><td><strong>All other signed forms</strong></td><td>After submission, via the <strong>e-Sign Queue</strong> (Admin &rarr; e-Sign Queue). The provider opens the document and adds a countersignature there.</td></tr>
 </table>
+</div>
+<div class="note">
+  <strong>How provider signature auto-fill works:</strong> When an MA opens the New Patient Packet form, the system checks today's schedule for that patient, finds the assigned provider, and pre-loads their saved signature. The MA does not need to be logged in as the provider. The provider must have a <strong>saved signature</strong> set on their Profile page for auto-fill to work.
 </div>
 
 <h2 class="sub" id="s6f">6.6 Form Statuses</h2>
@@ -718,7 +1264,7 @@ to the device's local storage (browser storage — <em>not</em> sent to the serv
 <p>To ensure forms are only filled during an actual clinical visit, PaperlessMD enforces a <strong>schedule gate</strong>:</p>
 <ul>
   <li>When no visit is scheduled for the patient <em>today</em>, the form tile panel on the patient record shows an amber <em>"No visit scheduled for today"</em> overlay. The tiles are visible but greyed out and non-clickable.</li>
-  <li>Below the overlay, <strong>intake forms</strong> (New Patient Consent, New Patient Pocket, PF Portal Consent) are always shown as fully clickable tiles with a label <em>"Intake forms (no visit required)"</em>.</li>
+  <li>Below the overlay, <strong>intake forms</strong> (New Patient Consent, New Patient Packet, PF Portal Consent) are always shown as fully clickable tiles with a label <em>"Intake forms (no visit required)"</em>.</li>
   <li><span class="badge badge-admin">Admin</span> users bypass the gate entirely and can open any form at any time. A blue note is shown: <em>"Admin override — no visit scheduled today, but you can still start forms."</em></li>
   <li>The gate is also enforced server-side — attempting to submit a visit form without a scheduled visit (e.g., by direct URL) returns an error, even for MA users.</li>
 </ul>
@@ -740,7 +1286,7 @@ which forms <em>must</em> be completed before that visit is considered clinicall
   <tr><th>Visit Type</th><th>Label</th><th>Required Forms</th></tr>
   <tr>
     <td><code>routine</code></td>
-    <td>Routine Visit</td>
+    <td>Follow-Up</td>
     <td>Visit Consent, ABN</td>
   </tr>
   <tr>
@@ -755,7 +1301,7 @@ which forms <em>must</em> be completed before that visit is considered clinicall
   </tr>
   <tr>
     <td><code>awv</code></td>
-    <td>Annual Wellness Visit</td>
+    <td>Annual Wellness</td>
     <td>Visit Consent, Medicare AWV, ABN</td>
   </tr>
   <tr>
@@ -786,6 +1332,11 @@ the MA can open them instantly without searching.</p>
 ═══════════════════════════════════════════════ -->
 <h1 class="section" id="s8"><span class="num">8</span> Schedule — Daily View</h1>
 
+<div class="screenshot">
+  <div class="screenshot-bar"><span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span><div class="url">ecpaperlessmd.com/schedule.php</div></div>
+  <div class="screenshot-body"><div class="cam">📷</div><div class="cap">MA Daily Schedule — visit cards with patient name, address, status badges (Pending / En Route / Completed), Start Visit button, Navigate button, and the stats strip at the top</div><div class="hint">Replace with actual screenshot</div></div>
+</div>
+
 <p>The Schedule page (accessible from the nav bar) shows all visits for <strong>one day</strong>.
 MAs see only their own visits. Admins can switch to any MA using the MA selector dropdown.</p>
 
@@ -801,17 +1352,56 @@ MAs see only their own visits. Admins can switch to any MA using the MA selector
 <div class="tbl-wrap">
 <table>
   <tr><th>Button / Action</th><th>What it does</th></tr>
-  <tr><td><span class="badge badge-amber">En Route</span></td><td>Mark yourself as heading to the patient; triggers Google Maps link for navigation</td></tr>
-  <tr><td><span class="badge badge-green">Complete</span></td><td>Mark visit as completed</td></tr>
+  <tr><td>▶ <strong>Start Visit</strong></td><td>Records the exact <strong>visit start time</strong>, marks the visit <em>En Route</em>, sends the MA's current GPS location to the office, and navigates <strong>directly to the first form</strong> for that visit type with the visit type pre-selected. Start time is stored permanently and never overwritten.</td></tr>
+  <tr><td>📂 <strong>Open Forms</strong></td><td>Shown when visit is already <em>En Route</em>. Opens the same direct form as Start Visit.</td></tr>
+  <tr><td>🛑 <strong>End Visit</strong></td><td>Shown (in red) when a visit is <em>En Route</em>. Records the exact <strong>visit end time</strong>, marks the visit <em>Completed</em>, and returns to the schedule. Start and end times are displayed on the visit card.</td></tr>
+  <tr><td><span class="badge badge-green">Complete</span></td><td>Mark visit as completed (without recording end time — use End Visit instead for time tracking)</td></tr>
   <tr><td><span class="badge badge-red">Missed</span></td><td>Mark visit as missed / patient not available</td></tr>
-  <tr><td>📋 Open Patient</td><td>Jump to the patient record (Forms tab pre-selected)</td></tr>
+  <tr><td>🗺 Navigate</td><td>Opens Google Maps with directions to the patient's address. <strong>Immediately pushes the MA's current GPS coordinates</strong> to the office before opening Maps.</td></tr>
+  <tr><td>📋 Chart</td><td>Jump to the full patient record</td></tr>
   <tr><td>🗒 Quick Note</td><td>Expand inline visit note panel to add a note for this visit</td></tr>
 </table>
 </div>
 
-<h2 class="sub" id="s8c">8.3 Google Maps Navigation</h2>
-<p>Each visit card shows the patient's address. Tapping <strong>Navigate</strong> (or marking a visit
-<em>En Route</em>) opens <strong>Google Maps</strong> with turn-by-turn directions to the patient's address.</p>
+<div class="screenshot">
+  <div class="screenshot-bar"><span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span><div class="url">ecpaperlessmd.com/schedule.php</div></div>
+  <div class="screenshot-body"><div class="cam">📷</div><div class="cap">Visit card action buttons — Start Visit (green), Navigate (blue), End Visit (red, shown when En Route), visit type badge, and patient address</div><div class="hint">Replace with actual screenshot</div></div>
+</div>
+
+<h2 class="sub" id="s8b2">8.3 Start Visit — Direct Form Routing</h2>
+<p>Tapping <strong>Start Visit</strong> marks the visit as <em>En Route</em> and goes straight to the primary form for that visit type:</p>
+<div class="tbl-wrap">
+<table>
+  <tr><th>Visit Type</th><th>Opens directly</th></tr>
+  <tr><td>Routine</td><td>Vital CS (Clinical Summary)</td></tr>
+  <tr><td>New Patient</td><td>New Patient Packet</td></tr>
+  <tr><td>AWV</td><td>Medicare Annual Wellness Visit</td></tr>
+  <tr><td>CCM</td><td>CCM Consent</td></tr>
+  <tr><td>IL Disclosure</td><td>IL DHS PHI Authorization</td></tr>
+  <tr><td>Wound Care</td><td>Patient Forms tab (multiple forms required)</td></tr>
+</table>
+</div>
+
+<h2 class="sub" id="s8c">8.4 GPS Location Tracking</h2>
+<p>PaperlessMD tracks the MA's location so the office always has an up-to-date position:</p>
+<ul>
+  <li>Location updates are sent to the office <strong>every minute</strong> automatically while the MA is logged in on the Schedule page.</li>
+  <li>The browser requests a <strong>fresh GPS fix</strong> each time (high-accuracy mode) — cached positions are not used.</li>
+  <li>A status badge on the schedule page shows the MA whether location sharing is <span class="badge badge-green">Active</span>, <span class="badge badge-amber">Searching</span>, or <span class="badge badge-red">Blocked</span>. If blocked, a prompt appears to enable location in browser settings.</li>
+  <li>Tapping <strong>Navigate</strong> on a visit card <strong>immediately pushes</strong> the MA's current GPS coordinates before opening Google Maps — the admin sees the location update in real time.</li>
+  <li>Admins can view all MA locations on the live map at <strong>Admin → MA Locations</strong>.</li>
+</ul>
+
+<h2 class="sub" id="s8d">8.5 Visit Time Tracking</h2>
+<p>Every visit now records both a start and end time for accurate visit duration tracking:</p>
+<ul>
+  <li><strong>Start time:</strong> Recorded automatically when the MA taps Start Visit. Displayed on the visit card and stored permanently — cannot be overwritten by re-tapping Start Visit.</li>
+  <li><strong>End time:</strong> Recorded when the MA taps the red <strong>End Visit</strong> button. Also available on the last step of the New Patient Packet form when opened from a scheduled visit.</li>
+  <li>Both times are visible on the visit card in the schedule view.</li>
+</ul>
+
+<h2 class="sub" id="s8e">8.6 Google Maps Navigation</h2>
+<p>Each visit card shows the patient's address. Tapping <strong>Navigate</strong> opens <strong>Google Maps</strong> with turn-by-turn directions to the patient's address.</p>
 <ul>
   <li>On mobile, this opens the Google Maps app automatically.</li>
   <li>On desktop, it opens in a new browser tab.</li>
@@ -822,6 +1412,11 @@ MAs see only their own visits. Admins can switch to any MA using the MA selector
      9. ADMIN — MANAGE SCHEDULE
 ═══════════════════════════════════════════════ -->
 <h1 class="section" id="s9"><span class="num">9</span> Admin — Manage Schedule</h1>
+
+<div class="screenshot">
+  <div class="screenshot-bar"><span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span><div class="url">ecpaperlessmd.com/admin/manage_schedule.php</div></div>
+  <div class="screenshot-body"><div class="cam">📷</div><div class="cap">Manage Schedule page — date picker, visits grouped by MA, drag-handle rows, Add Visit button, Optimize Route button, and Delete icons</div><div class="hint">Replace with actual screenshot</div></div>
+</div>
 
 <p>Accessible via <strong>Admin &rarr; Manage Schedule</strong>. Admin role only.</p>
 <p>This page shows all visits for a selected date, grouped by Medical Assistant. Visits can be
@@ -957,6 +1552,11 @@ newest first, 50 records per page.</p>
 <!-- ═══════════════════════════════════════════════
      11b. E-SIGN QUEUE
 ═══════════════════════════════════════════════ -->
+<div class="screenshot">
+  <div class="screenshot-bar"><span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span><div class="url">ecpaperlessmd.com/admin/manage_schedule.php → Add Visit</div></div>
+  <div class="screenshot-body"><div class="cam">📷</div><div class="cap">Add Visit panel — MA dropdown, Patient selector, visit date/time picker, visit type pills (Routine, New Patient, AWV, CCM, etc.), notes field, Save button</div><div class="hint">Replace with actual screenshot</div></div>
+</div>
+
 <h1 class="section" id="s11b"><span class="num">11.5</span> e-Sign Queue — Provider Countersignatures</h1>
 
 <p>Accessible via <strong>Admin &rarr; e-Sign Queue</strong> (also shown as a badge count in the nav bar).
@@ -964,8 +1564,13 @@ This queue lists all forms that have been signed by the patient and MA but are s
 <strong>provider (physician / NP) countersignature</strong>.</p>
 
 <div class="note">
-  <strong>Exception:</strong> The <em>New Patient Pocket</em> form collects the provider signature inline
+  <strong>Exception:</strong> The <em>New Patient Packet</em> form collects the provider signature inline
   during the signing session (Step 9). Those forms do <em>not</em> appear in the e-Sign Queue.
+</div>
+
+<div class="screenshot">
+  <div class="screenshot-bar"><span class="dot-r"></span><span class="dot-y"></span><span class="dot-g"></span><div class="url">ecpaperlessmd.com/admin/esign_queue.php</div></div>
+  <div class="screenshot-body"><div class="cam">📷</div><div class="cap">e-Sign Queue — list of forms awaiting provider countersignature, with patient name, form type, date, and MA. Badge count visible in the nav bar.</div><div class="hint">Replace with actual screenshot</div></div>
 </div>
 
 <h2 class="sub">11.5.1 Viewing the Queue</h2>
@@ -1067,12 +1672,12 @@ the browser's Service Worker so you can continue working with limited or no conn
   <tr>
     <td>Form tiles show "No visit scheduled for today" overlay</td>
     <td>No visit is scheduled for this patient today (schedule gate)</td>
-    <td>Ask admin to add a visit in <strong>Admin &rarr; Manage Schedule</strong>. Intake forms (New Patient Consent, New Patient Pocket, PF Portal Consent) are always accessible below the overlay.</td>
+    <td>Ask admin to add a visit in <strong>Admin &rarr; Manage Schedule</strong>. Intake forms (New Patient Consent, New Patient Packet, PF Portal Consent) are always accessible below the overlay.</td>
   </tr>
   <tr>
     <td>Provider countersignature panel appears even though provider already signed</td>
     <td>Provider signature was not saved to the DB column (old record)</td>
-    <td>Use the countersignature panel on the View Document page to re-sign. Going forward, New Patient Pocket captures provider signature inline during submission and this issue will not recur.</td>
+    <td>Use the countersignature panel on the View Document page to re-sign. Going forward, New Patient Packet captures provider signature inline during submission and this issue will not recur.</td>
   </tr>
   <tr>
     <td>Patient not appearing in MA's patient list</td>
@@ -1152,14 +1757,13 @@ the browser's Service Worker so you can continue working with limited or no conn
 <ol class="steps">
   <li>Log in → <strong>Dashboard</strong> shows today's schedule and any pending drafts.</li>
   <li>Go to <strong>Schedule</strong> to see the full day's visit list in order.</li>
-  <li>Tap a visit → tap <strong>Navigate</strong> to open Google Maps.</li>
-  <li>Tap <strong>En Route</strong> when leaving for the patient.</li>
-  <li>On arrival, tap the patient name to open their record.</li>
+  <li>Tap a visit → tap <strong>Navigate</strong> to open Google Maps (also pushes your GPS location to the office).</li>
+  <li>Tap <strong>Start Visit</strong> on arrival — records start time and opens the first form for that visit type with the visit type pre-selected.</li>
   <li>Complete required forms (check the <strong>Required Forms Checklist</strong> on the Forms tab).</li>
   <li>Patient signs each form → tap <strong>Submit Form</strong>.</li>
   <li>Add wound photos via the <strong>Wound Care Photos</strong> form if applicable.</li>
   <li>Update wound measurements on the <strong>Wounds</strong> tab.</li>
-  <li>Mark visit <strong>Completed</strong> on the Schedule page.</li>
+  <li>Tap the red <strong>End Visit</strong> button on the schedule (or on the final form step) to record the end time and mark the visit Completed.</li>
 </ol>
 
 <h2 class="sub">Daily Admin Workflow</h2>
@@ -1182,6 +1786,13 @@ the browser's Service Worker so you can continue working with limited or no conn
   <tr><td>Start voice dictation</td><td>Tap 🎤 mic button on any text area</td></tr>
   <tr><td>Clear signature pad</td><td>Click "Clear Signature" button</td></tr>
   <tr><td>Drag-reorder a visit</td><td>Hold the ⠿ handle on the left of a visit row</td></tr>
+  <tr><td colspan="2" style="background:#f8fafc;font-weight:700;color:#334155;font-size:0.82rem;">Wound Photo Lightbox</td></tr>
+  <tr><td>Open photo lightbox</td><td>Click any photo thumbnail</td></tr>
+  <tr><td>Navigate photos (prev / next)</td><td>← / → arrow keys, or arrow buttons in lightbox</td></tr>
+  <tr><td>Zoom in / out</td><td>+ / − keys, scroll wheel, or pinch gesture</td></tr>
+  <tr><td>Reset zoom &amp; position</td><td>0 key, or tap the zoom % label</td></tr>
+  <tr><td>Pan photo (when zoomed in)</td><td>Click and drag (or single-finger drag on mobile)</td></tr>
+  <tr><td>Close lightbox</td><td>Esc key, or click outside the photo</td></tr>
 </table>
 </div>
 
@@ -1208,13 +1819,326 @@ the browser's Service Worker so you can continue working with limited or no conn
 
 <hr>
 
-</div><!-- /container -->
+</div><!-- /content-body -->
+
+</div><!-- /main-content -->
+
+</div><!-- /layout -->
+
+<!-- Back to top button -->
+<button id="back-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="Back to top">&#8679;</button>
 
 <footer>
   PaperlessMD &mdash; Multi-Company EHR System &nbsp;|&nbsp;
   Beyond Wound Care Inc. &nbsp;|&nbsp; Visiting Medical Physician Inc.<br>
   This document is confidential and intended for authorized staff only.
 </footer>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ─── Elements ─── */
+  const sidebar  = document.getElementById('sidebar');
+  const overlay  = document.getElementById('sidebarOverlay');
+  const menuBtn  = document.getElementById('menuBtn');
+  const searchEl = document.getElementById('navSearch');
+  const noRes    = document.getElementById('searchNoResults');
+  const backTop  = document.getElementById('back-top');
+
+  /* ─── Mobile sidebar toggle ─── */
+  function openSidebar()  { sidebar.classList.add('open');  overlay.classList.add('open'); }
+  function closeSidebar() { sidebar.classList.remove('open'); overlay.classList.remove('open'); }
+  menuBtn.addEventListener('click', openSidebar);
+  overlay.addEventListener('click', closeSidebar);
+
+  /* Close sidebar on nav link click (mobile) */
+  sidebar.querySelectorAll('a[href^="#"]').forEach(function (a) {
+    a.addEventListener('click', function () {
+      if (window.innerWidth <= 900) closeSidebar();
+    });
+  });
+
+  /* ─── Expand / collapse parent groups ─── */
+  sidebar.querySelectorAll('.nav-parent').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var group = document.getElementById(btn.dataset.group);
+      if (group) group.classList.toggle('open');
+    });
+  });
+
+  /* ─── Active section tracking via IntersectionObserver ─── */
+  /* Map every anchor ID → which top-level section group it belongs to */
+  var sectionGroupMap = {
+    s1: 's1', s2: 's2', s2a: 's2', s2b: 's2', s2c: 's2',
+    s3: 's3', s4: 's4',
+    s5: 's5', s5a: 's5', s5b: 's5', s5c: 's5', s5d: 's5', s5e: 's5', s5f: 's5', s5g: 's5',
+    s6: 's6', s6a: 's6', s6b: 's6', s6c: 's6', s6d: 's6', s6e: 's6', s6f: 's6', s6g: 's6', s6h: 's6',
+    s7: 's7',
+    s8: 's8', s8a: 's8', s8b: 's8', s8b2: 's8', s8c: 's8', s8d: 's8', s8e: 's8', s8f: 's8',
+    s9: 's9', s9a: 's9', s9b: 's9', s9c: 's9', s9d: 's9',
+    s10: 's10', s11: 's11', s11b: 's11b',
+    s12: 's12', s12a: 's12', s12b: 's12', s12c: 's12', s12d: 's12', s12e: 's12',
+    s13: 's13', s14: 's14', s15: 's15', s16: 's16'
+  };
+
+  var activeSection = null;
+
+  function setActive(id) {
+    if (id === activeSection) return;
+    activeSection = id;
+
+    /* Remove all active classes */
+    sidebar.querySelectorAll('.nav-item.active').forEach(function (el) { el.classList.remove('active'); });
+    sidebar.querySelectorAll('.nav-sub a.active').forEach(function (el) { el.classList.remove('active'); });
+
+    /* Highlight the direct nav link */
+    var direct = sidebar.querySelector('[data-section="' + id + '"]');
+    if (direct) {
+      direct.classList.add('active');
+      /* Open its parent group if it's a sub-item */
+      var sub = direct.closest('.nav-sub');
+      if (sub) {
+        var group = sub.closest('.nav-group');
+        if (group) group.classList.add('open');
+        /* Also mark the parent nav-item */
+        var parentBtn = group ? group.querySelector('.nav-item') : null;
+        if (parentBtn) parentBtn.classList.add('active');
+      }
+    } else {
+      /* Fall back: highlight the top-level group */
+      var topId = sectionGroupMap[id];
+      if (topId) {
+        var topLink = sidebar.querySelector('[data-section="' + topId + '"]');
+        if (topLink) topLink.classList.add('active');
+      }
+    }
+
+    /* Open the group for the active top section */
+    var topGroup = sectionGroupMap[id];
+    if (topGroup) {
+      var groupEl = document.getElementById('ng-' + topGroup);
+      if (groupEl) groupEl.classList.add('open');
+    }
+  }
+
+  /* Gather all tracked headings */
+  var headingIds = Object.keys(sectionGroupMap);
+  var headings = headingIds.map(function (id) { return document.getElementById(id); }).filter(Boolean);
+
+  /* IntersectionObserver: watch which heading is near the top */
+  var visibleHeadings = new Set();
+  var observer = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) visibleHeadings.add(e.target);
+      else visibleHeadings.delete(e.target);
+    });
+    if (visibleHeadings.size > 0) {
+      /* Pick the one closest to the top of the viewport */
+      var topEl = Array.from(visibleHeadings).reduce(function (a, b) {
+        return Math.abs(a.getBoundingClientRect().top) < Math.abs(b.getBoundingClientRect().top) ? a : b;
+      });
+      setActive(topEl.id);
+    }
+  }, { rootMargin: '0px 0px -70% 0px', threshold: 0 });
+
+  headings.forEach(function (h) { observer.observe(h); });
+
+  /* ─── Smooth scroll links inside content ─── */
+  document.querySelectorAll('a[href^="#"]').forEach(function (a) {
+    a.addEventListener('click', function (e) {
+      var target = document.getElementById(a.getAttribute('href').slice(1));
+      if (target) {
+        e.preventDefault();
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setActive(a.getAttribute('href').slice(1));
+      }
+    });
+  });
+
+  /* ─── Back to top button ─── */
+  window.addEventListener('scroll', function () {
+    if (window.scrollY > 300) backTop.classList.add('visible');
+    else backTop.classList.remove('visible');
+  }, { passive: true });
+
+  /* ─── Sidebar nav search/filter ─── */
+  searchEl.addEventListener('input', function () {
+    var q = searchEl.value.trim().toLowerCase();
+    var anyVisible = false;
+
+    sidebar.querySelectorAll('.nav-group').forEach(function (group) {
+      var parentText = (group.querySelector('.nav-text') || { textContent: '' }).textContent.toLowerCase();
+      var subLinks = group.querySelectorAll('.nav-sub a');
+      var groupMatch = !q || parentText.includes(q);
+      var subMatch = false;
+
+      subLinks.forEach(function (a) {
+        var match = !q || a.textContent.toLowerCase().includes(q);
+        a.style.display = match ? '' : 'none';
+        if (match) subMatch = true;
+      });
+
+      var show = groupMatch || subMatch;
+      group.style.display = show ? '' : 'none';
+      if (show) {
+        anyVisible = true;
+        if (subMatch && q) group.classList.add('open');
+      }
+    });
+
+    /* Labels: hide if all groups below them are hidden */
+    sidebar.querySelectorAll('.nav-label').forEach(function (label) {
+      var next = label.nextElementSibling;
+      var hasVisible = false;
+      while (next && !next.classList.contains('nav-label')) {
+        if (next.style.display !== 'none') hasVisible = true;
+        next = next.nextElementSibling;
+      }
+      label.style.display = hasVisible ? '' : 'none';
+    });
+
+    noRes.style.display = anyVisible ? 'none' : 'block';
+
+    /* Clear search: re-show everything */
+    if (!q) {
+      sidebar.querySelectorAll('.nav-group, .nav-label').forEach(function (el) { el.style.display = ''; });
+      sidebar.querySelectorAll('.nav-sub a').forEach(function (a) { a.style.display = ''; });
+      noRes.style.display = 'none';
+    }
+  });
+
+  /* ─── Keyboard: Escape closes sidebar on mobile ─── */
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeSidebar();
+  });
+
+  /* ─────────────────────────────────────────────
+     SCREENSHOT MANAGEMENT
+     Click placeholder → file picker → stored in
+     localStorage → persists across reloads.
+     Export button downloads HTML with images baked in.
+  ───────────────────────────────────────────── */
+  var ssStore = {};
+  try { ssStore = JSON.parse(localStorage.getItem('pmd_screenshots') || '{}'); } catch(e) {}
+
+  function ssSave() {
+    try { localStorage.setItem('pmd_screenshots', JSON.stringify(ssStore)); } catch(e) {}
+  }
+
+  function ssUpdateCount() {
+    var n = Object.keys(ssStore).length;
+    var el = document.getElementById('ssCount');
+    if (el) el.textContent = n;
+  }
+
+  function ssPickFile(cb) {
+    var inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'image/*';
+    inp.onchange = function () {
+      var f = inp.files[0];
+      if (!f) return;
+      var r = new FileReader();
+      r.onload = function (ev) { cb(ev.target.result); };
+      r.readAsDataURL(f);
+    };
+    inp.click();
+  }
+
+  function ssApply(container, sid, src) {
+    var body = container.querySelector('.screenshot-body');
+    body.innerHTML = '<img src="' + src + '" alt="Screenshot">';
+    container.classList.add('has-image');
+
+    var old = container.querySelector('.screenshot-actions');
+    if (old) old.remove();
+
+    var actions = document.createElement('div');
+    actions.className = 'screenshot-actions';
+
+    var btnChange = document.createElement('button');
+    btnChange.className = 'btn-ss';
+    btnChange.innerHTML = '&#128247; Replace';
+    btnChange.title = 'Replace with a different image';
+
+    var btnRemove = document.createElement('button');
+    btnRemove.className = 'btn-ss btn-ss-remove';
+    btnRemove.innerHTML = '&#10005; Remove';
+    btnRemove.title = 'Remove screenshot';
+
+    actions.appendChild(btnChange);
+    actions.appendChild(btnRemove);
+    container.appendChild(actions);
+
+    btnChange.addEventListener('click', function (e) {
+      e.stopPropagation();
+      ssPickFile(function (dataUrl) {
+        ssStore[sid] = dataUrl;
+        ssSave();
+        body.querySelector('img').src = dataUrl;
+      });
+    });
+
+    btnRemove.addEventListener('click', function (e) {
+      e.stopPropagation();
+      delete ssStore[sid];
+      ssSave();
+      ssUpdateCount();
+      container.classList.remove('has-image');
+      actions.remove();
+      body.innerHTML = container.dataset.origBody;
+    });
+  }
+
+  var allScreenshots = document.querySelectorAll('.screenshot');
+  document.getElementById('ssTotal').textContent = allScreenshots.length;
+
+  allScreenshots.forEach(function (el, i) {
+    var sid = 'ss' + (i + 1);
+    el.dataset.sid = sid;
+
+    /* Save original placeholder HTML for restore-on-remove */
+    var body = el.querySelector('.screenshot-body');
+    el.dataset.origBody = body.innerHTML;
+
+    /* Update hint text */
+    var hint = body.querySelector('.hint');
+    if (hint) hint.textContent = 'Click to upload a screenshot';
+
+    /* Restore from localStorage */
+    if (ssStore[sid]) {
+      ssApply(el, sid, ssStore[sid]);
+    }
+
+    /* Click on empty placeholder → upload */
+    el.addEventListener('click', function () {
+      if (el.classList.contains('has-image')) return;
+      ssPickFile(function (dataUrl) {
+        ssStore[sid] = dataUrl;
+        ssSave();
+        ssUpdateCount();
+        ssApply(el, sid, dataUrl);
+      });
+    });
+  });
+
+  ssUpdateCount();
+
+  /* ─── Export: download HTML with images embedded ─── */
+  document.getElementById('btnExport').addEventListener('click', function () {
+    var html = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+    var blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'PaperlessMD_User_Manual_v2.4.html';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
+  });
+
+})();
+</script>
 
 </body>
 </html>

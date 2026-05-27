@@ -33,8 +33,8 @@ try {
 } catch (PDOException $e) {}
 
 if (!isBilling()) {
-    // 2. Pending billing upload
-    try {
+    // 2. Pending billing upload — disabled temporarily
+    /* 
         $n = (int)$pdo->query("SELECT COUNT(*) FROM form_submissions WHERE status = 'signed'")->fetchColumn();
         if ($n > 0) $notifs[] = [
             'type'  => 'upload',
@@ -45,10 +45,10 @@ if (!isBilling()) {
             'link'  => '/patients.php?filter=pending',
             'count' => $n,
         ];
-    } catch (PDOException $e) {}
+    */
 
-    // 3. E-sign queue (MA sees only their own forms)
-    try {
+    // 3. E-sign queue (hidden for MA accounts)
+    if (!isMa()) try {
         if (isAdmin()) {
             $n = (int)$pdo->query("
                 SELECT COUNT(*) FROM form_submissions
@@ -93,6 +93,43 @@ if (!isBilling()) {
             'count' => $n,
         ];
     } catch (PDOException $e) {}
+
+    if (isAdmin()) {
+        // 5. Wound photos uploaded today
+        try {
+            $n = (int)$pdo->query("
+                SELECT COUNT(*) FROM wound_photos
+                WHERE DATE(created_at) = CURDATE()
+            ")->fetchColumn();
+            if ($n > 0) $notifs[] = [
+                'type'  => 'wound_photo',
+                'icon'  => 'bi-camera-fill',
+                'color' => 'violet',
+                'title' => $n . ' wound photo' . ($n !== 1 ? 's' : '') . ' uploaded today',
+                'body'  => 'New wound photos are ready for review',
+                'link'  => '/admin/wound_photos.php',
+                'count' => $n,
+            ];
+        } catch (PDOException $e) {}
+
+        // 6. Visits completed today
+        try {
+            $n = (int)$pdo->query("
+                SELECT COUNT(*) FROM `schedule`
+                WHERE status = 'completed'
+                  AND visit_date = CURDATE()
+            ")->fetchColumn();
+            if ($n > 0) $notifs[] = [
+                'type'  => 'visit_completed',
+                'icon'  => 'bi-check-circle-fill',
+                'color' => 'emerald',
+                'title' => $n . ' visit' . ($n !== 1 ? 's' : '') . ' completed today',
+                'body'  => 'Field visits have been marked complete',
+                'link'  => '/schedule.php',
+                'count' => $n,
+            ];
+        } catch (PDOException $e) {}
+    }
 }
 
 echo json_encode([

@@ -51,7 +51,37 @@ function _notifStaffName(PDO $pdo, int $userId): string
 // ─────────────────────────────────────────────────────────────────────────────
 function notifyFormSigned(PDO $pdo, int $submissionId, int $patientId, string $formType, int $maId): void
 {
-    $recipients = _notifGetEmails($pdo, ['admin', 'provider']);
+    // Find provider assigned to this patient's most recent/today's schedule entry
+    $provStmt = $pdo->prepare("
+        SELECT provider_name FROM `schedule`
+        WHERE patient_id = ? AND COALESCE(provider_name,'') != ''
+        ORDER BY visit_date DESC, id DESC LIMIT 1
+    ");
+    $provStmt->execute([$patientId]);
+    $assignedProvider = (string)($provStmt->fetchColumn() ?: '');
+
+    $recipients = [];
+
+    if ($assignedProvider !== '') {
+        // Only notify the specific assigned provider
+        $provEmailStmt = $pdo->prepare(
+            "SELECT email FROM staff WHERE full_name = ? AND role = 'provider' AND active = 1 AND email IS NOT NULL AND email != '' LIMIT 1"
+        );
+        $provEmailStmt->execute([$assignedProvider]);
+        $provEmail = (string)($provEmailStmt->fetchColumn() ?: '');
+        if ($provEmail) $recipients[] = $provEmail;
+    } else {
+        // No specific provider scheduled — fall back to all active providers
+        foreach (_notifGetEmails($pdo, ['provider']) as $e) {
+            if (!in_array($e, $recipients, true)) $recipients[] = $e;
+        }
+    }
+
+    // Always include admins
+    foreach (_notifGetEmails($pdo, ['admin']) as $e) {
+        if (!in_array($e, $recipients, true)) $recipients[] = $e;
+    }
+
     if (empty($recipients)) return;
 
     $patientName = _notifPatientName($pdo, $patientId);
@@ -221,7 +251,7 @@ function notifyScheduleAssigned(
     $providerLine = $providerName ? "<dt>Provider</dt><dd>{$providerName}</dd>" : '';
 
     $html = <<<HTML
-<p>A new patient visit has been scheduled and assigned to you.</p>
+<p>A new patient visit has been scheduled.</p>
 <dl class="meta">
   <dt>Patient</dt><dd>{$patientName}</dd>
   <dt>Visit Date</dt><dd>{$visitDate_f}</dd>
@@ -240,7 +270,7 @@ HTML;
     $maEmail = _notifGetEmail($pdo, $maId);
     if ($maEmail) $recipients[] = $maEmail;
 
-    // Notify matching provider staff (lookup by full_name + role=provider)
+    // Notify the specific provider assigned to this visit (matched by full_name)
     if ($providerName !== '') {
         $provStmt = $pdo->prepare(
             "SELECT email FROM staff WHERE full_name = ? AND role = 'provider' AND active = 1 AND email IS NOT NULL AND email != '' LIMIT 1"
@@ -252,11 +282,6 @@ HTML;
         }
     }
 
-    // Notify all admins
-    foreach (_notifGetEmails($pdo, ['admin']) as $e) {
-        if (!in_array($e, $recipients, true)) $recipients[] = $e;
-    }
-
     if (empty($recipients)) return;
 
     $subject = "New visit scheduled — {$patientName} on {$visitDate_f}";
@@ -264,7 +289,92 @@ HTML;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 6. Account locked → notify admins
+// 6. Wound photo uploaded → notify all admins + providers
+// ─────────────────────────────────────────────────────────────────────────────
+function notifyWoundPhotoUploaded(PDO $pdo, int $patientId, int $uploadedBy, string $woundLocation): void
+{
+    $recipients = _notifGetEmails($pdo, ['admin', 'provider']);
+    if (empty($recipients)) return;
+
+    $patientName   = _notifPatientName($pdo, $patientId);
+    $uploaderName  = _notifStaffName($pdo, $uploadedBy);
+    $ts            = date('F j, Y \a\t g:i a T');
+    $patientUrl    = (defined('BASE_URL') ? BASE_URL : '') . '/patient_view.php?id=' . $patientId . '#wounds';
+    $locationLine  = $woundLocation ? "<dt>Wound Location</dt><dd>" . htmlspecialchars($woundLocation) . "</dd>" : '';
+
+    $html = <<<HTML
+<p>A new wound photo has been uploaded and is ready for review.</p>
+<dl class="meta">
+  <dt>Patient</dt><dd>{$patientName}</dd>
+  {$locationLine}
+  <dt>Uploaded by</dt><dd>{$uploaderName}</dd>
+  <dt>Uploaded at</dt><dd>{$ts}</dd>
+</dl>
+<p><a href="{$patientUrl}" class="btn">View Wound Photos</a></p>
+HTML;
+
+    sendMail($recipients, "New wound photo — {$patientName}", $html);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 7. SOAP note finalized (visit completed) → notify billing + admins
+// ─────────────────────────────────────────────────────────────────────────────
+function notifyVisitCompleted(PDO $pdo, int $patientId, int $authorId, ?int $visitId, string $noteDate): void
+{
+    $recipients = _notifGetEmails($pdo, ['billing', 'admin']);
+    if (empty($recipients)) return;
+
+    $patientName = _notifPatientName($pdo, $patientId);
+    $authorName  = _notifStaffName($pdo, $authorId);
+    $ts          = date('F j, Y \a\t g:i a T');
+    $noteDate_f  = date('F j, Y', strtotime($noteDate));
+    $patientUrl  = (defined('BASE_URL') ? BASE_URL : '') . '/patient_view.php?id=' . $patientId;
+
+    $html = <<<HTML
+<p>A SOAP note has been finalized. This visit is ready for billing review.</p>
+<dl class="meta">
+  <dt>Patient</dt><dd>{$patientName}</dd>
+  <dt>Visit Date</dt><dd>{$noteDate_f}</dd>
+  <dt>Signed by</dt><dd>{$authorName}</dd>
+  <dt>Finalized at</dt><dd>{$ts}</dd>
+</dl>
+<p><a href="{$patientUrl}" class="btn">View Patient Record</a></p>
+HTML;
+
+    sendMail($recipients, "Visit finalized — {$patientName} ({$noteDate_f})", $html);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 8. New staff account created → send welcome email to the new user
+// ─────────────────────────────────────────────────────────────────────────────
+function notifyAccountCreated(PDO $pdo, string $fullName, string $email, string $username, string $password, string $role): void
+{
+    if (!$email) return;
+
+    $loginUrl  = (defined('BASE_URL') ? BASE_URL : '') . '/';
+    $roleLabel = ucfirst($role);
+    $ts        = date('F j, Y \a\t g:i a T');
+
+    $html = <<<HTML
+<p>Hi <strong>{$fullName}</strong>,</p>
+<p>A PaperlessMD account has been created for you. Here are your login credentials:</p>
+<dl class="meta">
+  <dt>Username</dt><dd><strong>{$username}</strong></dd>
+  <dt>Password</dt><dd><strong>{$password}</strong></dd>
+  <dt>Role</dt><dd>{$roleLabel}</dd>
+  <dt>Created at</dt><dd>{$ts}</dd>
+</dl>
+<p><a href="{$loginUrl}" class="btn">Log In Now</a></p>
+<p style="font-size:13px;color:#64748b">
+  Please change your password after your first login via your profile page.
+</p>
+HTML;
+
+    sendMail($email, 'Your PaperlessMD account is ready', $html);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 9. Account locked → notify admins
 // ─────────────────────────────────────────────────────────────────────────────
 function notifyAccountLocked(PDO $pdo, string $lockedName, string $lockedUsername, string $lockedRole, string $lockUntil, string $ip): void
 {

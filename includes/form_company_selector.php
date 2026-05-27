@@ -1,13 +1,57 @@
 <?php
 /**
  * Form Company Selector
- * Include this at the top of any form's content area.
- * Renders two styled radio buttons for BWC / VMP selection.
+ * Auto-prefills company from:
+ *   1. The schedule entry (via visit_id URL param) — set by scheduler when booking
+ *   2. The patient record ($patient['company'])
+ *   3. Falls back to full radio UI when neither is available
  * Company is saved in form_data['company'] and used by print templates.
  * JS updates .co-name-display / .co-name-uc-display / .co-name-abb-display spans on change.
  */
+
+$_fcs_valid = ['Beyond Wound Care Inc.', 'Visiting Medical Physician Inc.'];
+$_fcs_auto  = '';
+
+// 1. Try schedule entry company (visit_id passed from schedule page)
+$_fcs_visit_id = (int)($_GET['visit_id'] ?? 0);
+if ($_fcs_visit_id && isset($pdo)) {
+    try {
+        $_fcs_stmt = $pdo->prepare("SELECT company FROM `schedule` WHERE id = ? LIMIT 1");
+        $_fcs_stmt->execute([$_fcs_visit_id]);
+        $_fcs_row = $_fcs_stmt->fetchColumn();
+        if (in_array($_fcs_row, $_fcs_valid, true)) {
+            $_fcs_auto = $_fcs_row;
+        }
+    } catch (PDOException $_fcs_e) {}
+}
+
+// 2. Fall back to patient record
+if (!$_fcs_auto && isset($patient['company']) && in_array($patient['company'], $_fcs_valid, true)) {
+    $_fcs_auto = $patient['company'];
+}
+
+if ($_fcs_auto):
+    // Auto-prefilled — hidden input only, no visible selector
 ?>
-<!-- ── Practice / Company Selector ─────────────────────────────────────── -->
+<input type="hidden" name="company" value="<?= htmlspecialchars($_fcs_auto, ENT_QUOTES, 'UTF-8') ?>">
+<script>
+(function () {
+    var val = <?= json_encode($_fcs_auto) ?>;
+    var abb = (val === 'Visiting Medical Physician Inc.') ? 'VMP' : 'BWC';
+    function syncNow() {
+        document.querySelectorAll('.co-name-display').forEach(function (el) { el.textContent = val; });
+        document.querySelectorAll('.co-name-uc-display').forEach(function (el) { el.textContent = val.toUpperCase(); });
+        document.querySelectorAll('.co-name-abb-display').forEach(function (el) { el.textContent = abb; });
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function () { setTimeout(syncNow, 0); });
+    } else {
+        setTimeout(syncNow, 0);
+    }
+}());
+</script>
+<?php else: ?>
+<!-- ── Practice / Company Selector (manual — no schedule context) ──────── -->
 <div class="mb-5 p-4 bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl border border-slate-200">
     <p class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
         <i class="bi bi-building-fill text-slate-400"></i> Select Practice
@@ -40,16 +84,14 @@
 <script>
 (function () {
     function syncCompany(val) {
-        var uc  = val.toUpperCase();
         var abb = (val === 'Visiting Medical Physician Inc.') ? 'VMP' : 'BWC';
         document.querySelectorAll('.co-name-display').forEach(function (el) { el.textContent = val; });
-        document.querySelectorAll('.co-name-uc-display').forEach(function (el) { el.textContent = uc; });
+        document.querySelectorAll('.co-name-uc-display').forEach(function (el) { el.textContent = val.toUpperCase(); });
         document.querySelectorAll('.co-name-abb-display').forEach(function (el) { el.textContent = abb; });
     }
     document.addEventListener('change', function (e) {
         if (e.target && e.target.name === 'company') syncCompany(e.target.value);
     });
-    // Sync on load (handles draft restore which sets value without firing 'change')
     document.addEventListener('DOMContentLoaded', function () {
         setTimeout(function () {
             var checked = document.querySelector('[name="company"]:checked');
@@ -58,3 +100,4 @@
     });
 }());
 </script>
+<?php endif; ?>

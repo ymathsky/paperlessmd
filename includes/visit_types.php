@@ -7,7 +7,7 @@
 
 define('VISIT_TYPES', [
     'routine' => [
-        'label'    => 'Routine Visit',
+        'label'    => 'Follow-Up',
         'icon'     => 'bi-house-medical-fill',
         'color'    => 'indigo',
         'required' => ['vital_cs', 'abn'],

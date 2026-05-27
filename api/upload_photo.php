@@ -82,8 +82,10 @@ $stmt->execute([
     $_SESSION['user_id'],
 ]);
 
+$newPhotoId = (int)$pdo->lastInsertId();
 echo json_encode([
     'success'  => true,
+    'id'       => $newPhotoId,
     'filename' => $filename,
     'url'      => BASE_URL . '/uploads/photos/' . $filename,
 ]);

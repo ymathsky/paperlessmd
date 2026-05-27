@@ -1,15 +1,52 @@
 <?php
 require_once __DIR__ . '/config.php';
 
+/**
+ * Returns true when the current request is an API/AJAX call that should
+ * never be used as a post-login redirect target.
+ */
+function _isApiRequest(): bool
+{
+    $uri  = $_SERVER['REQUEST_URI'] ?? '';
+    // Any path under /api/ or /forms/ (AJAX form-steps), or explicit XHR header
+    if (str_contains($uri, '/api/') || str_contains($uri, '/api\\')) {
+        return true;
+    }
+    $xhr = $_SERVER['HTTP_X_REQUESTED_WITH'] ?? '';
+    if (strcasecmp($xhr, 'XMLHttpRequest') === 0) {
+        return true;
+    }
+    // Requests that contain AJAX action params
+    $query = $_SERVER['QUERY_STRING'] ?? '';
+    if (str_contains($query, 'action=') && str_contains($uri, '/api')) {
+        return true;
+    }
+    return false;
+}
+
 function requireLogin(): void
 {
     if (empty($_SESSION['user_id'])) {
+        if (!_isApiRequest()) {
+            $intendedUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
+                . '://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+            $_SESSION['intended_url'] = $intendedUrl;
+        }
         header('Location: ' . BASE_URL . '/index.php');
         exit;
     }
     if (isset($_SESSION['last_active']) && (time() - $_SESSION['last_active']) > SESSION_TIMEOUT) {
+        $saveIntended = !_isApiRequest();
+        if ($saveIntended) {
+            $intendedUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
+                . '://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+        }
         session_unset();
         session_destroy();
+        session_start();
+        if ($saveIntended) {
+            $_SESSION['intended_url'] = $intendedUrl;
+        }
         header('Location: ' . BASE_URL . '/index.php?msg=timeout');
         exit;
     }

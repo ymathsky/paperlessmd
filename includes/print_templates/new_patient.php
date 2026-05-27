@@ -8,6 +8,13 @@ $sigDate = date('m/d/Y', strtotime($f['created_at']));
 $maName  = h($f['ma_name'] ?? '');
 $fmDate  = vd($data, 'form_date') ? date('m/d/Y', strtotime(vd($data,'form_date'))) : $sigDate;
 
+$_coFd   = is_array($data) ? ($data['company'] ?? '') : '';
+$_coPt   = $patient['company'] ?? '';
+$_coSrc  = $_coFd ?: $_coPt;
+$_coName = ($_coSrc === 'Visiting Medical Physician Inc.') ? 'Visiting Medical Physician Inc.' : 'Beyond Wound Care Inc.';
+$_coUC   = strtoupper($_coName);
+$_coAbb  = ($_coName === 'Visiting Medical Physician Inc.') ? 'VMP' : 'BWC';
+
 $consentTreatment = vd($data, 'consent_treatment');
 $consentHipaa     = vd($data, 'consent_hipaa');
 $consentFinancial = vd($data, 'consent_financial');
@@ -15,6 +22,7 @@ $emergName        = vd($data, 'emergency_name');
 $emergRel         = vd($data, 'emergency_relationship');
 $emergPhone       = vd($data, 'emergency_phone');
 ?>
+<?php ob_start(); ?>
 <style>
   @page { size: 8in 13in; margin: 0.4in 0.5in; }
 </style>
@@ -86,3 +94,9 @@ $emergPhone       = vd($data, 'emergency_phone');
         <div class="bwc-sig-label">Medical Assistant Signature — <?= $maName ?></div>
     </div>
 </div>
+<?php
+$_npOut = ob_get_clean();
+$_npOut = str_replace('Beyond Wound Care Inc.', $_coName, $_npOut);
+$_npOut = str_replace('BEYOND WOUND CARE INC.', $_coUC, $_npOut);
+echo $_npOut;
+?>

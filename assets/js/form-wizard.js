@@ -26,7 +26,7 @@
         restoreDraft();
 
         // Start on last saved step if available
-        const savedStep = parseInt(sessionStorage.getItem(storageKey + '_step') || '0', 10);
+        const savedStep = parseInt(localStorage.getItem(storageKey + '_step') || '0', 10);
         if (savedStep > 0 && savedStep < steps.length) {
             // Mark earlier steps as done
             for (let i = 0; i < savedStep; i++) markDone(i);
@@ -65,7 +65,7 @@
         // ── Clear draft after successful form submission ───────────────
         form.addEventListener('submit', function () {
             localStorage.removeItem(storageKey);
-            sessionStorage.removeItem(storageKey + '_step');
+            localStorage.removeItem(storageKey + '_step');
         });
 
         // ─────────────────────────────────────────────────────────────
@@ -82,7 +82,7 @@
         function showStep(idx) {
             steps.forEach((s, i) => s.classList.toggle('hidden', i !== idx));
             current = idx;
-            sessionStorage.setItem(storageKey + '_step', idx);
+            localStorage.setItem(storageKey + '_step', idx);
             updateHeader();
             updateNavButtons();
             scrollToTop();

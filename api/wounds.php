@@ -36,6 +36,7 @@ switch ($action) {
         $len     = round((float)($body['length_cm'] ?? 0), 1);
         $wid     = round((float)($body['width_cm']  ?? 0), 1);
         $dep     = round((float)($body['depth_cm']  ?? 0), 1);
+        $type    = trim($body['wound_type'] ?? '');
         $notes   = trim($body['notes'] ?? '');
         $visitId = !empty($body['visit_id']) ? (int)$body['visit_id'] : null;
 
@@ -49,10 +50,10 @@ switch ($action) {
 
         $stmt = $pdo->prepare("
             INSERT INTO wound_measurements
-                (patient_id, visit_id, measured_at, wound_site, length_cm, width_cm, depth_cm, notes, recorded_by)
-            VALUES (?,?,?,?,?,?,?,?,?)
+                (patient_id, visit_id, measured_at, wound_site, wound_type, length_cm, width_cm, depth_cm, notes, recorded_by)
+            VALUES (?,?,?,?,?,?,?,?,?,?)
         ");
-        $stmt->execute([$pid, $visitId, $date, $site, $len, $wid, $dep, $notes ?: null, $_SESSION['user_id']]);
+        $stmt->execute([$pid, $visitId, $date, $site, $type ?: null, $len, $wid, $dep, $notes ?: null, $_SESSION['user_id']]);
         $newId = (int)$pdo->lastInsertId();
 
         // Return the new row for instant UI update
@@ -90,6 +91,43 @@ switch ($action) {
         ");
         $stmt->execute([$pid]);
         echo json_encode(['ok' => true, 'measurements' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+        break;
+
+    case 'edit':
+        $id    = (int)($body['id']           ?? 0);
+        $date  = trim($body['measured_at']   ?? '');
+        $site  = trim($body['wound_site']    ?? '') ?: 'Unspecified';
+        $type  = trim($body['wound_type']    ?? '');
+        $len   = round((float)($body['length_cm'] ?? 0), 1);
+        $wid   = round((float)($body['width_cm']  ?? 0), 1);
+        $dep   = round((float)($body['depth_cm']  ?? 0), 1);
+        $notes = trim($body['notes'] ?? '');
+
+        if (!$id || $len <= 0 || $wid <= 0) {
+            echo json_encode(['error' => 'Missing or invalid fields']);
+            exit;
+        }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            $date = date('Y-m-d');
+        }
+
+        if (isAdmin()) {
+            $stmt = $pdo->prepare(
+                "UPDATE wound_measurements SET measured_at=?, wound_site=?, wound_type=?, length_cm=?, width_cm=?, depth_cm=?, notes=? WHERE id=?"
+            );
+            $stmt->execute([$date, $site, $type ?: null, $len, $wid, $dep, $notes ?: null, $id]);
+        } else {
+            $stmt = $pdo->prepare(
+                "UPDATE wound_measurements SET measured_at=?, wound_site=?, wound_type=?, length_cm=?, width_cm=?, depth_cm=?, notes=? WHERE id=? AND recorded_by=?"
+            );
+            $stmt->execute([$date, $site, $type ?: null, $len, $wid, $dep, $notes ?: null, $id, (int)$_SESSION['user_id']]);
+        }
+
+        if ($stmt->rowCount() === 0) {
+            echo json_encode(['error' => 'Not found or not authorized']);
+            exit;
+        }
+        echo json_encode(['ok' => true]);
         break;
 
     default:

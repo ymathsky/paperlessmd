@@ -1,7 +1,7 @@
 <?php
 /**
  * API: admin-only CRUD for dashboard pinned notes.
- * Actions: create | delete
+ * Actions: create | update | delete
  * Body: { csrf, action, body?, note_id? }
  */
 require_once __DIR__ . '/../includes/config.php';
@@ -46,6 +46,27 @@ if ($action === 'create') {
     $id = (int)$pdo->lastInsertId();
     auditLog($pdo, 'admin_note_add', 'admin_note', $id);
     echo json_encode(['ok' => true, 'id' => $id]);
+    exit;
+}
+
+if ($action === 'update') {
+    $noteId = (int)($input['note_id'] ?? 0);
+    $body   = trim($input['body'] ?? '');
+    if (!$noteId) {
+        http_response_code(422);
+        echo json_encode(['ok' => false, 'error' => 'note_id required']);
+        exit;
+    }
+    if ($body === '') {
+        http_response_code(422);
+        echo json_encode(['ok' => false, 'error' => 'Note body is required']);
+        exit;
+    }
+    $body = mb_substr($body, 0, 1000);
+    $stmt = $pdo->prepare("UPDATE admin_notes SET body = ?, updated_at = NOW() WHERE id = ?");
+    $stmt->execute([$body, $noteId]);
+    auditLog($pdo, 'admin_note_update', 'admin_note', $noteId);
+    echo json_encode(['ok' => true]);
     exit;
 }
 

@@ -368,12 +368,12 @@ include __DIR__ . '/../includes/header.php';
         <!-- Body -->
         <div class="flex flex-col md:flex-row overflow-y-auto flex-1 min-h-0">
             <!-- Image -->
-            <div class="flex-1 bg-slate-900 flex items-center justify-center min-h-[300px] p-4">
+            <div class="flex-1 bg-slate-900 flex items-center justify-center min-h-[300px] p-4 relative">
                 <img id="lbImg" src="" alt="Wound photo"
                      class="max-w-full max-h-[60vh] object-contain rounded-xl shadow-lg">
             </div>
             <!-- Sidebar meta -->
-            <div class="w-full md:w-72 shrink-0 p-5 space-y-4 border-t md:border-t-0 md:border-l border-slate-100">
+            <div class="w-full md:w-72 shrink-0 p-5 space-y-4 border-t md:border-t-0 md:border-l border-slate-100 overflow-y-auto">
                 <div>
                     <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Patient</div>
                     <a id="lbPatientMeta" href="#"
@@ -395,10 +395,11 @@ include __DIR__ . '/../includes/header.php';
                     <div class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Notes</div>
                     <p id="lbDescMeta" class="text-sm text-slate-600 italic leading-relaxed"></p>
                 </div>
+
                 <a id="lbDownload" href="#" download target="_blank"
                    class="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5
                           bg-slate-800 hover:bg-slate-900 text-white text-sm font-semibold
-                          rounded-xl transition-colors shadow-sm mt-2">
+                          rounded-xl transition-colors shadow-sm">
                     <i class="bi bi-download"></i> Download
                 </a>
             </div>
@@ -423,15 +424,15 @@ include __DIR__ . '/../includes/header.php';
 (function () {
     const PHOTOS = <?= json_encode(array_values(array_map(function($p) {
         return [
-            'id'       => (int)$p['id'],
-            'filename' => $p['filename'],
-            'location' => $p['wound_location'] ?: 'Unspecified',
-            'date'     => date('F j, Y \a\t g:i a', strtotime($p['created_at'])),
-            'patient'  => $p['patient_name'],
-            'patient_id' => (int)$p['patient_id'],
-            'ma'       => $p['ma_name'] ?: 'Unknown',
-            'desc'     => $p['description'] ?? '',
-            'url'      => BASE_URL . '/uploads/photos/' . $p['filename'],
+            'id'            => (int)$p['id'],
+            'filename'      => $p['filename'],
+            'location'      => $p['wound_location'] ?: 'Unspecified',
+            'date'          => date('F j, Y \a\t g:i a', strtotime($p['created_at'])),
+            'patient'       => $p['patient_name'],
+            'patient_id'    => (int)$p['patient_id'],
+            'ma'            => $p['ma_name'] ?: 'Unknown',
+            'desc'          => $p['description'] ?? '',
+            'url'           => BASE_URL . '/uploads/photos/' . $p['filename'],
         ];
     }, $photos))) ?>;
 
@@ -480,6 +481,8 @@ include __DIR__ . '/../includes/header.php';
         }
         // Hide nav if only 1 photo
         document.getElementById('lbNav').style.display = PHOTOS.length > 1 ? '' : 'none';
+        // Always show the original wound photo
+        document.getElementById('lbImg').src = p.url;
     }
 
     // Keyboard nav

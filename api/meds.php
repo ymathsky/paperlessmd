@@ -34,6 +34,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         echo json_encode(['ok' => true, 'history' => $history]);
         exit;
     }
+    if ($action === 'list' && $patientId > 0) {
+        $lstStmt = $pdo->prepare("
+            SELECT id, med_name, med_frequency
+            FROM patient_medications
+            WHERE patient_id = ? AND status = 'active'
+            ORDER BY sort_order ASC, added_at ASC
+        ");
+        $lstStmt->execute([$patientId]);
+        echo json_encode(['ok' => true, 'meds' => $lstStmt->fetchAll(PDO::FETCH_ASSOC)]);
+        exit;
+    }
     http_response_code(400);
     echo json_encode(['ok' => false, 'error' => 'Invalid request']);
     exit;

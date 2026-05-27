@@ -71,7 +71,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         }
                     } catch (PDOException $e) { /* column not yet added — run migrate_saved_signatures.php */ }
                 }
-                header('Location: ' . BASE_URL . '/dashboard.php');
+                // Redirect to intended URL if available, otherwise dashboard
+                $redirect = $_SESSION['intended_url'] ?? '';
+                unset($_SESSION['intended_url']);
+                // Only redirect to same-site, non-API page URLs
+                if ($redirect && strpos($redirect, BASE_URL . '/') === 0
+                    && strpos($redirect, BASE_URL . '/index.php') !== 0
+                    && strpos($redirect, BASE_URL . '/api/') !== 0) {
+                    header('Location: ' . $redirect);
+                } else {
+                    header('Location: ' . BASE_URL . '/dashboard.php');
+                }
                 exit;
 
             } else {
@@ -199,7 +209,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
 
                 <!-- Password -->
-                <div class="mb-8">
+                <div class="mb-2">
                     <label class="block text-sm font-semibold text-slate-700 mb-2">Password</label>
                     <div class="relative">
                         <span class="absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 pointer-events-none">
@@ -217,7 +227,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </button>
                     </div>
                 </div>
-
+                <div class="flex justify-end mb-6">
+                    <a href="<?= BASE_URL ?>/forgot_password.php"
+                       class="text-xs text-blue-500 hover:text-blue-700 font-semibold">
+                        Forgot password?
+                    </a>
+                </div>
                 <button type="submit"
                         class="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800
                                text-white font-bold py-4 rounded-2xl transition-all duration-200

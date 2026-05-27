@@ -10,7 +10,7 @@ echo json_encode([
     'id'               => $base . '/',
     'scope'            => $base . '/',
     'display'          => 'standalone',
-    'orientation'      => 'portrait-primary',
+    'orientation'      => 'any',
     'background_color' => '#172554',
     'theme_color'      => '#1e3a8a',
     'categories'       => ['medical', 'health'],

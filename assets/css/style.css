@@ -497,23 +497,21 @@ input[type="checkbox"].big, input[type="radio"].big {
 @media (max-width: 767px) {
     #wiz-nav {
         position: fixed;
-        bottom: 0;
+        bottom: 60px;
         left: 0;
         right: 0;
-        z-index: 30;
+        z-index: 40;
         background: #fff;
         border-top: 1.5px solid #e2e8f0;
         border-radius: 0;
         padding: 10px 16px;
-        /* iOS safe area: avoid home-bar overlap on notched phones */
-        padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
         box-shadow: 0 -4px 24px rgba(0, 0, 0, .09);
         margin-top: 0;
     }
 
-    /* Content padding so sticky nav never covers the bottom of the form */
+    /* Content padding so sticky nav + bottom nav never covers the bottom of the form */
     #mainForm {
-        padding-bottom: 96px;
+        padding-bottom: 148px;
     }
 
     /* Submit & Save: fill available width on mobile */
@@ -529,22 +527,35 @@ input[type="checkbox"].big, input[type="radio"].big {
         padding-top: 10px;
         padding-bottom: 10px;
     }
+
+    /* ── Floating action buttons: lift above the sticky wiz-nav bar ──────
+       Uses :has() to only apply on pages that contain #wiz-nav (form pages).
+       Adds ~76px (wiz-nav height) to each button's bottom offset. */
+    body:has(#wiz-nav) #wpFloatBtn      { bottom: 232px !important; }
+    body:has(#wiz-nav) #qnFloatBtn      { bottom: 308px !important; }
+    body:has(#wiz-nav) #rxPadFloatBtn   { bottom: 384px !important; }
+    body:has(#wiz-nav) #floatMenuToggle { bottom: 224px !important; }
+    body:has(#wiz-nav) #aiChatWrap      { bottom: 140px !important; }
 }
 
 /* ── 4. Medication Table → Card Layout on small phones ───────────────────
-   On screens < 640px each row becomes a rounded card with inline field labels.
-   Requires data-label attributes on <td> elements (added in PHP + JS). */
+   .med-rows-tbody (all forms): standard 2-col grid card layout.
+   .med-rows-tbody.med-collapsible (vital_cs only): adds collapse/expand. */
+
+/* Summary cell & collapse btn hidden on desktop and non-collapsible forms */
+.med-sum-cell     { display: none; }
+.med-collapse-btn { display: none; }
+
 @media (max-width: 639px) {
-    .med-rows-thead {
-        display: none !important;
-    }
-    /* Remove wrapper border; each row card has its own border */
-    .med-rows-tbody {
-        display: block;
-        padding: 8px;
-    }
+    .med-rows-thead { display: none !important; }
+    .med-rows-tbody { display: block; padding: 8px; }
+
+    /* ── Common card shell (all forms) ── */
     .med-rows-tbody tr {
-        display: block;
+        display: grid !important;
+        grid-template-columns: 1fr 44px;
+        grid-template-rows: auto auto auto;
+        gap: 6px 8px;
         border: 1.5px solid #e2e8f0;
         border-radius: 12px;
         padding: 10px 12px;
@@ -553,11 +564,19 @@ input[type="checkbox"].big, input[type="radio"].big {
         box-shadow: 0 1px 4px rgba(0,0,0,.04);
     }
     .med-rows-tbody td {
-        display: block;
-        padding: 4px 0 !important;
+        display: block !important;
+        padding: 0 !important;
         border: none !important;
     }
-    /* Inline label from data-label attribute */
+    .med-rows-tbody td:first-child  { grid-column: 1;      grid-row: 1; }
+    .med-rows-tbody td:nth-child(2) { grid-column: 1 / -1; grid-row: 2; }
+    .med-rows-tbody td:nth-child(3) { grid-column: 1 / -1; grid-row: 3; }
+    .med-rows-tbody td.no-print {
+        grid-column: 2; grid-row: 1;
+        display: flex !important;
+        align-items: center; justify-content: center;
+        border-top: none !important;
+    }
     .med-rows-tbody td[data-label]::before {
         content: attr(data-label);
         display: block;
@@ -568,21 +587,95 @@ input[type="checkbox"].big, input[type="radio"].big {
         color: #94a3b8;
         margin-bottom: 3px;
     }
-    /* Remove row button: right-aligned at card bottom */
-    .med-rows-tbody td.no-print {
-        text-align: right;
-        border-top: 1px solid #f1f5f9 !important;
-        padding-top: 8px !important;
-        margin-top: 4px;
-    }
     .med-rows-tbody .med-remove-btn {
-        padding: 6px 12px;
+        width: 32px; height: 32px;
         border-radius: 8px;
         background: #fef2f2;
         border: 1px solid #fecaca;
         color: #ef4444 !important;
+        display: flex; align-items: center; justify-content: center;
+    }
+
+    /* ── COLLAPSIBLE (vital_cs only): collapsed = summary row only ── */
+    .med-rows-tbody.med-collapsible tr:not(.med-row-open) {
+        display: block !important;
+        padding: 0;
+    }
+    .med-rows-tbody.med-collapsible tr:not(.med-row-open) .med-detail-td {
+        display: none !important;
+    }
+    .med-sum-cell {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        padding: 10px 14px;
+        min-height: 46px;
+        border-radius: 10px;
+    }
+    .med-sum-cell:active { background: #f8fafc; }
+    .med-sum-badge {
+        font-size: 0.65rem;
+        font-weight: 700;
+        padding: 2px 7px;
+        border-radius: 20px;
+        background: #f1f5f9;
+        color: #64748b;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+    .med-sum-name {
+        font-size: 0.875rem;
+        color: #334155;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        flex: 1;
+    }
+
+    /* ── EXPANDED grid (vital_cs) ── */
+    .med-rows-tbody.med-collapsible tr.med-row-open {
+        display: grid !important;
+        grid-template-columns: 1fr 44px;
+        gap: 6px 8px;
+        padding: 10px 12px;
+    }
+    .med-rows-tbody.med-collapsible tr.med-row-open .med-sum-cell  { display: none !important; }
+    .med-rows-tbody.med-collapsible tr.med-row-open .med-detail-td {
+        display: block !important;
+        padding: 0 !important;
+        border: none !important;
+    }
+    .med-rows-tbody .med-td-type    { grid-column: 1;      grid-row: 1; }
+    .med-rows-tbody .med-td-med     { grid-column: 1 / -1; grid-row: 2; }
+    .med-rows-tbody .med-td-freq    { grid-column: 1 / -1; grid-row: 3; }
+    .med-rows-tbody .med-td-actions {
+        grid-column: 2; grid-row: 1;
+        display: flex !important;
+        flex-direction: column;
+        align-items: center; justify-content: center;
+        gap: 4px;
+        padding: 0 !important;
+        border: none !important;
+    }
+    /* Collapse (minimize) button */
+    .med-collapse-btn {
+        width: 32px; height: 32px;
+        border-radius: 8px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        color: #94a3b8;
+        display: flex; align-items: center; justify-content: center;
     }
 }
+/* Dark mode med cards */
+html.dark .med-rows-tbody tr { background: #1e293b !important; border-color: #475569 !important; }
+html.dark .med-sum-cell { background: #1e293b; }
+html.dark .med-sum-badge { background: #334155 !important; color: #94a3b8 !important; }
+html.dark .med-sum-name { color: #e2e8f0 !important; }
+html.dark .med-rows-tbody td[data-label]::before { color: #64748b !important; }
+html.dark .med-rows-tbody .med-remove-btn { background: rgba(239,68,68,0.1) !important; border-color: rgba(239,68,68,0.3) !important; }
+html.dark .med-collapse-btn { background: #334155 !important; border-color: #475569 !important; }
 
 /* ── 5. General Touch UX ──────────────────────────────────────────────────*/
 @media (max-width: 767px) {
@@ -608,4 +701,477 @@ input[type="checkbox"].big, input[type="radio"].big {
         font-size: 0.8125rem;
     }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Global Form Polish  —  "Bolder" Enhancement Layer
+   Loaded after tailwind.css → safely overrides base utility styles.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Form inputs: 1.5 px border + hover shadow + smooth transition ───── */
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"])
+     :not([type="range"]):not([type="hidden"]):not([type="submit"]):not([type="button"]),
+select,
+textarea {
+    border-width: 1.5px;
+    transition: border-color .18s ease, box-shadow .18s ease, background-color .18s ease !important;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"])
+     :not([type="range"]):not([type="hidden"]):not([type="submit"]):not([type="button"]):hover:not(:focus),
+select:hover:not(:focus),
+textarea:hover:not(:focus) {
+    border-color: #94a3b8 !important;
+    box-shadow: 0 2px 10px rgba(0,0,0,.07) !important;
+}
+
+/* ── 2. Section title: left accent stripe, darker & bolder ─────────────── */
+.form-section-title {
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.09em;
+    color: #1e293b;
+    padding-left: 10px;
+    padding-bottom: 0;
+    border-left: 3.5px solid #6d28d9;
+    border-bottom: none;
+    margin-bottom: 20px;
+}
+
+/* ── 3. Selection cards (label wrapping radio/checkbox): lift on hover ───── */
+label:has(input[type="radio"]),
+label:has(input[type="checkbox"]) {
+    transition: border-color .15s ease, background-color .15s ease,
+                box-shadow .15s ease, transform .12s ease !important;
+}
+label:has(input[type="radio"]):hover,
+label:has(input[type="checkbox"]):hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 6px 18px rgba(0,0,0,.10) !important;
+}
+label:has(input[type="radio"]:checked),
+label:has(input[type="checkbox"]:checked) {
+    box-shadow: 0 2px 10px rgba(0,0,0,.09) !important;
+}
+
+/* ── 4. White cards: deeper shadow for more visual weight ───────────────── */
+.bg-white.rounded-2xl,
+.bg-white.rounded-xl {
+    box-shadow: 0 4px 24px -4px rgba(0,0,0,.11),
+                0 1px 4px rgba(0,0,0,.06) !important;
+}
+
+/* ── 5. Buttons: smooth press + hover brightness ───────────────────────── */
+button:not(:disabled),
+a.btn, [role="button"]:not(:disabled) {
+    transition: transform .12s ease, box-shadow .15s ease,
+                background-color .15s ease, opacity .15s ease,
+                filter .15s ease !important;
+}
+button:not(:disabled):active,
+a.btn:active {
+    transform: scale(0.96) !important;
+}
+
+/* ── 6. Navigation / sidebar links: smooth color transitions ────────────── */
+nav a, .sidebar a {
+    transition: color .15s ease, background-color .15s ease !important;
+}
+
+/* ── 7. Badge & pill animations ─────────────────────────────────────────── */
+.badge, [class*="rounded-full"][class*="px-"][class*="text-xs"] {
+    transition: background-color .15s ease, color .15s ease !important;
+}
+
+/* ── 8. Table rows: hover highlight ─────────────────────────────────────── */
+tbody tr {
+    transition: background-color .12s ease !important;
+}
+tbody tr:hover td {
+    background-color: #f8faff !important;
+}
+
+/* ── 9. Improved scrollbar ──────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 99px; }
+::-webkit-scrollbar-thumb {
+    background: linear-gradient(#a78bfa, #7c3aed);
+    border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover { background: #6d28d9; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   Global Typography Enhancements
+   Activates Inter font, stronger contrast, better sizes & line-heights.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Base: activate Inter + font rendering ──────────────────────────────── */
+html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+}
+body {
+    font-family: 'Inter', ui-sans-serif, system-ui, -apple-system,
+                 BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    color: #1e293b;
+    line-height: 1.6;
+    font-feature-settings: 'cv02','cv03','cv04','cv11';
+    font-size: 15px;
+}
+
+/* ── Headings: tight tracking, strong weight ────────────────────────────── */
+h1, h2, h3, h4, h5, h6 {
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif !important;
+    color: #0f172a;
+    font-weight: 700;
+    line-height: 1.3;
+    letter-spacing: -0.015em;
+}
+h1 { font-size: 1.75rem; font-weight: 800; }
+h2 { font-size: 1.375rem; }
+h3 { font-size: 1.125rem; }
+
+/* ── Paragraphs ─────────────────────────────────────────────────────────── */
+p { line-height: 1.65; }
+
+/* ── Form labels: strong, high-contrast ─────────────────────────────────── */
+label:not([class*="cursor"]):not([class*="flex"]) {
+    color: #0f172a;
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+/* Label block (common pattern: `label.block.text-sm`) */
+label.block {
+    color: #0f172a !important;
+    font-weight: 600 !important;
+}
+
+/* ── Input / select / textarea text ─────────────────────────────────────── */
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"])
+     :not([type="range"]):not([type="hidden"]):not([type="submit"]):not([type="button"]),
+select,
+textarea {
+    color: #0f172a;
+    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+    font-size: 0.9375rem; /* 15px */
+}
+
+/* ── Placeholder: visible but clearly secondary ──────────────────────────── */
+::placeholder {
+    color: #94a3b8 !important;
+    font-style: italic;
+    opacity: 1;
+}
+
+/* ── Secondary text: better contrast (WCAG AA) ──────────────────────────── */
+.text-slate-400 { color: #64748b !important; }   /* was #94a3b8 (~2.8:1) → 4.6:1 */
+.text-slate-500 { color: #475569 !important; }   /* was #64748b → even stronger  */
+.text-slate-600 { color: #334155 !important; }
+
+/* ── Table text: stronger column data ───────────────────────────────────── */
+td { color: #1e293b; font-size: 0.9rem; }
+th { color: #0f172a; font-weight: 700; font-size: 0.75rem;
+     letter-spacing: 0.06em; text-transform: uppercase; }
+
+/* ── Navigation / sidebar links ─────────────────────────────────────────── */
+nav, aside { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif !important; }
+
+/* ── Card / panel body text ──────────────────────────────────────────────── */
+.text-sm   { font-size: 0.9rem   !important; }  /* 14px → 14.4px */
+.text-xs   { font-size: 0.8rem   !important; }  /* 12px → 12.8px */
+.text-base { font-size: 1rem     !important; }
+.text-lg   { font-size: 1.125rem !important; }
+.text-xl   { font-size: 1.25rem  !important; }
+
+/* Protect mobile font-size override (already set to 16px !important) */
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DARK MODE  —  applied when <html class="dark"> is present
+   ══════════════════════════════════════════════════════════════════════════ */
+html.dark { color-scheme: dark; }
+
+/* ── Body ── */
+html.dark body { background-color: #0f172a !important; color: #e2e8f0; }
+
+/* ── Surfaces ── */
+html.dark .bg-white  { background-color: #1e293b !important; }
+html.dark .bg-slate-50  { background-color: #162032 !important; }
+html.dark .bg-slate-100 { background-color: #1e293b !important; }
+html.dark .bg-slate-200 { background-color: #283549 !important; }
+html.dark .bg-gray-50  { background-color: #162032 !important; }
+html.dark .bg-gray-100 { background-color: #1e293b !important; }
+
+/* ── Text ── */
+html.dark .text-slate-900 { color: #f1f5f9 !important; }
+html.dark .text-slate-800 { color: #f1f5f9 !important; }
+html.dark .text-slate-700 { color: #e2e8f0 !important; }
+html.dark .text-slate-600 { color: #cbd5e1 !important; }
+html.dark .text-slate-500 { color: #94a3b8 !important; }
+html.dark .text-slate-400 { color: #64748b !important; }
+html.dark .text-slate-300 { color: #475569 !important; }
+
+/* ── Borders ── */
+html.dark .border-slate-50  { border-color: #1e293b !important; }
+html.dark .border-slate-100 { border-color: #334155 !important; }
+html.dark .border-slate-200 { border-color: #475569 !important; }
+html.dark .border-slate-300 { border-color: #64748b !important; }
+html.dark .border-gray-200  { border-color: #475569 !important; }
+
+/* ── Dividers ── */
+html.dark .divide-slate-50  > :not([hidden]) ~ :not([hidden]) { border-color: #283549 !important; }
+html.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: #334155 !important; }
+html.dark .divide-y         > :not([hidden]) ~ :not([hidden]) { border-color: #334155 !important; }
+
+/* ── Hover states ── */
+html.dark .hover\:bg-slate-50:hover  { background-color: #1a2744 !important; }
+html.dark .hover\:bg-slate-100:hover { background-color: #283549 !important; }
+html.dark .hover\:bg-slate-200:hover { background-color: #334155 !important; }
+html.dark .hover\:bg-slate-50\/70:hover,
+html.dark tr.hover\:bg-slate-50\/70:hover { background-color: rgba(30,41,59,0.7) !important; }
+
+/* ── Inputs & Textarea ── */
+html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="submit"]):not([type="button"]):not([type="color"]),
+html.dark textarea,
+html.dark select {
+    background-color: #0f172a !important;
+    border-color: #475569 !important;
+    color: #f1f5f9 !important;
+}
+html.dark input::placeholder,
+html.dark textarea::placeholder { color: #64748b !important; }
+html.dark input:disabled,
+html.dark input[disabled] {
+    background-color: #1e293b !important;
+    color: #475569 !important;
+}
+html.dark .focus\:bg-white:focus { background-color: #0f172a !important; }
+html.dark .focus\:ring-2:focus { --tw-ring-opacity: 0.5; }
+
+/* ── Tables ── */
+html.dark table { color: #e2e8f0; }
+html.dark thead,
+html.dark .bg-slate-50.text-left { background-color: #162032 !important; }
+html.dark th  { color: #94a3b8 !important; }
+html.dark tbody tr { border-color: #283549 !important; }
+html.dark td { color: #cbd5e1 !important; }
+
+/* ── Bottom nav ── */
+html.dark #bottomNav {
+    background-color: #1e293b !important;
+    border-color: #334155 !important;
+}
+html.dark #wiz-nav {
+    background-color: #1e293b !important;
+    border-color: #334155 !important;
+}
+html.dark #bottomNav a { color: #64748b !important; }
+html.dark #bottomNav a.active,
+html.dark #bottomNav a[class*="text-blue"] { color: #60a5fa !important; }
+html.dark #bottomNav span[class*="bg-blue"] { background-color: #162032 !important; }
+html.dark #bottomNav span[class*="text-blue"] { color: #60a5fa !important; }
+
+/* ── Cards / panels ── */
+html.dark .shadow-sm { box-shadow: 0 1px 3px rgba(0,0,0,0.5) !important; }
+
+/* ── Modals (session timeout, confirm, search) ── */
+html.dark #sessionTimeoutModal > div:last-child,
+html.dark #searchModal > div > div,
+html.dark [x-data*="pdConfirm"] .bg-white { background-color: #1e293b !important; }
+
+/* ── Profile page hero — keep gradient, adjust bottom stat strip ── */
+html.dark .profile-hero .bg-white\/10 { background-color: rgba(255,255,255,0.1) !important; }
+
+/* ── Notification drawer ── */
+html.dark #notifDrawer { background-color: #1e293b !important; border-color: #334155 !important; }
+
+/* ── Messages chat ── */
+html.dark .bubble-them {
+    background-color: #283549 !important;
+    border-color: #475569 !important;
+    color: #e2e8f0 !important;
+}
+html.dark #leftPanel  { background-color: #162032 !important; }
+html.dark #rightPanel { background-color: #0f172a !important; }
+html.dark #composeForm { background-color: #1e293b !important; }
+html.dark #composeBody { background-color: transparent !important; color: #e2e8f0 !important; }
+html.dark .msg-action-btn { background-color: #283549 !important; border-color: #475569 !important; color: #94a3b8 !important; }
+html.dark .reply-quote-them { background-color: #283549 !important; }
+
+/* ── Push-pref toggle switches ── */
+html.dark [role="switch"]                          { background-color: #475569 !important; }
+html.dark [role="switch"][aria-checked="true"]     { background-color: #0ea5e9 !important; }
+html.dark [role="switch"] > span                   { background-color: #f1f5f9 !important; }
+
+/* ── Custom scrollbar ── */
+html.dark ::-webkit-scrollbar { width: 6px; height: 6px; }
+html.dark ::-webkit-scrollbar-track { background: #0f172a; }
+html.dark ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+html.dark ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+/* ═══════════════════════════════════════════════════════════
+   Global Modern Select Enhancement
+   Applies to every <select> project-wide — no HTML changes needed
+═══════════════════════════════════════════════════════════ */
+select:not([multiple]) {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.5rem center;
+    background-size: 0.8rem;
+    padding-right: 1.75rem !important;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+select:not([multiple]):focus {
+    outline: none;
+    border-color: #6366f1 !important;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+html.dark select:not([multiple]) {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-color: #1e293b;
+    border-color: #475569;
+    color: #f1f5f9;
+}
+html.dark select:not([multiple]):focus {
+    border-color: #818cf8 !important;
+    box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.15);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Dark mode — form radio/checkbox pill cards (vital_cs, schedule_manage, etc.)
+═══════════════════════════════════════════════════════════ */
+
+/* Radio and checkbox inputs — visible accent color */
+html.dark input[type="radio"],
+html.dark input[type="checkbox"] {
+    accent-color: #ef4444;
+}
+
+/* Unselected pill card — subtle dark card background */
+html.dark .wiz-step label:has(input[type="radio"]),
+html.dark .wiz-step label:has(input[type="checkbox"]) {
+    background-color: #1e293b !important;
+    border-color: #475569 !important;
+}
+
+/* Selected pill card — red tint */
+html.dark .wiz-step label:has(input[type="radio"]:checked),
+html.dark .wiz-step label:has(input[type="checkbox"]:checked) {
+    background-color: rgba(239, 68, 68, 0.15) !important;
+    border-color: rgba(239, 68, 68, 0.6) !important;
+}
+
+/* Label text inside pill cards */
+html.dark .wiz-step label:has(input[type="radio"]) span,
+html.dark .wiz-step label:has(input[type="checkbox"]) span {
+    color: #e2e8f0 !important;
+}
+
+/* ── #printDoc — always light theme (document viewer) ─────────────── */
+html.dark #printDoc,
+html.dark #printDoc .bwc-form { color-scheme: light; background-color: #fff !important; color: #000 !important; }
+html.dark #printDoc .bg-white   { background-color: #fff !important; }
+html.dark #printDoc .bg-slate-50, html.dark #printDoc .bg-gray-50   { background-color: #f8fafc !important; }
+html.dark #printDoc .bg-slate-100, html.dark #printDoc .bg-gray-100 { background-color: #f1f5f9 !important; }
+html.dark #printDoc .bg-slate-200 { background-color: #e2e8f0 !important; }
+html.dark #printDoc .text-slate-900, html.dark #printDoc .text-slate-800 { color: #0f172a !important; }
+html.dark #printDoc .text-slate-700 { color: #334155 !important; }
+html.dark #printDoc .text-slate-600 { color: #475569 !important; }
+html.dark #printDoc .text-slate-500 { color: #64748b !important; }
+html.dark #printDoc .text-slate-400 { color: #94a3b8 !important; }
+html.dark #printDoc .border-slate-100 { border-color: #f1f5f9 !important; }
+html.dark #printDoc .border-slate-200 { border-color: #e2e8f0 !important; }
+html.dark #printDoc .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+html.dark #printDoc .divide-y         > :not([hidden]) ~ :not([hidden]) { border-color: #f1f5f9 !important; }
+html.dark #printDoc table  { color: #000 !important; background-color: transparent !important; }
+html.dark #printDoc thead  { background-color: #f1f5f9 !important; }
+html.dark #printDoc th     { color: #334155 !important; background-color: transparent !important; }
+html.dark #printDoc td     { color: #000 !important; background-color: transparent !important; }
+html.dark #printDoc tbody tr { border-color: #e2e8f0 !important; background-color: transparent !important; }
+html.dark #printDoc .bwc-section-hdr { background: #333 !important; color: #fff !important; }
+html.dark #printDoc input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]),
+html.dark #printDoc textarea,
+html.dark #printDoc select { background-color: #fff !important; color: #000 !important; border-color: #cbd5e1 !important; }
+
+/* ── Colored text inside dark-mode-overridden containers ─────────────
+   Only targets elements WITHOUT their own bg-* class (badges/pills are
+   excluded via :not([class*="bg-"]) so dark text on colored bg stays).
+   Covers bg-white, bg-slate-50/100, bg-gray-50/100 containers.
+──────────────────────────────────────────────────────────────────── */
+html.dark :is(.bg-white,.bg-slate-50,.bg-slate-100,.bg-gray-50,.bg-gray-100)
+  .text-indigo-600:not([class*="bg-"]),
+html.dark :is(.bg-white,.bg-slate-50,.bg-slate-100,.bg-gray-50,.bg-gray-100)
+  .text-indigo-700:not([class*="bg-"]) { color: #a5b4fc !important; }
+
+html.dark :is(.bg-white,.bg-slate-50,.bg-slate-100,.bg-gray-50,.bg-gray-100)
+  .text-blue-600:not([class*="bg-"]),
+html.dark :is(.bg-white,.bg-slate-50,.bg-slate-100,.bg-gray-50,.bg-gray-100)
+  .text-blue-700:not([class*="bg-"]),
+html.dark :is(.bg-white,.bg-slate-50,.bg-slate-100,.bg-gray-50,.bg-gray-100)
+  .text-blue-800:not([class*="bg-"]) { color: #93c5fd !important; }
+
+html.dark :is(.bg-white,.bg-slate-50,.bg-slate-100,.bg-gray-50,.bg-gray-100)
+  .text-emerald-600:not([class*="bg-"]),
+html.dark :is(.bg-white,.bg-slate-50,.bg-slate-100,.bg-gray-50,.bg-gray-100)
+  .text-emerald-700:not([class*="bg-"]),
+html.dark :is(.bg-white,.bg-slate-50,.bg-slate-100,.bg-gray-50,.bg-gray-100)
+  .text-emerald-800:not([class*="bg-"]) { color: #6ee7b7 !important; }
+
+html.dark :is(.bg-white,.bg-slate-50,.bg-slate-100,.bg-gray-50,.bg-gray-100)
+  .text-teal-500:not([class*="bg-"]),
+html.dark :is(.bg-white,.bg-slate-50,.bg-slate-100,.bg-gray-50,.bg-gray-100)
+  .text-teal-600:not([class*="bg-"]) { color: #5eead4 !important; }
+
+html.dark :is(.bg-white,.bg-slate-50,.bg-slate-100,.bg-gray-50,.bg-gray-100)
+  .text-amber-600:not([class*="bg-"]),
+html.dark :is(.bg-white,.bg-slate-50,.bg-slate-100,.bg-gray-50,.bg-gray-100)
+  .text-amber-700:not([class*="bg-"]),
+html.dark :is(.bg-white,.bg-slate-50,.bg-slate-100,.bg-gray-50,.bg-gray-100)
+  .text-amber-800:not([class*="bg-"]) { color: #fcd34d !important; }
+
+html.dark :is(.bg-white,.bg-slate-50,.bg-slate-100,.bg-gray-50,.bg-gray-100)
+  .text-red-600:not([class*="bg-"]),
+html.dark :is(.bg-white,.bg-slate-50,.bg-slate-100,.bg-gray-50,.bg-gray-100)
+  .text-red-700:not([class*="bg-"]) { color: #fca5a5 !important; }
+
+html.dark :is(.bg-white,.bg-slate-50,.bg-slate-100,.bg-gray-50,.bg-gray-100)
+  .text-violet-600:not([class*="bg-"]),
+html.dark :is(.bg-white,.bg-slate-50,.bg-slate-100,.bg-gray-50,.bg-gray-100)
+  .text-violet-700:not([class*="bg-"]) { color: #c4b5fd !important; }
+
+html.dark :is(.bg-white,.bg-slate-50,.bg-slate-100,.bg-gray-50,.bg-gray-100)
+  .text-rose-600:not([class*="bg-"]),
+html.dark :is(.bg-white,.bg-slate-50,.bg-slate-100,.bg-gray-50,.bg-gray-100)
+  .text-rose-700:not([class*="bg-"]) { color: #fda4af !important; }
+
+/* ── Radio/Checkbox label-cards: selected state keeps light bg (bg-blue-50,
+   bg-teal-50, etc.) but global text-slate-* overrides make text near-white
+   → restore dark text so it's readable on the light colored background.
+   Attribute selector catches Tailwind modifier classes like
+   has-[:checked]:bg-blue-50 which won't match a plain .bg-blue-50 rule.
+──────────────────────────────────────────────────────────────────────── */
+html.dark label[class*=":bg-blue-50"]:has(:checked) .text-slate-900,
+html.dark label[class*=":bg-blue-50"]:has(:checked) .text-slate-800,
+html.dark label[class*=":bg-blue-50"]:has(:checked) .text-slate-700 { color: #1e3a5f !important; }
+html.dark label[class*=":bg-blue-50"]:has(:checked) .text-slate-600,
+html.dark label[class*=":bg-blue-50"]:has(:checked) .text-slate-500 { color: #334155 !important; }
+
+html.dark label[class*=":bg-teal-50"]:has(:checked) .text-slate-900,
+html.dark label[class*=":bg-teal-50"]:has(:checked) .text-slate-800,
+html.dark label[class*=":bg-teal-50"]:has(:checked) .text-slate-700 { color: #134e4a !important; }
+html.dark label[class*=":bg-teal-50"]:has(:checked) .text-slate-600,
+html.dark label[class*=":bg-teal-50"]:has(:checked) .text-slate-500 { color: #334155 !important; }
+
+html.dark label[class*=":bg-indigo-50"]:has(:checked) .text-slate-900,
+html.dark label[class*=":bg-indigo-50"]:has(:checked) .text-slate-800,
+html.dark label[class*=":bg-indigo-50"]:has(:checked) .text-slate-700 { color: #1e1b4b !important; }
+html.dark label[class*=":bg-indigo-50"]:has(:checked) .text-slate-500 { color: #334155 !important; }
+
+/* Unselected card: modifier-class bg-white not caught by plain .bg-white
+   selector → force dark bg so globally-lightened text stays readable */
+html.dark label[class*=":bg-white"]:not(:has(:checked)) { background-color: #1e293b !important; }
 

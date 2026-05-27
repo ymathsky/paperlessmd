@@ -38,6 +38,15 @@ document.addEventListener('DOMContentLoaded', function () {
         (function tryInit(attempts) {
             if (!resizeCanvas(false) && attempts < 30) {
                 requestAnimationFrame(function() { tryInit(attempts + 1); });
+            } else {
+                // Pre-fill from saved patient signature after canvas is sized
+                if (window._patientSavedSignature && sigData) {
+                    sigData.value = window._patientSavedSignature;
+                    var pPadArea = document.getElementById('patientSigPadArea');
+                    if (pPadArea && !pPadArea.classList.contains('hidden')) {
+                        sigPad.fromDataURL(window._patientSavedSignature);
+                    }
+                }
             }
         })(0);
         // Only re-size on actual window resize (not layout shifts during drawing)
@@ -48,6 +57,19 @@ document.addEventListener('DOMContentLoaded', function () {
             clearBtn.addEventListener('click', () => {
                 if (sigPad.isEmpty()) return;
                 if (confirm('Clear the patient signature? This cannot be undone.')) sigPad.clear();
+            });
+        }
+
+        // "Sign manually" button for patient signature
+        const manualPatientBtn = document.getElementById('useManualPatientSig');
+        if (manualPatientBtn) {
+            manualPatientBtn.addEventListener('click', function () {
+                var banner = document.getElementById('patientSavedBanner');
+                var padArea = document.getElementById('patientSigPadArea');
+                if (banner) banner.style.display = 'none';
+                if (padArea) { padArea.classList.remove('hidden'); resizeCanvas(false); }
+                if (sigData) sigData.value = '';
+                window._patientSavedSignature = null;
             });
         }
     }
@@ -245,41 +267,57 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function captureAndSubmit() {
         if (!mainForm) return;
+        const editOverrideEl = mainForm.querySelector('input[name="edit_override"]');
+        const isEditOverride = !!(editOverrideEl && String(editOverrideEl.value) === '1');
+
+        // Clear stale signature alerts before any early-return validations.
+        const sigAlert = document.getElementById('sigAlert');
+        const maSigAlert = document.getElementById('maSigAlert');
+        const patientPadArea = document.getElementById('patientSigPadArea');
+        const maPadArea = document.getElementById('maSigPadArea');
+        const usingSavedPatientSig = !!(sigData && sigData.value && (!patientPadArea || patientPadArea.classList.contains('hidden')));
+        const usingSavedMaSig = !!(maSigData && maSigData.value && (!maPadArea || maPadArea.classList.contains('hidden')));
+        if (sigAlert && (isEditOverride || usingSavedPatientSig)) sigAlert.classList.add('hidden');
+        if (maSigAlert && (isEditOverride || usingSavedMaSig)) maSigAlert.classList.add('hidden');
 
         // ── Required field check first ────────────────────────────────
         if (!validateRequiredFields()) return;
 
         // Validate patient signature
-        const sigAlert   = document.getElementById('sigAlert');
-        const maSigAlert = document.getElementById('maSigAlert');
         let valid = true;
 
-        if (!sigPad || !maSigPad) {
+        if ((!sigPad || !maSigPad) && !isEditOverride) {
             alert('Signature pad failed to load. Please refresh the page and try again.');
             return;
         }
 
         if (sigPad) {
-            if (sigPad.isEmpty()) {
-                if (sigAlert) { sigAlert.classList.remove('hidden'); sigAlert.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
-                valid = false;
+            if (!usingSavedPatientSig && sigPad.isEmpty()) {
+                if (!isEditOverride) {
+                    if (sigAlert) { sigAlert.classList.remove('hidden'); sigAlert.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+                    valid = false;
+                } else if (sigAlert) {
+                    sigAlert.classList.add('hidden');
+                }
             } else {
                 if (sigAlert) sigAlert.classList.add('hidden');
-                sigData.value = sigPad.toDataURL('image/png');
+                if (!usingSavedPatientSig) sigData.value = sigPad.toDataURL('image/png');
             }
         }
 
         // Validate MA signature
         if (maSigPad) {
             // If using saved signature the hidden input is already populated; pad may be hidden
-            var padArea = document.getElementById('maSigPadArea');
-            var usingSaved = maSigData && maSigData.value && (!padArea || padArea.classList.contains('hidden'));
-            if (!usingSaved && maSigPad.isEmpty()) {
-                if (maSigAlert) { maSigAlert.classList.remove('hidden'); if (valid) maSigAlert.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
-                valid = false;
+            if (!usingSavedMaSig && maSigPad.isEmpty()) {
+                if (!isEditOverride) {
+                    if (maSigAlert) { maSigAlert.classList.remove('hidden'); if (valid) maSigAlert.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+                    valid = false;
+                } else if (maSigAlert) {
+                    maSigAlert.classList.add('hidden');
+                }
             } else {
                 if (maSigAlert) maSigAlert.classList.add('hidden');
-                if (!usingSaved) maSigData.value = maSigPad.toDataURL('image/png');
+                if (!usingSavedMaSig) maSigData.value = maSigPad.toDataURL('image/png');
             }
         }
 

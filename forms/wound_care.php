@@ -60,7 +60,7 @@ $extraJs = '<script>
         if (stream) stream.getTracks().forEach(t => t.stop());
         try {
             stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode, width: { ideal: 1920 }, height: { ideal: 1080 } },
+                video: { facingMode, width: { ideal: 4096 }, height: { ideal: 4096 } },
                 audio: false
             });
             video.srcObject = stream;
@@ -382,11 +382,11 @@ include __DIR__ . '/../includes/header.php';
     </div>
 
     <!-- Viewfinder -->
-    <div class="flex-1 relative flex items-center justify-center overflow-hidden bg-black">
+    <div class="flex-1 relative overflow-hidden bg-black">
         <video id="cameraVideo" autoplay playsinline muted
-               class="max-h-full max-w-full w-full object-contain"></video>
+               class="absolute inset-0 w-full h-full object-cover"></video>
         <canvas id="cameraCanvas"
-                class="hidden max-h-full max-w-full w-full object-contain"></canvas>
+                class="hidden absolute inset-0 w-full h-full object-cover"></canvas>
         <!-- Aiming guide -->
         <div class="absolute inset-0 pointer-events-none flex items-center justify-center">
             <div class="w-64 h-64 border-2 border-white/30 rounded-2xl"></div>
@@ -415,4 +415,6 @@ include __DIR__ . '/../includes/header.php';
         </button>
     </div>
 </div>
+<?php include __DIR__ . '/../includes/wound_photo_panel.php'; ?>
+<?php include __DIR__ . '/../includes/rx_pad_panel.php'; ?>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

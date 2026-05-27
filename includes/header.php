@@ -4,7 +4,7 @@ header('Permissions-Policy: geolocation=(self)');
 // Each page sets $pageTitle and $activeNav before including this.
 // Build esign count once (used in sidebar)
 $_esignCount = 0;
-if (!isBilling()) {
+if (!isBilling() && !isMa()) {
     if (isAdmin()) {
         $_esignCount = (int)$pdo->query("SELECT COUNT(*) FROM form_submissions WHERE status IN ('signed','uploaded') AND (provider_signature IS NULL OR provider_signature = '')")->fetchColumn();
     } else {
@@ -22,8 +22,16 @@ if (!isBilling()) {
         $_oldDrafts     = (int)$pdo->query("SELECT COUNT(*) FROM form_submissions WHERE status = 'draft' AND created_at < DATE_SUB(NOW(), INTERVAL 24 HOUR)")->fetchColumn();
     } catch (PDOException $e) {}
 }
+// Always read dark mode from DB to ensure it reflects the latest toggle
+$_darkMode = false;
+if (!empty($_SESSION['user_id'])) {
+    $__dmStmt = $pdo->prepare("SELECT dark_mode FROM staff WHERE id = ?");
+    $__dmStmt->execute([$_SESSION['user_id']]);
+    $__dmRow = $__dmStmt->fetch(PDO::FETCH_ASSOC);
+    $_darkMode = !empty($__dmRow['dark_mode']);
+}
 ?><!DOCTYPE html>
-<html lang="en">
+<html lang="en"<?= $_darkMode ? ' class="dark"' : '' ?>>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -32,7 +40,9 @@ if (!isBilling()) {
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/tailwind.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css?v=2">
+    <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css?v=15">
+    <!-- Alpine.js (declarative UI, replaces inline JS patterns) -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
     <link rel="manifest" href="<?= BASE_URL ?>/manifest.php">
     <link rel="apple-touch-icon" href="<?= BASE_URL ?>/assets/img/apple-touch-icon.png">
     <meta name="theme-color" content="#1e3a8a">
@@ -99,7 +109,7 @@ if (!isBilling()) {
             ['href' => '/dashboard.php', 'key' => 'dashboard', 'icon' => 'bi-speedometer2',    'label' => 'Dashboard'],
             ['href' => '/patients.php',  'key' => 'patients',  'icon' => 'bi-people-fill',     'label' => 'Patients'],
             ['href' => '/schedule.php',  'key' => 'schedule',  'icon' => 'bi-calendar3',       'label' => 'Schedule',   'billingHide' => true],
-            ['href' => '/esign_queue.php','key'=> 'esign',     'icon' => 'bi-pen-fill',        'label' => 'Sign Queue', 'billingHide' => true, 'badge' => $_esignCount, 'badgeCls' => 'bg-violet-500'],
+            ['href' => '/esign_queue.php','key'=> 'esign',     'icon' => 'bi-pen-fill',        'label' => 'Sign Queue', 'billingHide' => true, 'maHide' => true, 'badge' => $_esignCount, 'badgeCls' => 'bg-violet-500'],
             ['href' => '/messages.php',  'key' => 'messages',  'icon' => 'bi-chat-dots-fill',  'label' => 'Messages',   'badge' => $_unreadMessages, 'badgeCls' => 'bg-emerald-500'],
             ['href' => '/whats_new.php', 'key' => 'whats_new', 'icon' => 'bi-rocket-takeoff-fill', 'label' => "What's New"],
         ];
@@ -114,6 +124,7 @@ if (!isBilling()) {
         </button>
         <?php foreach ($navItems as $n):
             if (!empty($n['billingHide']) && isBilling()) continue;
+            if (!empty($n['maHide']) && isMa()) continue;
             $active = ($activeNav ?? '') === $n['key'];
         ?>
         <a href="<?= BASE_URL . $n['href'] ?>"
@@ -172,6 +183,7 @@ if (!isBilling()) {
             ['href' => '/admin/roles.php',            'key' => 'roles',           'icon' => 'bi-person-badge-fill',    'label' => 'Roles & Permissions'],
             ['href' => '/admin/audit_log.php',       'key' => 'audit_log',       'icon' => 'bi-shield-lock-fill',     'label' => 'Audit Log'],
             ['href' => '/admin/settings.php',        'key' => 'settings',        'icon' => 'bi-sliders2-vertical',    'label' => 'Settings'],
+            ['href' => '/admin/push_test.php',       'key' => 'push_test',       'icon' => 'bi-bell-fill',            'label' => 'Push Notifications'],
         ] as $n):
             $active = ($activeNav ?? '') === $n['key'];
         ?>
@@ -268,10 +280,104 @@ if (!isBilling()) {
 </div>
 
 <!-- Page content wrapper (offset for sidebar on desktop, top bar on mobile) -->
+
+<!-- ── Session Timeout Warning Modal ───────────────────────────────────── -->
+<?php if (!empty($_SESSION['user_id'])): ?>
+<div id="sessionWarnModal" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,.65);backdrop-filter:blur(4px);align-items:center;justify-content:center">
+    <div style="background:#fff;border-radius:20px;padding:32px 28px;max-width:380px;width:90%;box-shadow:0 24px 60px rgba(0,0,0,.25);text-align:center">
+        <div style="width:60px;height:60px;background:#fef3c7;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
+            <i class="bi bi-clock-history" style="font-size:28px;color:#d97706"></i>
+        </div>
+        <h3 style="margin:0 0 6px;font-size:18px;font-weight:700;color:#1e293b">Session expiring soon</h3>
+        <p style="margin:0 0 6px;font-size:14px;color:#64748b">You'll be logged out automatically in</p>
+        <div id="sessionCountdown" style="font-size:40px;font-weight:800;color:#ef4444;letter-spacing:2px;margin:10px 0">2:00</div>
+        <p style="margin:0 0 24px;font-size:13px;color:#94a3b8">Any unsaved changes will be lost.</p>
+        <div style="display:flex;gap:10px">
+            <button onclick="sessionExtend()" style="flex:1;padding:11px;background:#2563eb;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer">
+                <i class="bi bi-arrow-repeat mr-1"></i> Stay logged in
+            </button>
+            <a href="<?= BASE_URL ?>/logout.php" style="flex:1;padding:11px;background:#f1f5f9;color:#475569;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;display:flex;align-items:center;justify-content:center">
+                Log out
+            </a>
+        </div>
+    </div>
+</div>
+<script>
+(function() {
+    const TIMEOUT   = <?= SESSION_TIMEOUT ?>;   // seconds (e.g. 7200)
+    const WARN_SECS = 120;                        // show warning this many seconds before expiry
+    const CSRF      = <?= json_encode(csrfToken(), JSON_HEX_TAG) ?>;
+    const BASE      = <?= json_encode(BASE_URL) ?>;
+
+    let _lastActivity = Date.now(); // ms
+    let _warnTimer = null, _expireTimer = null, _countdownInterval = null;
+    let _warned = false;
+
+    // Reset activity timestamp on any user interaction
+    ['mousemove','keydown','click','touchstart','scroll'].forEach(ev =>
+        document.addEventListener(ev, () => { _lastActivity = Date.now(); }, {passive:true})
+    );
+
+    function scheduleTimers() {
+        clearTimeout(_warnTimer); clearTimeout(_expireTimer);
+        const warnMs    = (TIMEOUT - WARN_SECS) * 1000;
+        const expireMs  = TIMEOUT * 1000;
+        _warnTimer   = setTimeout(showWarning, warnMs);
+        _expireTimer = setTimeout(forceLogout,  expireMs);
+    }
+
+    function showWarning() {
+        if (_warned) return;
+        _warned = true;
+        const modal = document.getElementById('sessionWarnModal');
+        modal.style.display = 'flex';
+        let remaining = WARN_SECS;
+        updateCountdown(remaining);
+        _countdownInterval = setInterval(() => {
+            remaining--;
+            updateCountdown(remaining);
+            if (remaining <= 0) { clearInterval(_countdownInterval); forceLogout(); }
+        }, 1000);
+    }
+
+    function updateCountdown(secs) {
+        const m = Math.floor(secs / 60), s = secs % 60;
+        const el = document.getElementById('sessionCountdown');
+        if (el) el.textContent = m + ':' + String(s).padStart(2,'0');
+    }
+
+    function forceLogout() {
+        window.location.href = BASE + '/logout.php';
+    }
+
+    window.sessionExtend = function() {
+        fetch(BASE + '/api/session_ping.php', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({csrf: CSRF})
+        })
+        .then(r => r.json())
+        .then(d => {
+            if (d.ok) {
+                document.getElementById('sessionWarnModal').style.display = 'none';
+                clearInterval(_countdownInterval);
+                _warned = false;
+                scheduleTimers();
+            } else {
+                forceLogout();
+            }
+        })
+        .catch(() => forceLogout());
+    };
+
+    scheduleTimers();
+})();
+</script>
+<?php endif; ?>
 <?php if (!empty($fullHeight)): ?>
 <div class="md:pt-0 pt-14 h-screen overflow-hidden flex flex-col">
 <div class="flex-1 overflow-hidden">
 <?php else: ?>
-<div class="md:pt-0 pt-14 pb-12 min-h-screen">
+<div class="md:pt-0 pt-14 pb-24 md:pb-8 min-h-screen">
 <div class="max-w-screen-xl mx-auto px-4 sm:px-6 py-6 page-fade">
 <?php endif; ?>

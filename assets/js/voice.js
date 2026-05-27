@@ -116,6 +116,13 @@
             text = text.trim();
             if (!text) return;
 
+            /* If the target is numbers-only (e.g. vitals), strip everything
+               that isn't a digit, decimal point, slash (BP), or dash */
+            if (target.dataset.voiceNumbersOnly) {
+                text = text.replace(/[^0-9.\/\-]/g, '').trim();
+                if (!text) return; // nothing numeric was heard
+            }
+
             /* Append with a space separator */
             var cur = target.value;
             target.value = cur + (cur.length > 0 && !/\s$/.test(cur) ? ' ' : '') + text;

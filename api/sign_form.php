@@ -64,6 +64,7 @@ $upd = $pdo->prepare("
 ");
 $upd->execute([$signature, $formId]);
 
+// ── Auto-complete schedule visit when form is signed ─────────────────────────
 require_once __DIR__ . '/../includes/audit.php';
 auditLog($pdo, 'form_sign', 'form', $formId);
 

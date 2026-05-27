@@ -42,8 +42,9 @@ function sendMail($to, string $subject, string $html, array $extra = []): bool
         $mail->SMTPAuth   = true;
         $mail->Username   = MAIL_USER;
         $mail->Password   = MAIL_PASS;
-        $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS; // port 465 SSL
+        $mail->SMTPSecure = (MAIL_PORT === 465) ? PHPMailer::ENCRYPTION_SMTPS : PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port       = MAIL_PORT;
+        $mail->Timeout    = 5; // fail fast if SMTP is unreachable
         $mail->CharSet    = 'UTF-8';
 
         // From

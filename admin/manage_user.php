@@ -55,6 +55,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $hash = password_hash($password, PASSWORD_DEFAULT);
             $pdo->prepare("INSERT INTO staff (username, full_name, email, role, password_hash, active) VALUES (?,?,?,?,?,1)")
                 ->execute([$vals['username'], $vals['full_name'], $vals['email'] ?: null, $vals['role'], $hash]);
+            // Send welcome email with credentials
+            if (!empty($vals['email'])) {
+                require_once __DIR__ . '/../includes/mailer.php';
+                require_once __DIR__ . '/../includes/notifications.php';
+                notifyAccountCreated($pdo, $vals['full_name'], $vals['email'], $vals['username'], $password, $vals['role']);
+            }
         }
         header('Location: ' . BASE_URL . '/admin/users.php?msg=updated');
         exit;

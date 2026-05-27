@@ -1,8 +1,18 @@
-<?php
+﻿<?php
 require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/db.php';
 require_once __DIR__ . '/includes/visit_types.php';
 requireNotBilling();
+
+// Map visit type to the primary form URL (used by Start Visit and Open Forms buttons)
+function firstFormUrl(string $visitType, int $patientId, int $visitId, string $visitSubtype = ''): string {
+    $slug = strtolower(trim($visitType));
+    if (str_contains($slug, 'new')) {
+        $npType = ($visitSubtype === 'primary_care') ? 'primary_care' : 'wound_care';
+        return '/forms/new_patient_pocket.php?patient_id=' . $patientId . '&visit_id=' . $visitId . '&sched_visit_type=' . urlencode($visitType) . '&np_type=' . $npType;
+    }
+    return '/forms/vital_cs.php?patient_id=' . $patientId . '&visit_id=' . $visitId . '&sched_visit_type=' . urlencode($visitType);
+}
 
 $pageTitle = 'My Schedule';
 $activeNav = 'schedule';
@@ -18,7 +28,8 @@ $isToday  = $date === date('Y-m-d');
 $view = in_array($_GET['view'] ?? '', ['day','week']) ? $_GET['view'] : 'day';
 
 // Admins can view any MA's schedule via ?ma_id=X, or all via ?ma_id=all
-$viewAll  = isAdmin() && ($_GET['ma_id'] ?? '') === 'all';
+// Default to 'all' for admins when no ma_id param is present
+$viewAll  = isAdmin() && (($_GET['ma_id'] ?? 'all') === 'all');
 $viewMaId = (!$viewAll && isAdmin() && isset($_GET['ma_id'])) ? (int)$_GET['ma_id'] : (int)$_SESSION['user_id'];
 
 // Fetch MA info
@@ -31,8 +42,12 @@ if ($viewAll) {
     if (!$ma) { header('Location: ' . BASE_URL . '/dashboard.php'); exit; }
 }
 
-// Provider filter — must be defined before any queries that reference it
-$filterProvider = trim($_GET['provider'] ?? '');
+// Provider filter — synced with dashboard session filter
+// If ?provider= is explicitly passed, update the session; otherwise fall back to session value
+if (array_key_exists('provider', $_GET)) {
+    $_SESSION['dash_provider_filter'] = trim($_GET['provider']);
+}
+$filterProvider = $_SESSION['dash_provider_filter'] ?? '';
 
 // Week bounds (Monday–Sunday of the week containing $date)
 $dow       = (int)date('N', strtotime($date));   // 1=Mon … 7=Sun
@@ -85,7 +100,7 @@ $schedStmt->execute($schedParams);
 $visits = $schedStmt->fetchAll();
 
 // When admin views all MAs, also build grouped structure
-$allMaVisits = []; // [ma_id => ['name'=>'...', 'counts'=>[], 'visits'=>[]]]
+$allMaVisits = []; // [provider_name => ['name'=>'...', 'mas'=>[], 'counts'=>[], 'visits'=>[]]]
 if ($viewAll && $view === 'day') {
     $allSql = "
         SELECT sc.*,
@@ -101,19 +116,24 @@ if ($viewAll && $view === 'day') {
     ";
     $allParams = [$date];
     if ($filterProvider !== '') { $allSql .= " AND sc.provider_name = ?"; $allParams[] = $filterProvider; }
-    $allSql .= " ORDER BY s.full_name, sc.visit_order ASC, sc.visit_time ASC";
+    $allSql .= " ORDER BY COALESCE(NULLIF(TRIM(sc.provider_name),''),'zzz'), sc.visit_order ASC, sc.visit_time ASC";
     $allStmt = $pdo->prepare($allSql);
     $allStmt->execute($allParams);
     foreach ($allStmt->fetchAll() as $av) {
-        if (!isset($allMaVisits[$av['ma_id']])) {
-            $allMaVisits[$av['ma_id']] = [
-                'name'   => $av['ma_name'],
+        $pKey = trim($av['provider_name'] ?? '') ?: '— Unassigned —';
+        if (!isset($allMaVisits[$pKey])) {
+            $allMaVisits[$pKey] = [
+                'name'   => $pKey,
+                'mas'    => [],
                 'counts' => ['pending'=>0,'en_route'=>0,'completed'=>0,'missed'=>0],
                 'visits' => [],
             ];
         }
-        $allMaVisits[$av['ma_id']]['visits'][] = $av;
-        $allMaVisits[$av['ma_id']]['counts'][$av['status']]++;
+        $allMaVisits[$pKey]['visits'][] = $av;
+        $allMaVisits[$pKey]['counts'][$av['status']]++;
+        if (!empty($av['ma_name']) && !in_array($av['ma_name'], $allMaVisits[$pKey]['mas'], true)) {
+            $allMaVisits[$pKey]['mas'][] = $av['ma_name'];
+        }
     }
     // Flatten for total stats
     $visits = array_merge(...(array_column($allMaVisits, 'visits') ?: [[]]));
@@ -122,6 +142,13 @@ if ($viewAll && $view === 'day') {
 // Stats
 $counts = ['pending'=>0,'en_route'=>0,'completed'=>0,'missed'=>0];
 foreach ($visits as $v) $counts[$v['status']]++;
+
+// Route Map — ordered unique addresses from today's visits (for "Open Route Map" button)
+$routeAddresses = [];
+foreach ($visits as $rv) {
+    $a = trim($rv['patient_address'] ?? '');
+    if ($a !== '' && !in_array($a, $routeAddresses, true)) $routeAddresses[] = $a;
+}
 
 // All MAs for admin switcher
 $allMas = [];
@@ -132,123 +159,152 @@ if (isAdmin()) {
 // Provider options for the filter dropdown
 $providerOptions = [];
 try {
-    $providerOptions = $pdo->query("SELECT DISTINCT provider_name FROM `schedule` WHERE provider_name IS NOT NULL AND provider_name != '' ORDER BY provider_name")->fetchAll(PDO::FETCH_COLUMN);
-} catch (PDOException $e) { /* provider_name column may not exist yet */ }
+    $providerOptions = $pdo->query("SELECT full_name FROM staff WHERE active=1 AND role IN ('admin','provider') ORDER BY full_name")->fetchAll(PDO::FETCH_COLUMN);
+} catch (PDOException $e) { /* ignore */ }
+
+// Provider staff accounts for the edit modal dropdown
+$providerStaff = $pdo->query("SELECT id, full_name FROM staff WHERE active=1 AND role='admin' ORDER BY full_name")->fetchAll();
 
 include __DIR__ . '/includes/header.php';
 ?>
 
-<!-- Date nav + Title -->
-<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 no-print">
-    <div>
-        <h2 class="text-2xl font-extrabold text-slate-800">
-            <i class="bi bi-calendar3 text-indigo-500 mr-1"></i> Daily Schedule
-        </h2>
-        <p class="text-slate-500 text-sm mt-0.5">
-            <?= h($ma['full_name']) ?> &mdash;
-            <?php if ($view === 'week'): ?>
-                <?= date('M j', strtotime($weekStart)) ?> – <?= date('M j, Y', strtotime($weekEnd)) ?>
-            <?php else: ?>
-                <?= date('l, F j, Y', strtotime($date)) ?>
-                <?php if ($isToday): ?><span class="ml-2 px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs font-bold rounded-full">TODAY</span><?php endif; ?>
-            <?php endif; ?>
-        </p>
-    </div>
-    <div class="flex items-center gap-2">
-        <!-- Admin MA switcher -->
-        <?php if (isAdmin() && $allMas): ?>
-        <form method="GET" class="flex items-center gap-2">
-            <input type="hidden" name="date" value="<?= h($date) ?>">
-            <input type="hidden" name="view" value="<?= h($view) ?>">
-            <?php if ($filterProvider !== ''): ?><input type="hidden" name="provider" value="<?= h($filterProvider) ?>"><?php endif; ?>
-            <select name="ma_id" onchange="this.form.submit()"
-                    class="px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                <option value="all" <?= $viewAll ? 'selected' : '' ?>>All MAs</option>
-                <?php foreach ($allMas as $m): ?>
-                <option value="<?= $m['id'] ?>" <?= (!$viewAll && $m['id'] == $viewMaId) ? 'selected' : '' ?>>
-                    <?= h($m['full_name']) ?>
-                </option>
-                <?php endforeach; ?>
-            </select>
-        </form>
-        <?php endif; ?>
+<!-- Schedule Page Header - Clean Mobile-First V3 -->
+<style>
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+.hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+/* GPS badge row: hidden until JS reveals it */
+#gpsStatusRow { display: none; }
+#gpsStatusRow.gps-visible { display: flex; }
+</style>
+<?php $maParam = $viewAll ? 'all' : $viewMaId; $pParam = $filterProvider !== '' ? '&provider=' . urlencode($filterProvider) : ''; ?>
+<div class="sticky top-[60px] z-30 bg-white/95 backdrop-blur-sm border-b border-slate-100 shadow-sm no-print -mx-4 px-4 sm:mx-0 sm:px-0 pt-3 pb-2 mb-5">
+    <div class="flex flex-col gap-2">
 
-        <?php if (!empty($providerOptions)): ?>
-        <form method="GET" class="flex items-center gap-2">
-            <input type="hidden" name="date" value="<?= h($date) ?>">
-            <input type="hidden" name="view" value="<?= h($view) ?>">
-            <input type="hidden" name="ma_id" value="<?= $viewAll ? 'all' : $viewMaId ?>">
-            <select name="provider" onchange="this.form.submit()"
-                    class="px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                <option value="">All Providers</option>
-                <?php foreach ($providerOptions as $pOpt): ?>
-                <option value="<?= h($pOpt) ?>" <?= $filterProvider === $pOpt ? 'selected' : '' ?>><?= h($pOpt) ?></option>
-                <?php endforeach; ?>
-            </select>
-        </form>
-        <?php endif; ?>
-
-        <!-- Day / Week toggle -->
-        <?php $maParam = $viewAll ? 'all' : $viewMaId;
-              $pParam  = $filterProvider !== '' ? '&provider=' . urlencode($filterProvider) : ''; ?>
-        <div class="flex items-center bg-slate-100 rounded-xl p-1 gap-0.5">
-            <a href="?date=<?= $date ?>&ma_id=<?= $maParam ?>&view=day<?= $pParam ?>"
-               class="px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-all <?= $view === 'day' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700' ?>">
-                <i class="bi bi-calendar3 mr-1"></i>Day
-            </a>
-            <a href="?date=<?= $weekStart ?>&ma_id=<?= $maParam ?>&view=week<?= $pParam ?>"
-               class="px-3.5 py-1.5 rounded-lg text-sm font-semibold transition-all <?= $view === 'week' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-700' ?>">
-                <i class="bi bi-calendar-week mr-1"></i>Week
-            </a>
+        <!-- Row 1: Title + subtitle + Day/Week toggle -->
+        <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0">
+                <h2 class="text-lg font-extrabold text-slate-800 tracking-tight leading-none">
+                    <i class="bi bi-calendar3 text-indigo-500 mr-1 text-base"></i>Schedule
+                </h2>
+                <p class="text-[11px] text-slate-400 font-medium mt-0.5 truncate">
+                    <?= h($ma['full_name']) ?> &middot;
+                    <?= $view === 'week'
+                        ? date('M j', strtotime($weekStart)) . '–' . date('M j', strtotime($weekEnd))
+                        : date('D, M j, Y', strtotime($date)) ?>
+                    <?php if ($isToday && $view === 'day'): ?><span class="ml-1 px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded font-bold text-[9px] uppercase tracking-wide">Today</span><?php endif; ?>
+                </p>
+            </div>
+            <div class="flex items-center bg-slate-100 p-0.5 rounded-xl shrink-0">
+                <a href="?date=<?= $date ?>&ma_id=<?= $maParam ?>&view=day<?= $pParam ?>"
+                   class="px-3 py-1 rounded-[10px] text-xs font-bold transition-all <?= $view === 'day' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-400 hover:text-slate-600' ?>">Day</a>
+                <a href="?date=<?= $weekStart ?>&ma_id=<?= $maParam ?>&view=week<?= $pParam ?>"
+                   class="px-3 py-1 rounded-[10px] text-xs font-bold transition-all <?= $view === 'week' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-400 hover:text-slate-600' ?>">Week</a>
+            </div>
         </div>
 
-        <!-- Date navigation -->
-        <?php if ($view === 'week'): ?>
-        <a href="?date=<?= $prevWeek ?>&ma_id=<?= $maParam ?>&view=week<?= $pParam ?>"
-           class="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors text-slate-600">
-            <i class="bi bi-chevron-left text-sm"></i>
-        </a>
-        <a href="?date=<?= date('Y-m-d') ?>&ma_id=<?= $maParam ?>&view=week<?= $pParam ?>"
-           class="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors <?= (date('Y-m-d') >= $weekStart && date('Y-m-d') <= $weekEnd) ? 'border-indigo-300 text-indigo-600' : '' ?>">
-            Today
-        </a>
-        <a href="?date=<?= $nextWeek ?>&ma_id=<?= $maParam ?>&view=week<?= $pParam ?>"
-           class="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors text-slate-600">
-            <i class="bi bi-chevron-right text-sm"></i>
-        </a>
-        <?php else: ?>
-        <a href="?date=<?= $prevDate ?>&ma_id=<?= $maParam ?>&view=day<?= $pParam ?>"
-           class="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors text-slate-600">
-            <i class="bi bi-chevron-left text-sm"></i>
-        </a>
-        <a href="?date=<?= date('Y-m-d') ?>&ma_id=<?= $maParam ?>&view=day<?= $pParam ?>"
-           class="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors <?= $isToday ? 'border-indigo-300 text-indigo-600' : '' ?>">
-            Today
-        </a>
-        <a href="?date=<?= $nextDate ?>&ma_id=<?= $maParam ?>&view=day<?= $pParam ?>"
-           class="p-2.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors text-slate-600">
-            <i class="bi bi-chevron-right text-sm"></i>
-        </a>
+        <!-- Row 2: GPS status badge (own isolated row, shown only by JS) -->
+        <?php if (in_array($_SESSION['role'] ?? '', ['ma', 'admin'])): ?>
+        <div id="gpsStatusRow" class="items-center">
+            <span id="gpsStatusBadge" class="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-full bg-slate-100 text-slate-500 border border-slate-200">
+                <i class="bi bi-geo-alt"></i> Locating…
+            </span>
+        </div>
         <?php endif; ?>
 
-        <?php if (isAdmin()): ?>
-        <a href="<?= BASE_URL ?>/admin/schedule_manage.php?date=<?= $date ?>"
-           class="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold transition-colors shadow-sm">
-            <i class="bi bi-pencil-fill text-xs"></i> Manage
-        </a>
-        <?php endif; ?>
-        <button onclick="window.print()"
-                class="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-semibold transition-colors shadow-sm no-print">
-            <i class="bi bi-printer-fill text-slate-500"></i> Print
-        </button>
+        <!-- Row 3: Date nav + filters + actions (horizontally scrollable) -->
+        <div class="flex items-center gap-1.5 overflow-x-auto hide-scrollbar pb-0.5">
+
+            <!-- Date navigator pill -->
+            <div class="flex items-center rounded-lg border border-indigo-100 bg-indigo-50 shrink-0 overflow-hidden">
+                <?php if ($view === 'week'): ?>
+                <a href="?date=<?= $prevWeek ?>&ma_id=<?= $maParam ?>&view=week<?= $pParam ?>" class="px-2 py-1.5 text-indigo-600 hover:bg-indigo-100 transition-colors"><i class="bi bi-chevron-left text-[10px]"></i></a>
+                <span class="px-2 py-1.5 text-[10px] font-bold text-indigo-700 whitespace-nowrap"><?= date('M j', strtotime($weekStart)) ?>–<?= date('j', strtotime($weekEnd)) ?></span>
+                <a href="?date=<?= $nextWeek ?>&ma_id=<?= $maParam ?>&view=week<?= $pParam ?>" class="px-2 py-1.5 text-indigo-600 hover:bg-indigo-100 transition-colors"><i class="bi bi-chevron-right text-[10px]"></i></a>
+                <?php else: ?>
+                <a href="?date=<?= $prevDate ?>&ma_id=<?= $maParam ?>&view=day<?= $pParam ?>" class="px-2 py-1.5 text-indigo-600 hover:bg-indigo-100 transition-colors"><i class="bi bi-chevron-left text-[10px]"></i></a>
+                <a href="?date=<?= date('Y-m-d') ?>&ma_id=<?= $maParam ?>&view=day<?= $pParam ?>"
+                   class="px-2.5 py-1.5 text-[10px] font-bold whitespace-nowrap transition-colors <?= $isToday ? 'bg-indigo-600 text-white' : 'text-indigo-700 hover:bg-indigo-100' ?>">
+                    <?= $isToday ? 'Today' : date('M j', strtotime($date)) ?>
+                </a>
+                <a href="?date=<?= $nextDate ?>&ma_id=<?= $maParam ?>&view=day<?= $pParam ?>" class="px-2 py-1.5 text-indigo-600 hover:bg-indigo-100 transition-colors"><i class="bi bi-chevron-right text-[10px]"></i></a>
+                <?php endif; ?>
+            </div>
+
+            <!-- Provider filter -->
+            <?php if (!empty($providerOptions)): ?>
+            <form method="GET" class="shrink-0" style="width:97px">
+                <input type="hidden" name="date" value="<?= h($date) ?>">
+                <input type="hidden" name="view" value="<?= h($view) ?>">
+                <input type="hidden" name="ma_id" value="<?= $viewAll ? 'all' : $viewMaId ?>">
+                <select name="provider" onchange="this.form.submit()"
+                        class="w-full px-1.5 py-1.5 border border-slate-200 rounded-lg text-[10px] font-semibold bg-white text-slate-700 shadow-sm outline-none focus:ring-2 focus:ring-indigo-300 transition">
+                    <option value="">All Providers</option>
+                    <?php foreach ($providerOptions as $pOpt): ?>
+                    <option value="<?= h($pOpt) ?>" <?= $filterProvider === $pOpt ? 'selected' : '' ?>><?= h($pOpt) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </form>
+            <?php endif; ?>
+
+            <!-- Route map button -->
+            <?php if ($view === 'day' && count($routeAddresses) >= 1): ?>
+            <button onclick="openRouteMapModal()"
+                    class="shrink-0 flex items-center gap-1 px-2 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-lg text-[10px] font-bold shadow-sm transition-all">
+                <i class="bi bi-map-fill text-[10px]"></i>
+                <span class="bg-white/25 px-1 rounded text-[9px] leading-none py-0.5"><?= count($routeAddresses) ?></span>
+            </button>
+            <?php endif; ?>
+
+            <!-- Admin: manage schedule -->
+            <?php if (isAdmin()): ?>
+            <a href="<?= BASE_URL ?>/admin/schedule_manage.php?date=<?= $date ?>"
+               class="shrink-0 flex items-center justify-center w-7 h-7 bg-slate-800 hover:bg-slate-900 text-white rounded-lg shadow-sm transition-colors" title="Manage">
+                <i class="bi bi-pencil-fill text-[10px]"></i>
+            </a>
+            <?php endif; ?>
+
+            <!-- Print -->
+            <button onclick="window.print()"
+                    class="shrink-0 flex items-center justify-center w-7 h-7 bg-white border border-slate-200 text-slate-500 rounded-lg shadow-sm hover:bg-slate-50 transition-colors" title="Print">
+                <i class="bi bi-printer-fill text-[10px]"></i>
+            </button>
+
+        </div>
     </div>
 </div>
+<script>
+// Show GPS badge row once JS has a status to report
+(function() {
+    var orig = window.__pdSetGpsBadge;
+    var _observer = new MutationObserver(function() {
+        var badge = document.getElementById('gpsStatusBadge');
+        var row   = document.getElementById('gpsStatusRow');
+        if (badge && row && badge.textContent.trim() !== '') {
+            row.classList.add('gps-visible');
+        }
+    });
+    var badge = document.getElementById('gpsStatusBadge');
+    if (badge) _observer.observe(badge, { childList: true, subtree: true, characterData: true, attributes: true });
+})();
+</script>
 
 <style>
 /* Screen: hide the dedicated print layout */
+
 #print-layout { display: none; }
 
+/* Hide print-only header on screen */
+.print-header { display: none; }
+
+/* Status bar: 2 cols on mobile, 4 on sm+ */
+.print-stat-bar { grid-template-columns: repeat(2, 1fr) !important; }
+@media (min-width: 640px) {
+    .print-stat-bar { grid-template-columns: repeat(4, 1fr) !important; }
+}
+
 @media print {
+    .print-header { display: block; }
+    .print-stat-bar { grid-template-columns: repeat(4, 1fr) !important; }
     @page { size: A4 <?= $view === 'week' ? 'landscape' : 'portrait' ?>; margin: 18mm 20mm; }
 
     body, html { background: #fff !important; margin: 0 !important; padding: 0 !important; }
@@ -275,6 +331,291 @@ include __DIR__ . '/includes/header.php';
     }
 }
 </style>
+<?php
+// ── Visit card border colours keyed by status ─────────────────────────────
+$_sbc = ['pending'=>'#94a3b8','en_route'=>'#3b82f6','completed'=>'#22c55e','missed'=>'#ef4444'];
+$_vtl = ['routine'=>'Follow-Up','new_patient'=>'New Patient','wound_care'=>'Wound Care','awv'=>'Annual Wellness','ccm'=>'CCM','il'=>'IL Disc.'];
+
+/** Renders one compact visit card. $showMaName=true → show MA; false → show Provider */
+$renderVisitCard = function(array $v, int $idx, bool $showMaName) use ($statusDefs, $_sbc, $_vtl): void {
+    $sd      = $statusDefs[$v['status']];
+    $addr    = $v['patient_address'] ? rawurlencode($v['patient_address']) : '';
+    $mapsUrl = $addr ? 'https://www.google.com/maps/dir/?api=1&destination='.$addr : '#';
+    $vt      = $v['visit_type'] ?? 'routine';
+    $href    = in_array($v['status'], ['pending','en_route'])
+        ? BASE_URL . firstFormUrl($v['visit_type'] ?? 'routine', $v['patient_id'], $v['id'], $v['visit_subtype'] ?? '')
+        : BASE_URL . '/patient_view.php?id=' . $v['patient_id'];
+
+    // Status header gradients + config
+    $statusGrad = [
+        'pending'   => 'linear-gradient(135deg,#334155 0%,#64748b 100%)',
+        'en_route'  => 'linear-gradient(135deg,#1e3a8a 0%,#3b82f6 100%)',
+        'completed' => 'linear-gradient(135deg,#064e3b 0%,#10b981 100%)',
+        'missed'    => 'linear-gradient(135deg,#7f1d1d 0%,#f87171 100%)',
+    ];
+    $vtIcons = [
+        'routine'     => 'bi-arrow-repeat',
+        'new_patient' => 'bi-person-plus-fill',
+        'wound_care'  => 'bi-bandaid-fill',
+        'awv'         => 'bi-heart-pulse-fill',
+        'ccm'         => 'bi-clipboard2-heart-fill',
+        'il'          => 'bi-capsule',
+    ];
+    $grad    = $statusGrad[$v['status']];
+    $vtIcon  = $vtIcons[$vt] ?? 'bi-calendar2-check';
+    ?>
+
+    <div class="rounded-2xl mb-4 overflow-hidden flex flex-col print-visit-card"
+         id="visit-<?= $v['id'] ?>"
+         style="box-shadow:0 8px 32px rgba(0,0,0,0.18),0 2px 8px rgba(0,0,0,0.10);">
+
+        <!-- ── HEADER: colored gradient ── -->
+        <div style="background:<?= $grad ?>;padding:18px 16px 22px;position:relative;">
+            <!-- top row: visit # + edit -->
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+                <span style="background:rgba(255,255,255,0.18);color:#fff;border:1px solid rgba(255,255,255,0.3);
+                             display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;
+                             font-size:12px;font-weight:800;letter-spacing:0.03em;">
+                    <i class="bi bi-hash" style="font-size:11px;"></i><?= $idx + 1 ?>
+                </span>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <?php if ($v['visit_time']): ?>
+                    <span style="background:rgba(255,255,255,0.18);color:#fff;border:1px solid rgba(255,255,255,0.25);
+                                 display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;
+                                 font-size:12px;font-weight:700;">
+                        <i class="bi bi-clock" style="font-size:11px;"></i><?= date('g:i A', strtotime($v['visit_time'])) ?>
+                    </span>
+                    <?php endif; ?>
+                    <?php if ($v['patient_address']): ?>
+                    <button onclick="openMapPanel(<?= htmlspecialchars(json_encode($v['patient_address']), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($v['patient_name']), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($mapsUrl), ENT_QUOTES) ?>); if(window._pdSendLocation)window._pdSendLocation();"
+                            style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;
+                                   border-radius:10px;background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.3);
+                                   color:#fff;cursor:pointer;transition:background 0.15s;" title="Navigate"
+                            class="no-print">
+                        <i class="bi bi-map-fill" style="font-size:13px;"></i>
+                    </button>
+                    <?php endif; ?>
+                    <button onclick="openEditModal(<?= htmlspecialchars(json_encode(['id'=>$v['id'],'visit_time'=>$v['visit_time'],'visit_type'=>$v['visit_type'] ?? 'routine','notes'=>$v['notes'] ?? '','provider_name'=>$v['provider_name'] ?? '','visit_order'=>$v['visit_order'],'visit_date'=>$v['visit_date'],'ma_id'=>$v['ma_id'],'patient_name'=>$v['patient_name']]), ENT_QUOTES) ?>)"
+                            style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;
+                                   border-radius:10px;background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.3);
+                                   color:#fff;cursor:pointer;transition:background 0.15s;" title="Edit visit"
+                            class="no-print">
+                        <i class="bi bi-pencil-fill" style="font-size:11px;"></i>
+                    </button>
+                </div>
+            </div>
+            <?php if (!empty($v['visit_started_at']) || !empty($v['visit_ended_at'])): ?>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;">
+                <?php if (!empty($v['visit_started_at'])): ?>
+                <span style="background:rgba(255,255,255,0.18);color:#fff;border:1px solid rgba(255,255,255,0.25);
+                             display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:16px;font-size:11px;font-weight:700;">
+                    <i class="bi bi-play-circle-fill"></i> <?= date('g:i A', strtotime($v['visit_started_at'])) ?>
+                </span>
+                <?php endif; ?>
+                <?php if (!empty($v['visit_ended_at'])): ?>
+                <span style="background:rgba(255,255,255,0.18);color:#fff;border:1px solid rgba(255,255,255,0.25);
+                             display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:16px;font-size:11px;font-weight:700;">
+                    <i class="bi bi-stop-circle-fill"></i> <?= date('g:i A', strtotime($v['visit_ended_at'])) ?>
+                </span>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+        </div>
+
+        <!-- ── BODY: dark slate ── -->
+        <div style="background:#0f172a;padding:16px 16px 4px;">
+
+            <!-- visit type + status badges -->
+            <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:12px;">
+                <span style="background:rgba(99,102,241,0.25);color:#a5b4fc;border:1px solid rgba(99,102,241,0.4);
+                             display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;
+                             font-size:12px;font-weight:800;">
+                    <i class="bi <?= $vtIcon ?>" style="font-size:12px;"></i>
+                    <?= h($_vtl[$vt] ?? 'Follow-Up') ?>
+                </span>
+                <span style="background:rgba(255,255,255,0.08);color:#cbd5e1;border:1px solid rgba(255,255,255,0.12);
+                             display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;
+                             font-size:12px;font-weight:700;">
+                    <i class="bi <?= $sd['icon'] ?>" style="font-size:11px;"></i>
+                    <?= $sd['label'] ?>
+                </span>
+            </div>
+
+            <!-- Patient name — main title -->
+            <a href="<?= $href ?>"
+               style="display:block;color:#f8fafc;font-size:22px;font-weight:900;line-height:1.2;
+                      letter-spacing:-0.02em;margin-bottom:14px;word-break:break-word;text-decoration:none;">
+                <?= h($v['patient_name']) ?>
+            </a>
+
+            <!-- MA / provider -->
+            <?php if ($showMaName && !empty($v['ma_name'])): ?>
+            <div style="display:flex;align-items:center;gap:8px;color:#94a3b8;font-size:14px;margin-bottom:8px;">
+                <i class="bi bi-person-circle" style="color:#818cf8;font-size:16px;flex-shrink:0;"></i>
+                <span style="font-weight:600;"><?= h($v['ma_name']) ?></span>
+            </div>
+            <?php elseif (!$showMaName && !empty($v['provider_name'])): ?>
+            <div style="display:flex;align-items:center;gap:8px;color:#94a3b8;font-size:14px;margin-bottom:8px;">
+                <i class="bi bi-person-badge" style="color:#94a3b8;font-size:16px;flex-shrink:0;"></i>
+                <span style="font-weight:600;"><?= h($v['provider_name']) ?></span>
+            </div>
+            <?php endif; ?>
+
+            <!-- Address -->
+            <?php if ($v['patient_address']): ?>
+            <a href="https://www.google.com/maps/dir/?api=1&destination=<?= $addr ?>" target="_blank" rel="noopener"
+               style="display:flex;align-items:flex-start;gap:8px;color:#94a3b8;font-size:16px;margin-bottom:8px;
+                      text-decoration:none;transition:color 0.15s;"
+               onmouseover="this.style.color='#60a5fa'" onmouseout="this.style.color='#94a3b8'">
+                <i class="bi bi-geo-alt-fill" style="color:#64748b;font-size:16px;flex-shrink:0;margin-top:1px;"></i>
+                <span style="word-break:break-word;line-height:1.4;"><?= h($v['patient_address']) ?></span>
+            </a>
+            <?php endif; ?>
+
+            <!-- Phone -->
+            <?php if ($v['patient_phone']): ?>
+            <a href="tel:<?= h(preg_replace('/\D/','',$v['patient_phone'])) ?>"
+               style="display:inline-flex;align-items:center;gap:8px;color:#94a3b8;font-size:16px;margin-bottom:8px;
+                      text-decoration:none;transition:color 0.15s;"
+               onmouseover="this.style.color='#60a5fa'" onmouseout="this.style.color='#94a3b8'">
+                <i class="bi bi-telephone-fill" style="color:#64748b;font-size:14px;flex-shrink:0;"></i>
+                <span><?= h($v['patient_phone']) ?></span>
+            </a>
+            <?php endif; ?>
+
+            <!-- Scheduling notes -->
+            <?php if ($v['notes']): ?>
+            <div style="display:flex;align-items:flex-start;gap:8px;background:rgba(251,191,36,0.1);
+                        border:1px solid rgba(251,191,36,0.25);border-radius:12px;padding:10px 12px;margin-top:4px;margin-bottom:4px;">
+                <i class="bi bi-exclamation-triangle-fill" style="color:#fbbf24;font-size:13px;flex-shrink:0;margin-top:1px;"></i>
+                <span style="color:#fde68a;font-size:13px;font-weight:600;line-height:1.4;word-break:break-word;"><?= h($v['notes']) ?></span>
+            </div>
+            <?php endif; ?>
+
+            <!-- ── Primary action row ── -->
+            <div style="display:flex;align-items:center;gap:10px;padding:14px 0 16px;" class="no-print">
+                <?php if ($v['status'] === 'pending'): ?>
+                <button onclick="startVisit(<?= $v['id'] ?>, <?= $v['patient_id'] ?>, '<?= h($v['visit_type'] ?? 'routine') ?>', '<?= h($v['visit_subtype'] ?? '') ?>', this)"
+                        style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;
+                               padding:13px 20px;background:#2563eb;color:#fff;border:none;border-radius:50px;
+                               font-size:15px;font-weight:800;cursor:pointer;transition:all 0.15s;letter-spacing:0.01em;
+                               box-shadow:0 4px 16px rgba(37,99,235,0.45);"
+                        onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#2563eb'">
+                    <i class="bi bi-play-fill"></i> Start Visit &nbsp;→
+                </button>
+                <?php elseif ($v['status'] === 'en_route'): ?>
+                <a href="<?= BASE_URL . firstFormUrl($v['visit_type'] ?? 'routine', $v['patient_id'], $v['id'], $v['visit_subtype'] ?? '') ?>"
+                   style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;
+                          padding:13px 20px;background:#2563eb;color:#fff;border-radius:50px;
+                          font-size:15px;font-weight:800;text-decoration:none;transition:background 0.15s;
+                          box-shadow:0 4px 16px rgba(37,99,235,0.45);"
+                   onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#2563eb'">
+                    <i class="bi bi-file-earmark-plus-fill"></i> Open Forms &nbsp;→
+                </a>
+                <button onclick="endVisit(<?= $v['id'] ?>, this)"
+                        style="display:flex;align-items:center;gap:6px;padding:13px 16px;background:rgba(239,68,68,0.15);
+                               color:#fca5a5;border:1px solid rgba(239,68,68,0.3);border-radius:50px;
+                               font-size:14px;font-weight:700;cursor:pointer;transition:all 0.15s;flex-shrink:0;">
+                    <i class="bi bi-stop-fill"></i> End
+                </button>
+                <?php elseif ($v['status'] === 'completed'): ?>
+                <span style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;
+                             padding:13px 20px;background:rgba(16,185,129,0.15);color:#6ee7b7;
+                             border:1px solid rgba(16,185,129,0.3);border-radius:50px;font-size:15px;font-weight:800;">
+                    <i class="bi bi-check-circle-fill"></i> Visit Complete
+                </span>
+                <button onclick="undoEndVisit(<?= $v['id'] ?>, this)"
+                        style="display:flex;align-items:center;gap:6px;padding:13px 14px;background:rgba(251,191,36,0.12);
+                               color:#fde68a;border:1px solid rgba(251,191,36,0.3);border-radius:50px;
+                               font-size:13px;font-weight:700;cursor:pointer;transition:all 0.15s;flex-shrink:0;">
+                    <i class="bi bi-arrow-counterclockwise"></i> Undo
+                </button>
+                <?php elseif ($v['status'] === 'missed'): ?>
+                <button onclick="updateStatus(<?= $v['id'] ?>, 'pending')"
+                        style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;
+                               padding:13px 20px;background:rgba(148,163,184,0.12);color:#cbd5e1;
+                               border:1px solid rgba(148,163,184,0.25);border-radius:50px;
+                               font-size:15px;font-weight:800;cursor:pointer;transition:all 0.15s;">
+                    <i class="bi bi-arrow-counterclockwise"></i> Mark as Pending
+                </button>
+                <?php endif; ?>
+
+                <a href="<?= BASE_URL ?>/patient_view.php?id=<?= $v['patient_id'] ?>"
+                   style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;
+                          border-radius:50%;background:rgba(148,163,184,0.12);color:#94a3b8;
+                          border:1px solid rgba(148,163,184,0.2);text-decoration:none;transition:all 0.15s;flex-shrink:0;" title="Patient chart">
+                    <i class="bi bi-folder2-open" style="font-size:15px;"></i>
+                </a>
+            </div>
+        </div>
+
+        <!-- ── Status switcher ── -->
+        <div style="background:#0f172a;border-top:1px solid rgba(255,255,255,0.07);padding:10px 16px;
+                    display:flex;align-items:center;gap:8px;overflow-x:auto;" class="hide-scrollbar no-print">
+            <?php
+            $statusInlineDark = [
+                'pending'   => ['active'=>'background:#334155;color:#e2e8f0;border:1.5px solid #64748b;font-weight:800;',
+                                'inactive'=>'background:rgba(255,255,255,0.05);color:#475569;border:1px solid rgba(255,255,255,0.08);'],
+                'en_route'  => ['active'=>'background:#1e3a8a;color:#93c5fd;border:1.5px solid #3b82f6;font-weight:800;',
+                                'inactive'=>'background:rgba(255,255,255,0.05);color:#475569;border:1px solid rgba(255,255,255,0.08);'],
+                'completed' => ['active'=>'background:#064e3b;color:#6ee7b7;border:1.5px solid #10b981;font-weight:800;',
+                                'inactive'=>'background:rgba(255,255,255,0.05);color:#475569;border:1px solid rgba(255,255,255,0.08);'],
+                'missed'    => ['active'=>'background:#7f1d1d;color:#fca5a5;border:1.5px solid #ef4444;font-weight:800;',
+                                'inactive'=>'background:rgba(255,255,255,0.05);color:#475569;border:1px solid rgba(255,255,255,0.08);'],
+            ];
+            foreach ($statusDefs as $sKey => $sDef):
+                $isCurrent = $v['status'] === $sKey;
+                $btnS      = $statusInlineDark[$sKey][$isCurrent ? 'active' : 'inactive'];
+            ?>
+            <button onclick="updateStatus(<?= $v['id'] ?>, '<?= $sKey ?>')"
+                    style="<?= $btnS ?>;display:inline-flex;align-items:center;gap:6px;padding:7px 13px;
+                           border-radius:10px;font-size:12px;white-space:nowrap;cursor:pointer;
+                           transition:all 0.15s;flex-shrink:0;">
+                <i class="bi <?= $sDef['icon'] ?>" style="font-size:12px;"></i><?= $sDef['label'] ?>
+            </button>
+            <?php endforeach; ?>
+        </div>
+
+        <!-- Quick Note Expansion -->
+        <div style="background:#0f172a;border-top:1px solid rgba(255,255,255,0.07);" class="no-print">
+            <button type="button" onclick="toggleNotes(this, <?= $v['id'] ?>)"
+                    style="width:100%;display:flex;align-items:center;gap:8px;padding:11px 16px;
+                           font-size:12px;font-weight:700;text-align:left;background:transparent;border:none;cursor:pointer;
+                           color:<?= !empty($v['visit_notes']) ? '#fde68a' : '#475569' ?>;transition:color 0.15s;"
+                    class="<?= !empty($v['visit_notes']) ? 'text-amber-400' : 'text-slate-500' ?>">
+                <i class="bi bi-pencil-square text-[13px]"></i>
+                <?php if (!empty($v['visit_notes'])): ?>
+                    <span class="truncate flex-1 font-medium"><?= h(mb_strimwidth($v['visit_notes'], 0, 60, '...')) ?></span>
+                    <span class="shrink-0 px-1.5 py-0.5 bg-amber-200 text-amber-800 rounded text-[9px] font-black uppercase tracking-wide">Saved</span>
+                <?php else: ?>
+                    <span class="flex-1 font-medium">Add clinical note...</span>
+                <?php endif; ?>
+                <i class="bi bi-chevron-down text-[10px] shrink-0 note-chevron transition-transform"></i>
+            </button>
+            <div class="note-panel hidden" style="padding:10px 16px 14px;background:#0f172a;">
+                <textarea id="note-<?= $v['id'] ?>"
+                    style="width:100%;padding:10px 12px;border:1px solid rgba(251,191,36,0.3);border-radius:12px;
+                           font-size:13px;background:rgba(255,255,255,0.06);color:#e2e8f0;resize:none;
+                           outline:none;transition:border-color 0.15s;box-sizing:border-box;"
+                    rows="2" placeholder="Quick observation..."
+                    onfocus="this.style.borderColor='rgba(251,191,36,0.6)'" onblur="this.style.borderColor='rgba(251,191,36,0.3)'"><?= h($v['visit_notes'] ?? '') ?></textarea>
+                <div style="display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:8px;">
+                    <span class="note-saved-msg hidden" style="font-size:11px;color:#6ee7b7;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;">
+                        <i class="bi bi-check-circle-fill"></i> Saved
+                    </span>
+                    <button type="button" onclick="saveNote(<?= $v['id'] ?>, this)"
+                            style="padding:7px 16px;background:#d97706;color:#fff;font-size:12px;font-weight:700;
+                                   border:none;border-radius:10px;cursor:pointer;transition:background 0.15s;"
+                            onmouseover="this.style.background='#b45309'" onmouseout="this.style.background='#d97706'">
+                        Save Note
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php
+};
+?>
 
 <div id="screen-layout">
 <!-- Print-only header (hidden on screen) -->
@@ -289,26 +630,23 @@ include __DIR__ . '/includes/header.php';
     </div>
 </div>
 
-<!-- Status summary bar -->
-<div class="grid grid-cols-4 gap-3 mb-6 print-stat-bar"
-     style="display:grid; grid-template-columns:repeat(4,1fr); gap:6pt; margin-bottom:10pt;">
+<!-- Status summary bar (single compact row of 4 pills) -->
+<div class="flex items-center gap-2 mb-4 print-stat-bar">
     <?php
     $statusDefs = [
-        'pending'   => ['label'=>'Pending',   'bg'=>'bg-slate-100',   'text'=>'text-slate-600',   'dot'=>'bg-slate-400',   'icon'=>'bi-clock'],
-        'en_route'  => ['label'=>'En Route',  'bg'=>'bg-blue-100',    'text'=>'text-blue-700',    'dot'=>'bg-blue-500',    'icon'=>'bi-car-front-fill'],
-        'completed' => ['label'=>'Completed', 'bg'=>'bg-emerald-100', 'text'=>'text-emerald-700', 'dot'=>'bg-emerald-500', 'icon'=>'bi-check-circle-fill'],
-        'missed'    => ['label'=>'Missed',    'bg'=>'bg-red-100',     'text'=>'text-red-700',     'dot'=>'bg-red-400',     'icon'=>'bi-x-circle-fill'],
+        'pending'   => ['label'=>'Pending',   'bg'=>'bg-slate-100',   'text'=>'text-slate-600',   'border'=>'border-slate-200',   'icon'=>'bi-clock'],
+        'en_route'  => ['label'=>'En Route',  'bg'=>'bg-blue-50',     'text'=>'text-blue-700',    'border'=>'border-blue-200',    'icon'=>'bi-car-front-fill'],
+        'completed' => ['label'=>'Completed', 'bg'=>'bg-emerald-50',  'text'=>'text-emerald-700', 'border'=>'border-emerald-200', 'icon'=>'bi-check-circle-fill'],
+        'missed'    => ['label'=>'Missed',    'bg'=>'bg-rose-50',     'text'=>'text-rose-700',    'border'=>'border-rose-200',    'icon'=>'bi-x-circle-fill'],
     ];
     $displayCounts = ($view === 'week') ? $weekCounts : $counts;
     foreach ($statusDefs as $key => $def): ?>
-    <div class="bg-white border border-slate-100 rounded-2xl p-4 flex items-center gap-3 shadow-sm">
-        <div class="<?= $def['bg'] ?> p-2.5 rounded-xl">
-            <i class="bi <?= $def['icon'] ?> <?= $def['text'] ?> text-lg leading-none"></i>
+    <div class="flex-1 flex flex-col items-center justify-center gap-0.5 <?= $def['bg'] ?> border <?= $def['border'] ?> rounded-xl py-2 shadow-sm">
+        <div class="flex items-center gap-1">
+            <i class="bi <?= $def['icon'] ?> <?= $def['text'] ?> text-[12px]"></i>
+            <span class="text-[14px] font-extrabold <?= $def['text'] ?> leading-none"><?= $displayCounts[$key] ?></span>
         </div>
-        <div>
-            <div class="text-2xl font-extrabold text-slate-800"><?= $displayCounts[$key] ?></div>
-            <div class="text-xs text-slate-500 font-medium"><?= $def['label'] ?></div>
-        </div>
+        <span class="text-[9px] font-semibold <?= $def['text'] ?> opacity-75 uppercase tracking-wide leading-none"><?= $def['label'] ?></span>
     </div>
     <?php endforeach; ?>
 </div>
@@ -389,183 +727,63 @@ include __DIR__ . '/includes/header.php';
 <!-- ═══════════════════════ DAILY VIEW ═══════════════════════ -->
 
 <?php if ($viewAll && !empty($allMaVisits)): ?>
-<!-- ── All-MAs filter pills ── -->
+<!-- ── Provider filter pills ── -->
 <div class="flex flex-wrap items-center gap-2 mb-4 no-print">
-    <span class="text-xs font-semibold text-slate-500 mr-1">Filter:</span>
-    <button onclick="filterMa('all')" id="pill-all"
-            class="ma-pill px-3 py-1.5 rounded-full text-xs font-bold border transition-colors bg-indigo-600 text-white border-indigo-600">
-        All MAs
+    <span class="text-xs font-semibold text-slate-500 mr-1">Provider:</span>
+    <button onclick="filterProvider('all')" id="pill-all"
+            class="ma-pill px-3 py-1.5 rounded-full text-xs font-bold border transition-colors bg-teal-600 text-white border-teal-600">
+        All Providers
     </button>
-    <?php foreach ($allMaVisits as $mid => $mg): ?>
-    <button onclick="filterMa(<?= $mid ?>)" id="pill-<?= $mid ?>"
-            class="ma-pill px-3 py-1.5 rounded-full text-xs font-bold border transition-colors bg-white text-slate-600 border-slate-200 hover:border-indigo-400 hover:text-indigo-600">
-        <?= h($mg['name']) ?>
+    <?php foreach ($allMaVisits as $pKey => $mg): ?>
+    <button onclick="filterProvider('<?= htmlspecialchars(addslashes($pKey), ENT_QUOTES) ?>')" id="pill-<?= md5($pKey) ?>"
+            class="ma-pill px-3 py-1.5 rounded-full text-xs font-bold border transition-colors bg-white text-slate-600 border-slate-200 hover:border-teal-400 hover:text-teal-600">
+        <?= h($pKey) ?>
         <span class="ml-1 px-1.5 py-0.5 bg-slate-100 rounded-full text-[10px]"><?= count($mg['visits']) ?></span>
     </button>
     <?php endforeach; ?>
 </div>
 <script>
-function filterMa(maId) {
+function filterProvider(key) {
     document.querySelectorAll('.ma-section').forEach(el => {
-        el.style.display = (maId === 'all' || el.dataset.maId == maId) ? '' : 'none';
+        el.style.display = (key === 'all' || el.dataset.provKey === key) ? '' : 'none';
     });
     document.querySelectorAll('.ma-pill').forEach(btn => {
-        const active = (maId === 'all' && btn.id === 'pill-all') || (btn.id === 'pill-' + maId);
-        btn.className = btn.className.replace(/bg-indigo-600 text-white border-indigo-600|bg-white text-slate-600 border-slate-200/g, '');
+        const active = (key === 'all' && btn.id === 'pill-all') || (btn.dataset.provKey === key);
+        btn.className = btn.className.replace(/bg-teal-600 text-white border-teal-600|bg-white text-slate-600 border-slate-200/g, '');
         btn.classList.add(...(active
-            ? ['bg-indigo-600','text-white','border-indigo-600']
+            ? ['bg-teal-600','text-white','border-teal-600']
             : ['bg-white','text-slate-600','border-slate-200']));
     });
 }
+document.querySelectorAll('.ma-pill[id^="pill-"]:not(#pill-all)').forEach(btn => {
+    btn.dataset.provKey = btn.getAttribute('onclick').match(/filterProvider\('(.*?)'\)/)?.[1] || '';
+});
 </script>
 
-<?php foreach ($allMaVisits as $mid => $mg): ?>
-<div class="ma-section mb-6" data-ma-id="<?= $mid ?>">
-    <!-- MA header -->
+<?php foreach ($allMaVisits as $pKey => $mg):
+    $isUnassigned = $pKey === '— Unassigned —';
+?>
+<div class="ma-section mb-6" data-prov-key="<?= h($pKey) ?>">
+    <!-- Provider header -->
     <div class="flex items-center gap-3 mb-3 px-1">
-        <div class="w-8 h-8 bg-indigo-100 text-indigo-700 font-extrabold text-xs rounded-lg grid place-items-center shrink-0">
-            <i class="bi bi-person-fill"></i>
+        <div class="w-8 h-8 <?= $isUnassigned ? 'bg-slate-200 text-slate-500' : 'bg-teal-100 text-teal-700' ?> font-extrabold text-xs rounded-lg grid place-items-center shrink-0">
+            <?php if ($isUnassigned): ?><i class="bi bi-question-lg"></i><?php else: ?><i class="bi bi-person-badge-fill"></i><?php endif; ?>
         </div>
         <div class="flex-1">
-            <p class="font-bold text-slate-800"><?= h($mg['name']) ?></p>
+            <p class="font-bold text-slate-800"><?= h($pKey) ?></p>
             <p class="text-xs text-slate-400">
                 <?php foreach (['completed'=>'text-emerald-600','en_route'=>'text-blue-600','pending'=>'text-slate-500','missed'=>'text-red-500'] as $sk=>$sc): if ($mg['counts'][$sk]): ?>
                 <span class="<?= $sc ?> font-semibold"><?= $mg['counts'][$sk] ?> <?= ucwords(str_replace('_',' ',$sk)) ?></span>
                 <?php endif; endforeach; ?>
+                <?php if (!empty($mg['mas'])): ?>
+                &bull; <span class="text-slate-400">MAs: <?= h(implode(', ', $mg['mas'])) ?></span>
+                <?php endif; ?>
             </p>
         </div>
-        <a href="?date=<?= $date ?>&ma_id=<?= $mid ?>&view=day"
-           class="no-print text-xs text-indigo-600 font-semibold hover:underline">View only &rsaquo;</a>
     </div>
-    <div class="space-y-3">
-    <?php foreach ($mg['visits'] as $idx => $v):
-        $sd      = $statusDefs[$v['status']];
-        $addr    = $v['patient_address'] ? rawurlencode($v['patient_address']) : '';
-        $mapsUrl = $addr ? 'https://www.google.com/maps/dir/?api=1&destination=' . $addr : '#'; ?>
-    <div class="bg-white border border-slate-100 rounded-2xl shadow-sm hover:shadow-md transition-shadow print-visit-card"
-         id="visit-<?= $v['id'] ?>">
-        <div class="flex items-start gap-4 p-4">
-            <div class="w-10 h-10 bg-indigo-100 text-indigo-700 font-extrabold text-sm rounded-xl grid place-items-center shrink-0">
-                <?= $idx + 1 ?>
-            </div>
-            <div class="flex-1 min-w-0">
-                <div class="flex flex-wrap items-center gap-2 mb-1">
-                    <a href="<?= BASE_URL ?>/patient_view.php?id=<?= $v['patient_id'] ?>"
-                       class="font-bold text-slate-800 hover:text-indigo-600 transition-colors text-base">
-                        <?= h($v['patient_name']) ?>
-                    </a>
-                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold <?= $sd['bg'] ?> <?= $sd['text'] ?>">
-                        <span class="w-1.5 h-1.5 rounded-full <?= $sd['dot'] ?>"></span>
-                        <?= $sd['label'] ?>
-                    </span>
-                    <?php $vt = $v['visit_type'] ?? 'routine';
-                    $vtLabels = ['routine'=>'Routine','new_patient'=>'New Pt','wound_care'=>'Wound Care','awv'=>'AWV','ccm'=>'CCM','il'=>'IL Disc.']; ?>
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-700">
-                        <?= h($vtLabels[$vt] ?? 'Routine') ?>
-                    </span>
-                </div>
-                <?php if ($v['visit_time']): ?>
-                <div class="flex items-center gap-1.5 text-sm text-slate-500 mb-1">
-                    <i class="bi bi-clock text-slate-400"></i>
-                    <?= date('g:i A', strtotime($v['visit_time'])) ?>
-                </div>
-                <?php endif; ?>
-                <?php if ($v['patient_address']): ?>
-                <div class="flex items-start gap-1.5 text-sm text-slate-500 mb-1">
-                    <i class="bi bi-geo-alt text-slate-400 mt-0.5 shrink-0"></i>
-                    <a href="https://www.google.com/maps/dir/?api=1&destination=<?= $addr ?>" target="_blank" rel="noopener"
-                       class="hover:text-blue-600 underline decoration-dotted"><?= h($v['patient_address']) ?></a>
-                </div>
-                <?php endif; ?>
-                <?php if ($v['patient_phone']): ?>
-                <div class="flex items-center gap-1.5 text-sm text-slate-500">
-                    <i class="bi bi-telephone text-slate-400"></i>
-                    <a href="tel:<?= h(preg_replace('/\D/','',$v['patient_phone'])) ?>"
-                       class="hover:text-indigo-600"><?= h($v['patient_phone']) ?></a>
-                </div>
-                <?php endif; ?>
-                <?php if ($v['notes']): ?>
-                <div class="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
-                    <i class="bi bi-sticky-fill mr-1"></i><?= h($v['notes']) ?>
-                </div>
-                <?php endif; ?>
-                <?php if (!empty($v['provider_name'])): ?>
-                <div class="flex items-center gap-1.5 text-xs text-slate-500 mt-1">
-                    <i class="bi bi-person-badge text-slate-400"></i>
-                    <?= h($v['provider_name']) ?>
-                </div>
-                <?php endif; ?>
-            </div>
-            <div class="flex flex-col gap-2 shrink-0 no-print">
-                <?php if ($v['status'] === 'pending'): ?>
-                <button onclick="startVisit(<?= $v['id'] ?>, <?= $v['patient_id'] ?>, this)"
-                        class="flex items-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-sm transition-all">
-                    <i class="bi bi-play-fill text-sm"></i> Start Visit
-                </button>
-                <?php elseif ($v['status'] === 'en_route'): ?>
-                <a href="<?= BASE_URL ?>/patient_view.php?id=<?= $v['patient_id'] ?>&tab=forms&visit=<?= $v['id'] ?>"
-                   class="flex items-center gap-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all">
-                    <i class="bi bi-file-earmark-plus-fill text-sm"></i> Open Forms
-                </a>
-                <?php endif; ?>
-                <?php if ($v['patient_address']): ?>
-                <a href="<?= h($mapsUrl) ?>" target="_blank" rel="noopener"
-                   class="flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-xs font-semibold hover:bg-blue-100 transition-colors">
-                    <i class="bi bi-navigation-fill"></i> Navigate
-                </a>
-                <?php endif; ?>
-                <a href="<?= BASE_URL ?>/patient_view.php?id=<?= $v['patient_id'] ?>"
-                   class="flex items-center gap-1.5 px-3 py-2 bg-slate-50 text-slate-600 border border-slate-200 rounded-xl text-xs font-semibold hover:bg-slate-100 transition-colors">
-                    <i class="bi bi-person-lines-fill"></i> Chart
-                </a>
-            </div>
-        </div>
-        <div class="border-t border-slate-100 px-4 py-3 flex flex-wrap gap-2 bg-slate-50/60 no-print">
-            <span class="text-xs text-slate-500 font-medium self-center mr-1">Update:</span>
-            <?php foreach ($statusDefs as $sKey => $sDef): ?>
-            <button onclick="updateStatus(<?= $v['id'] ?>, '<?= $sKey ?>')"
-                    class="status-btn px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors
-                           <?= $v['status'] === $sKey
-                               ? $sDef['bg'] . ' ' . $sDef['text'] . ' border-transparent ring-2 ring-offset-1 ring-' . explode('-',$sDef['dot'])[1] . '-400'
-                               : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-100' ?>"
-                    data-visit="<?= $v['id'] ?>" data-status="<?= $sKey ?>">
-                <i class="bi <?= $sDef['icon'] ?> mr-0.5"></i> <?= $sDef['label'] ?>
-            </button>
-            <?php endforeach; ?>
-        </div>
-        <div class="border-t border-slate-100 rounded-b-2xl overflow-hidden no-print">
-            <button type="button" onclick="toggleNotes(this, <?= $v['id'] ?>)"
-                    class="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-left transition-colors
-                           <?= !empty($v['visit_notes']) ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' : 'bg-slate-50/80 text-slate-500 hover:bg-slate-100' ?>">
-                <i class="bi bi-pencil-square text-sm"></i>
-                <?php if (!empty($v['visit_notes'])): ?>
-                    <span class="truncate flex-1"><?= h(mb_strimwidth($v['visit_notes'], 0, 80, '…')) ?></span>
-                    <span class="shrink-0 px-2 py-0.5 bg-amber-200 text-amber-800 rounded-full text-[10px] font-bold">Note saved</span>
-                <?php else: ?>
-                    <span class="flex-1">Add quick note…</span>
-                <?php endif; ?>
-                <i class="bi bi-chevron-down text-xs shrink-0 note-chevron transition-transform"></i>
-            </button>
-            <div class="note-panel hidden px-4 pb-4 pt-3 bg-amber-50/60">
-                <textarea id="note-<?= $v['id'] ?>"
-                    class="w-full px-3 py-2.5 border border-amber-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent resize-none transition"
-                    rows="3"
-                    placeholder="Quick clinical observation — e.g. wound looks improved, patient reports pain 3/10…"
-                    ><?= h($v['visit_notes'] ?? '') ?></textarea>
-                <div class="flex items-center gap-2 mt-2">
-                    <button type="button" onclick="saveNote(<?= $v['id'] ?>, this)"
-                            class="px-4 py-2 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs font-bold rounded-xl transition-all shadow-sm">
-                        <i class="bi bi-floppy-fill mr-1"></i> Save Note
-                    </button>
-                    <span class="note-saved-msg hidden text-xs text-emerald-600 font-semibold">
-                        <i class="bi bi-check-circle-fill mr-0.5"></i> Saved!
-                    </span>
-                </div>
-            </div>
-        </div>
-    </div>
-    <?php endforeach; // end per-MA visits ?>
-    </div><!-- /space-y-3 -->
+    <div class="space-y-2">
+    <?php foreach ($mg['visits'] as $idx => $v): $renderVisitCard($v, $idx, true); endforeach; ?>
+    </div><!-- /space-y-2 -->
 </div><!-- /ma-section -->
 <?php endforeach; // end foreach allMaVisits ?>
 
@@ -586,138 +804,169 @@ function filterMa(maId) {
     <?php endif; ?>
 </div>
 <?php else: ?>
-<div class="space-y-3" id="visitList">
-    <?php foreach ($visits as $idx => $v):
-        $sd      = $statusDefs[$v['status']];
-        $addr    = $v['patient_address'] ? rawurlencode($v['patient_address']) : '';
-        $mapsUrl = $addr ? 'https://www.google.com/maps/dir/?api=1&destination=' . $addr : '#'; ?>
-    <div class="bg-white border border-slate-100 rounded-2xl shadow-sm hover:shadow-md transition-shadow print-visit-card"
-         id="visit-<?= $v['id'] ?>">
-        <div class="flex items-start gap-4 p-4">
-            <div class="w-10 h-10 bg-indigo-100 text-indigo-700 font-extrabold text-sm rounded-xl grid place-items-center shrink-0">
-                <?= $idx + 1 ?>
-            </div>
-            <div class="flex-1 min-w-0">
-                <div class="flex flex-wrap items-center gap-2 mb-1">
-                    <a href="<?= BASE_URL ?>/patient_view.php?id=<?= $v['patient_id'] ?>"
-                       class="font-bold text-slate-800 hover:text-indigo-600 transition-colors text-base">
-                        <?= h($v['patient_name']) ?>
-                    </a>
-                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold <?= $sd['bg'] ?> <?= $sd['text'] ?>">
-                        <span class="w-1.5 h-1.5 rounded-full <?= $sd['dot'] ?>"></span>
-                        <?= $sd['label'] ?>
-                    </span>
-                    <?php $vt = $v['visit_type'] ?? 'routine';
-                    $vtLabels = ['routine'=>'Routine','new_patient'=>'New Pt','wound_care'=>'Wound Care','awv'=>'AWV','ccm'=>'CCM','il'=>'IL Disc.']; ?>
-                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-violet-100 text-violet-700">
-                        <?= h($vtLabels[$vt] ?? 'Routine') ?>
-                    </span>
-                </div>
-                <?php if ($v['visit_time']): ?>
-                <div class="flex items-center gap-1.5 text-sm text-slate-500 mb-1">
-                    <i class="bi bi-clock text-slate-400"></i>
-                    <?= date('g:i A', strtotime($v['visit_time'])) ?>
-                </div>
-                <?php endif; ?>
-                <?php if ($v['patient_address']): ?>
-                <div class="flex items-start gap-1.5 text-sm text-slate-500 mb-1">
-                    <i class="bi bi-geo-alt text-slate-400 mt-0.5 shrink-0"></i>
-                    <a href="https://www.google.com/maps/dir/?api=1&destination=<?= $addr ?>" target="_blank" rel="noopener"
-                       class="hover:text-blue-600 underline decoration-dotted"><?= h($v['patient_address']) ?></a>
-                </div>
-                <?php endif; ?>
-                <?php if ($v['patient_phone']): ?>
-                <div class="flex items-center gap-1.5 text-sm text-slate-500">
-                    <i class="bi bi-telephone text-slate-400"></i>
-                    <a href="tel:<?= h(preg_replace('/\D/','',$v['patient_phone'])) ?>"
-                       class="hover:text-indigo-600"><?= h($v['patient_phone']) ?></a>
-                </div>
-                <?php endif; ?>
-                <?php if ($v['notes']): ?>
-                <div class="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
-                    <i class="bi bi-sticky-fill mr-1"></i><?= h($v['notes']) ?>
-                </div>
-                <?php endif; ?>
-                <?php if (!empty($v['provider_name'])): ?>
-                <div class="flex items-center gap-1.5 text-xs text-slate-500 mt-1">
-                    <i class="bi bi-person-badge text-slate-400"></i>
-                    <?= h($v['provider_name']) ?>
-                </div>
-                <?php endif; ?>
-            </div>
-            <div class="flex flex-col gap-2 shrink-0 no-print">
-                <?php if ($v['status'] === 'pending'): ?>
-                <button onclick="startVisit(<?= $v['id'] ?>, <?= $v['patient_id'] ?>, this)"
-                        class="flex items-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-sm transition-all">
-                    <i class="bi bi-play-fill text-sm"></i> Start Visit
-                </button>
-                <?php elseif ($v['status'] === 'en_route'): ?>
-                <a href="<?= BASE_URL ?>/patient_view.php?id=<?= $v['patient_id'] ?>&tab=forms&visit=<?= $v['id'] ?>"
-                   class="flex items-center gap-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all">
-                    <i class="bi bi-file-earmark-plus-fill text-sm"></i> Open Forms
-                </a>
-                <?php endif; ?>
-                <?php if ($v['patient_address']): ?>
-                <a href="<?= h($mapsUrl) ?>" target="_blank" rel="noopener"
-                   class="flex items-center gap-1.5 px-3 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-xl text-xs font-semibold hover:bg-blue-100 transition-colors">
-                    <i class="bi bi-navigation-fill"></i> Navigate
-                </a>
-                <?php endif; ?>
-                <a href="<?= BASE_URL ?>/patient_view.php?id=<?= $v['patient_id'] ?>"
-                   class="flex items-center gap-1.5 px-3 py-2 bg-slate-50 text-slate-600 border border-slate-200 rounded-xl text-xs font-semibold hover:bg-slate-100 transition-colors">
-                    <i class="bi bi-person-lines-fill"></i> Chart
-                </a>
-            </div>
-        </div>
-        <div class="border-t border-slate-100 px-4 py-3 flex flex-wrap gap-2 bg-slate-50/60 no-print">
-            <span class="text-xs text-slate-500 font-medium self-center mr-1">Update:</span>
-            <?php foreach ($statusDefs as $sKey => $sDef): ?>
-            <button onclick="updateStatus(<?= $v['id'] ?>, '<?= $sKey ?>')"
-                    class="status-btn px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors
-                           <?= $v['status'] === $sKey
-                               ? $sDef['bg'] . ' ' . $sDef['text'] . ' border-transparent ring-2 ring-offset-1 ring-' . explode('-',$sDef['dot'])[1] . '-400'
-                               : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:bg-slate-100' ?>"
-                    data-visit="<?= $v['id'] ?>" data-status="<?= $sKey ?>">
-                <i class="bi <?= $sDef['icon'] ?> mr-0.5"></i> <?= $sDef['label'] ?>
-            </button>
-            <?php endforeach; ?>
-        </div>
-        <div class="border-t border-slate-100 rounded-b-2xl overflow-hidden no-print">
-            <button type="button" onclick="toggleNotes(this, <?= $v['id'] ?>)"
-                    class="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-semibold text-left transition-colors
-                           <?= !empty($v['visit_notes']) ? 'bg-amber-50 text-amber-700 hover:bg-amber-100' : 'bg-slate-50/80 text-slate-500 hover:bg-slate-100' ?>">
-                <i class="bi bi-pencil-square text-sm"></i>
-                <?php if (!empty($v['visit_notes'])): ?>
-                    <span class="truncate flex-1"><?= h(mb_strimwidth($v['visit_notes'], 0, 80, '…')) ?></span>
-                    <span class="shrink-0 px-2 py-0.5 bg-amber-200 text-amber-800 rounded-full text-[10px] font-bold">Note saved</span>
-                <?php else: ?>
-                    <span class="flex-1">Add quick note…</span>
-                <?php endif; ?>
-                <i class="bi bi-chevron-down text-xs shrink-0 note-chevron transition-transform"></i>
-            </button>
-            <div class="note-panel hidden px-4 pb-4 pt-3 bg-amber-50/60">
-                <textarea id="note-<?= $v['id'] ?>"
-                    class="w-full px-3 py-2.5 border border-amber-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent resize-none transition"
-                    rows="3"
-                    placeholder="Quick clinical observation — e.g. wound looks improved, patient reports pain 3/10…"
-                    ><?= h($v['visit_notes'] ?? '') ?></textarea>
-                <div class="flex items-center gap-2 mt-2">
-                    <button type="button" onclick="saveNote(<?= $v['id'] ?>, this)"
-                            class="px-4 py-2 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-xs font-bold rounded-xl transition-all shadow-sm">
-                        <i class="bi bi-floppy-fill mr-1"></i> Save Note
-                    </button>
-                    <span class="note-saved-msg hidden text-xs text-emerald-600 font-semibold">
-                        <i class="bi bi-check-circle-fill mr-0.5"></i> Saved!
-                    </span>
-                </div>
-            </div>
-        </div>
-    </div>
-    <?php endforeach; // single-MA visits ?>
+<div class="space-y-2" id="visitList">
+    <?php foreach ($visits as $idx => $v): $renderVisitCard($v, $idx, false); endforeach; ?>
 </div><!-- /visitList -->
 <?php endif; // viewAll / empty / single-MA ?>
 <?php endif; // end daily view ?>
 </div><!-- /screen-layout -->
+
+<!-- ═══════════════════════ EDIT VISIT MODAL ═══════════════════════ -->
+<div id="editModalBackdrop" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 no-print" onclick="closeEditModal()">
+</div>
+<div id="editModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none no-print">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg pointer-events-auto" onclick="event.stopPropagation()">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-violet-600 rounded-t-2xl">
+            <h3 id="editModalTitle" class="font-bold text-white text-base truncate pr-4"></h3>
+            <button onclick="closeEditModal()" class="w-8 h-8 flex items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <!-- Body -->
+        <div class="px-6 py-5 space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+                <!-- Visit Time -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1.5"><i class="bi bi-clock mr-1 text-slate-400"></i>Visit Time</label>
+                    <input type="time" id="editVisitTime"
+                           class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent">
+                </div>
+                <!-- Visit Order -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1.5"><i class="bi bi-list-ol mr-1 text-slate-400"></i>Visit Order</label>
+                    <input type="number" id="editOrder" min="1" max="99"
+                           class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent">
+                </div>
+            </div>
+            <!-- Visit Type -->
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1.5"><i class="bi bi-tag mr-1 text-slate-400"></i>Visit Type</label>
+                <select id="editVisitType" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent bg-white">
+                    <option value="routine">Follow-Up</option>
+                    <option value="new_patient">New Patient</option>
+                    <option value="wound_care">Wound Care</option>
+                    <option value="awv">Annual Wellness Visit</option>
+                    <option value="ccm">CCM</option>
+                    <option value="il">IL Disclosure</option>
+                </select>
+            </div>
+            <!-- Provider -->
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1.5"><i class="bi bi-person-badge mr-1 text-slate-400"></i>Provider Name</label>
+                <select id="editProvider" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent bg-white">
+                    <option value="">— None —</option>
+                    <?php foreach ($providerStaff as $ps): ?>
+                    <option value="<?= h($ps['full_name']) ?>"><?= h($ps['full_name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <!-- Schedule Notes -->
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1.5"><i class="bi bi-sticky mr-1 text-slate-400"></i>Schedule Notes <span class="text-slate-400 font-normal">(instructions / pre-visit)</span></label>
+                <textarea id="editNotes" rows="2" placeholder="e.g. Bring blood pressure log, fasting required…"
+                          class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent resize-none"></textarea>
+            </div>
+            <?php if (isAdmin()): ?>
+            <!-- Admin: Visit Date -->
+            <div id="editDateRow">
+                <label class="block text-xs font-semibold text-slate-600 mb-1.5"><i class="bi bi-calendar3 mr-1 text-slate-400"></i>Visit Date <span class="text-violet-600 font-semibold">(Admin)</span></label>
+                <input type="date" id="editVisitDate"
+                       class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent">
+            </div>
+            <!-- Admin: Reassign MA -->
+            <div id="editMaRow">
+                <label class="block text-xs font-semibold text-slate-600 mb-1.5"><i class="bi bi-person-fill mr-1 text-slate-400"></i>Assigned MA <span class="text-violet-600 font-semibold">(Admin)</span></label>
+                <select id="editMaId" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent bg-white">
+                    <?php foreach ($allMas as $m): ?>
+                    <option value="<?= $m['id'] ?>"><?= h($m['full_name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <?php endif; ?>
+        </div>
+        <!-- Footer -->
+        <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-3 bg-slate-50 rounded-b-2xl">
+            <button onclick="closeEditModal()" class="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 transition">Cancel</button>
+            <button id="editSaveBtn" onclick="saveEdit()"
+                    class="flex items-center gap-2 px-5 py-2 bg-violet-600 hover:bg-violet-700 active:scale-95 text-white text-sm font-bold rounded-xl shadow-sm transition-all">
+                <i class="bi bi-floppy-fill"></i> Save Changes
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- ═══════════════════════ ROUTE MAP MODAL ══════════════════════ -->
+<?php if ($view === 'day' && count($routeAddresses) >= 1):
+    // Build Google Maps URL: 2+ stops use dir/; single stop uses search
+    if (count($routeAddresses) === 1) {
+        $routeMapUrl = 'https://www.google.com/maps/search/?api=1&query=' . rawurlencode($routeAddresses[0]);
+    } else {
+        $routeMapUrl = 'https://www.google.com/maps/dir/' . implode('/', array_map('rawurlencode', $routeAddresses));
+    }
+?>
+<div id="routeMapModal" class="hidden no-print" onclick="if(event.target===this)closeRouteMapModal()"
+     style="position:fixed;inset:0;z-index:10000;background:rgba(15,23,42,.6);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:1rem">
+    <div style="background:#fff;border-radius:20px;max-width:460px;width:100%;box-shadow:0 24px 60px rgba(0,0,0,.25);overflow:hidden">
+        <!-- Header -->
+        <div style="background:linear-gradient(135deg,#059669,#10b981);padding:20px 24px 16px;color:#fff">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+                <div style="display:flex;align-items:center;gap:10px">
+                    <div style="width:40px;height:40px;background:rgba(255,255,255,.2);border-radius:12px;display:flex;align-items:center;justify-content:center">
+                        <i class="bi bi-map-fill" style="font-size:18px"></i>
+                    </div>
+                    <div>
+                        <div style="font-size:16px;font-weight:800">Today's Route</div>
+                        <div style="font-size:12px;opacity:.85"><?= date('l, F j, Y', strtotime($date)) ?></div>
+                    </div>
+                </div>
+                <button onclick="closeRouteMapModal()" style="background:rgba(255,255,255,.2);border:none;color:#fff;width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+        </div>
+        <!-- Stop list -->
+        <div style="padding:16px 24px;max-height:320px;overflow-y:auto">
+            <p style="font-size:12px;color:#64748b;margin:0 0 12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">
+                <?= count($routeAddresses) ?> Stop<?= count($routeAddresses) !== 1 ? 's' : '' ?> &nbsp;&bull;&nbsp; in visit order
+            </p>
+            <?php foreach ($routeAddresses as $stopIdx => $stopAddr): ?>
+            <div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid #f1f5f9">
+                <div style="width:24px;height:24px;background:<?= $stopIdx === 0 ? '#dcfce7' : ($stopIdx === count($routeAddresses)-1 ? '#fee2e2' : '#eff6ff') ?>;color:<?= $stopIdx === 0 ? '#166534' : ($stopIdx === count($routeAddresses)-1 ? '#991b1b' : '#1e40af') ?>;border-radius:50%;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;shrink:0;flex-shrink:0">
+                    <?php if ($stopIdx === 0): ?><i class="bi bi-geo-alt-fill" style="font-size:11px"></i>
+                    <?php elseif ($stopIdx === count($routeAddresses)-1): ?><i class="bi bi-flag-fill" style="font-size:10px"></i>
+                    <?php else: ?><?= $stopIdx + 1 ?><?php endif; ?>
+                </div>
+                <div style="flex:1;min-width:0">
+                    <div style="font-size:13px;color:#1e293b;line-height:1.4"><?= h($stopAddr) ?></div>
+                    <?php
+                    // Find patients at this address
+                    $patsHere = array_filter($visits, fn($v) => trim($v['patient_address'] ?? '') === $stopAddr);
+                    foreach ($patsHere as $pv): ?>
+                    <div style="font-size:11px;color:#64748b;margin-top:1px">
+                        <?= h($pv['patient_name']) ?>
+                        <?php if ($pv['visit_time']): ?>&nbsp;<span style="color:#94a3b8"><?= date('g:i A', strtotime($pv['visit_time'])) ?></span><?php endif; ?>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <?php endforeach; ?>
+        </div>
+        <!-- Actions -->
+        <div style="padding:16px 24px;border-top:1px solid #f1f5f9;display:flex;gap:10px">
+            <a href="<?= h($routeMapUrl) ?>" target="_blank" rel="noopener noreferrer"
+               style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;background:#059669;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;text-decoration:none;transition:background .15s"
+               onmouseover="this.style.background='#047857'" onmouseout="this.style.background='#059669'">
+                <i class="bi bi-map-fill"></i> Open in Google Maps
+            </a>
+            <button onclick="closeRouteMapModal()"
+                    style="padding:12px 18px;background:#f1f5f9;color:#475569;border:none;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer">
+                Close
+            </button>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <!-- ═══════════════════════ PRINT LAYOUT ═══════════════════════ -->
 <div id="print-layout">
@@ -770,7 +1019,7 @@ function filterMa(maId) {
         <tr style="vertical-align: top;">
             <?php
             $dotC      = ['pending'=>'#94a3b8','en_route'=>'#3b82f6','completed'=>'#22c55e','missed'=>'#ef4444'];
-            $pVtLabels = ['routine'=>'Routine','new_patient'=>'New Pt','wound_care'=>'Wound Care','awv'=>'AWV','ccm'=>'CCM','il'=>'IL'];
+            $pVtLabels = ['routine'=>'Follow-Up','new_patient'=>'New Patient','wound_care'=>'Wound Care','awv'=>'Annual Wellness','ccm'=>'CCM','il'=>'IL'];
             for ($d = 0; $d < 7; $d++):
                 $colDate    = date('Y-m-d', strtotime($weekStart . ' +' . $d . ' days'));
                 $colIsToday = $colDate === date('Y-m-d');
@@ -815,7 +1064,7 @@ function filterMa(maId) {
     <?php if (empty($visits)): ?>
     <p style="text-align: center; color: #94a3b8; font-size: 9pt; padding: 20pt 0; border: 1pt dashed #e2e8f0; border-radius: 4pt;">No visits scheduled for this day.</p>
     <?php else:
-        $pVtLabels2 = ['routine'=>'Routine','new_patient'=>'New Patient','wound_care'=>'Wound Care','awv'=>'Annual Wellness Visit','ccm'=>'CCM','il'=>'IL Disclosure'];
+        $pVtLabels2 = ['routine'=>'Follow-Up','new_patient'=>'New Patient','wound_care'=>'Wound Care','awv'=>'Annual Wellness Visit','ccm'=>'CCM','il'=>'IL Disclosure'];
         $pSColors   = [
             'pending'   => ['bg'=>'#f1f5f9','color'=>'#475569','border'=>'#cbd5e1','dot'=>'#94a3b8'],
             'en_route'  => ['bg'=>'#eff6ff','color'=>'#1d4ed8','border'=>'#bfdbfe','dot'=>'#3b82f6'],
@@ -883,7 +1132,7 @@ function filterMa(maId) {
                 </td>
                 <!-- Visit Type -->
                 <td style="padding: 6pt 5pt; font-size: 7.5pt; color: #4f46e5; font-weight: 700; border-right: 0.5pt solid #e2e8f0;">
-                    <?= h($pVtLabels2[$vt2] ?? 'Routine') ?>
+                    <?= h($pVtLabels2[$vt2] ?? 'Follow-Up') ?>
                 </td>
                 <!-- Status badge -->
                 <td style="padding: 6pt 5pt; text-align: center; border-right: 0.5pt solid #e2e8f0;">
@@ -942,10 +1191,29 @@ function filterMa(maId) {
 const CSRF   = '<?= csrfToken() ?>';
 const BASE   = '<?= BASE_URL ?>';
 
+// ── Route Map Modal ───────────────────────────────────────────────────────────
+function openRouteMapModal() {
+    const m = document.getElementById('routeMapModal');
+    if (!m) return;
+    m.style.display = 'flex';
+}
+function closeRouteMapModal() {
+    const m = document.getElementById('routeMapModal');
+    if (m) m.style.display = 'none';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeRouteMapModal(); });
+
 // ── One-tap Start Visit ───────────────────────────────────────────────────────
-function startVisit(visitId, patientId, btn) {
+function startVisit(visitId, patientId, visitType, visitSubtype, btn) {
     btn.disabled = true;
     btn.innerHTML = '<i class="bi bi-hourglass-split text-sm animate-spin"></i> Starting…';
+
+    const isNewPatient = visitType.toLowerCase().includes('new');
+    const npType = (visitSubtype === 'primary_care') ? 'primary_care' : 'wound_care';
+    const formPath = isNewPatient
+        ? '/forms/new_patient_pocket.php'
+        : '/forms/vital_cs.php';
+    const npParam = isNewPatient ? '&np_type=' + npType : '';
 
     fetch(BASE + '/api/schedule_update.php', {
         method: 'POST',
@@ -955,18 +1223,119 @@ function startVisit(visitId, patientId, btn) {
     .then(r => r.json())
     .then(data => {
         if (data.ok) {
-            // Navigate straight to the patient's forms page
-            window.location.href = BASE + '/patient_view.php?id=' + patientId + '&tab=forms&visit=' + visitId;
+            window.location.href = BASE + formPath + '?patient_id=' + patientId + '&visit_id=' + visitId + '&sched_visit_type=' + encodeURIComponent(visitType) + npParam;
         } else {
             btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-play-fill text-sm"></i> Start Visit';
-            alert('Error: ' + (data.error || 'Could not start visit.'));
+            btn.innerHTML = '<i class="bi bi-play-fill text-sm"></i> Start Visit &nbsp;→';
+            pdToast(data.error || 'Could not start visit.', 'error');
         }
     })
     .catch(() => {
         btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-play-fill text-sm"></i> Start Visit';
-        alert('Network error. Please try again.');
+        btn.innerHTML = '<i class="bi bi-play-fill text-sm"></i> Start Visit &nbsp;→';
+        pdToast('Network error. Please try again.', 'error');
+    });
+}
+
+// ── End Visit ────────────────────────────────────────────────────────────────
+async function endVisit(visitId, btn) {
+    const ok = await pdConfirm({
+        message: 'Mark this visit as completed?',
+        confirmLabel: 'Complete Visit',
+        confirmIcon:  'bi bi-check-circle-fill',
+        confirmStyle: 'background:#059669;',
+    });
+    if (!ok) return;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split text-sm animate-spin"></i> Ending…';
+
+    fetch(BASE + '/api/schedule_update.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csrf: CSRF, id: visitId, action: 'status', status: 'completed' })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
+            location.reload();
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-stop-fill"></i> End';
+            pdToast(data.error || 'Could not end visit.', 'error');
+        }
+    })
+    .catch(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-stop-fill"></i> End';
+        pdToast('Network error. Please try again.', 'error');
+    });
+}
+
+// ── Reset Visit ───────────────────────────────────────────────────────────────
+async function resetVisit(visitId, btn) {
+    const ok = await pdConfirm({
+        message: 'Reset this visit to Pending?',
+        subtext: 'This will clear the start time.',
+        confirmLabel: 'Reset',
+        confirmIcon:  'bi bi-arrow-counterclockwise',
+        confirmStyle: 'background:#d97706;',
+    });
+    if (!ok) return;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split text-sm animate-spin"></i>';
+    fetch(BASE + '/api/schedule_update.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csrf: CSRF, id: visitId, action: 'reset_visit' })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
+            location.reload();
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-arrow-counterclockwise text-sm"></i> Reset';
+            pdToast(data.error || 'Could not reset visit.', 'error');
+        }
+    })
+    .catch(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-arrow-counterclockwise text-sm"></i> Reset';
+        pdToast('Network error. Please try again.', 'error');
+    });
+}
+
+// ── Undo End Visit ────────────────────────────────────────────────────────────
+async function undoEndVisit(visitId, btn) {
+    const ok = await pdConfirm({
+        message: 'Undo End Visit?',
+        subtext: 'This will set the visit back to In Progress.',
+        confirmLabel: 'Undo',
+        confirmIcon:  'bi bi-arrow-counterclockwise',
+        confirmStyle: 'background:#d97706;',
+    });
+    if (!ok) return;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split text-sm animate-spin"></i>';
+    fetch(BASE + '/api/schedule_update.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csrf: CSRF, id: visitId, action: 'undo_end' })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
+            location.reload();
+        } else {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i> Undo';
+            pdToast(data.error || 'Could not undo end visit.', 'error');
+        }
+    })
+    .catch(() => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i> Undo';
+        pdToast('Network error. Please try again.', 'error');
     });
 }
 
@@ -1021,8 +1390,8 @@ async function saveNote(visitId, btn) {
             }
             msg.classList.remove('hidden');
             setTimeout(() => msg.classList.add('hidden'), 2500);
-        } else { alert(d.error || 'Could not save note.'); }
-    } catch { alert('Network error.'); }
+        } else { pdToast(d.error || 'Could not save note.', 'error'); }
+    } catch { pdToast('Network error.', 'error'); }
     btn.disabled = false;
     btn.innerHTML = orig;
 }
@@ -1039,11 +1408,386 @@ function updateStatus(visitId, status) {
         if (data.ok) {
             location.reload();
         } else {
-            alert('Error: ' + (data.error || 'Could not update status.'));
+            pdToast(data.error || 'Could not update status.', 'error');
         }
     })
-    .catch(() => alert('Network error. Please try again.'));
+    .catch(() => pdToast('Network error. Please try again.', 'error'));
 }
+
+// ── Edit Modal ────────────────────────────────────────────────────────────────
+let _editVisitId = null;
+
+function openEditModal(visit) {
+    _editVisitId = visit.id;
+    document.getElementById('editModalTitle').textContent = 'Edit Visit — ' + visit.patient_name;
+    document.getElementById('editVisitTime').value        = visit.visit_time ? visit.visit_time.substring(0,5) : '';
+    document.getElementById('editVisitType').value        = visit.visit_type || 'routine';
+    document.getElementById('editNotes').value            = visit.notes || '';
+    document.getElementById('editProvider').value         = visit.provider_name || '';
+    document.getElementById('editOrder').value            = visit.visit_order || 1;
+    // Admin-only fields
+    const dateRow = document.getElementById('editDateRow');
+    const maRow   = document.getElementById('editMaRow');
+    if (dateRow) { document.getElementById('editVisitDate').value = visit.visit_date || ''; }
+    if (maRow)   { document.getElementById('editMaId').value = visit.ma_id || ''; }
+    document.getElementById('editModal').classList.remove('hidden');
+    document.getElementById('editModalBackdrop').classList.remove('hidden');
+    document.getElementById('editVisitTime').focus();
+}
+
+function closeEditModal() {
+    document.getElementById('editModal').classList.add('hidden');
+    document.getElementById('editModalBackdrop').classList.add('hidden');
+    _editVisitId = null;
+}
+
+async function saveEdit() {
+    if (!_editVisitId) return;
+    const btn = document.getElementById('editSaveBtn');
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split animate-spin mr-1"></i> Saving…';
+
+    const payload = {
+        csrf:          CSRF,
+        action:        'edit',
+        id:            _editVisitId,
+        visit_time:    document.getElementById('editVisitTime').value,
+        visit_type:    document.getElementById('editVisitType').value,
+        notes:         document.getElementById('editNotes').value,
+        provider_name: document.getElementById('editProvider').value,
+        visit_order:   parseInt(document.getElementById('editOrder').value) || 1,
+    };
+    const dateEl = document.getElementById('editVisitDate');
+    const maEl   = document.getElementById('editMaId');
+    if (dateEl) payload.visit_date = dateEl.value;
+    if (maEl)   payload.ma_id      = parseInt(maEl.value) || 0;
+
+    try {
+        const r = await fetch(BASE + '/api/schedule_update.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const d = await r.json();
+        if (d.ok) {
+            closeEditModal();
+            location.reload();
+        } else {
+            pdToast(d.error || 'Could not save changes.', 'error');
+        }
+    } catch { pdToast('Network error. Please try again.', 'error'); }
+    btn.disabled = false;
+    btn.innerHTML = orig;
+}
+
+// Close on Escape key
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeEditModal(); });
+
+</script>
+
+<!-- ═══════════════════════════════════════════════
+     BUILT-IN MAP PANEL
+═══════════════════════════════════════════════ -->
+<style>
+#mapPanel {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 1000;
+    display: flex; flex-direction: column;
+    max-height: 88vh;
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -8px 40px rgba(0,0,0,0.25);
+    transform: translateY(100%);
+    transition: transform 0.32s cubic-bezier(.4,0,.2,1);
+    overflow: hidden;
+    background: white;
+}
+#mapPanel.map-open { transform: translateY(0); }
+#mapOverlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+    z-index: 999; display: none;
+    backdrop-filter: blur(2px);
+}
+#mapOverlay.map-open { display: block; }
+#mapPanelHeader {
+    background: #0f172a; color: white;
+    padding: 14px 16px 12px;
+    display: flex; align-items: center; gap: 12px;
+    flex-shrink: 0;
+    cursor: grab;
+}
+#builtinMap { flex: 1; min-height: 300px; }
+#mapStatus {
+    background: white; border-top: 1px solid #e2e8f0;
+    padding: 10px 16px; font-size: 0.82rem; color: #475569;
+    display: flex; align-items: center; gap: 8px;
+    flex-shrink: 0;
+}
+#mapStatus .spin { animation: spin 1s linear infinite; display: inline-block; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@media (min-width: 768px) {
+    #mapPanel { left: var(--sidebar-w, 240px); border-radius: 20px 20px 0 0; }
+    #builtinMap { min-height: 420px; }
+}
+</style>
+
+<div id="mapOverlay" onclick="closeMapPanel()"></div>
+
+<div id="mapPanel" role="dialog" aria-modal="true" aria-label="Map Navigation">
+
+  <!-- Header / drag handle -->
+  <div id="mapPanelHeader">
+    <div style="width:36px;height:36px;background:rgba(255,255,255,0.1);border-radius:10px;display:grid;place-items:center;flex-shrink:0;">
+      <i class="bi bi-map-fill" style="font-size:1.1rem;color:#93c5fd;"></i>
+    </div>
+    <div style="flex:1;min-width:0;">
+      <div style="font-weight:700;font-size:0.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="mapPanelName"></div>
+      <div style="font-size:0.72rem;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="mapPanelAddr"></div>
+    </div>
+    <a id="mapPanelGmBtn" href="#" target="_blank" rel="noopener"
+       style="display:flex;align-items:center;gap:6px;background:#2563eb;color:white;border:none;border-radius:10px;padding:7px 13px;font-size:0.78rem;font-weight:700;text-decoration:none;white-space:nowrap;flex-shrink:0;transition:background 0.15s;"
+       onmouseover="this.style.background='#1d4ed8'" onmouseout="this.style.background='#2563eb'">
+      <i class="bi bi-google"></i> Open in Maps
+    </a>
+    <button onclick="closeMapPanel()"
+            style="width:34px;height:34px;background:rgba(255,255,255,0.08);border:none;border-radius:8px;color:#94a3b8;font-size:1rem;cursor:pointer;display:grid;place-items:center;flex-shrink:0;margin-left:4px;transition:background 0.12s;"
+            onmouseover="this.style.background='rgba(255,255,255,0.16)'" onmouseout="this.style.background='rgba(255,255,255,0.08)'"
+            title="Close">
+      <i class="bi bi-x-lg"></i>
+    </button>
+  </div>
+
+  <div id="builtinMap"></div>
+
+  <div id="mapStatus">
+    <i class="bi bi-hourglass-split spin" style="color:#3b82f6;"></i> Loading map…
+  </div>
+
+</div>
+
+<script>
+(function () {
+'use strict';
+
+var mapInstance  = null;
+var destMarker   = null;
+var userMarker   = null;
+var routeLayer   = null;
+var leafletReady = false;
+
+window.openMapPanel = function (address, name, gmUrl) {
+    document.getElementById('mapPanelName').textContent = name || 'Patient';
+    document.getElementById('mapPanelAddr').textContent = address || '';
+    document.getElementById('mapPanelGmBtn').href = gmUrl || '#';
+    setMapStatus('<i class="bi bi-hourglass-split spin" style="color:#3b82f6;"></i> Loading map…');
+
+    document.getElementById('mapPanel').classList.add('map-open');
+    document.getElementById('mapOverlay').classList.add('map-open');
+    document.body.style.overflow = 'hidden';
+
+    loadLeaflet(function () {
+        // Let panel animate into view, then init
+        setTimeout(function () { initMap(address); }, 80);
+    });
+};
+
+window.closeMapPanel = function () {
+    document.getElementById('mapPanel').classList.remove('map-open');
+    document.getElementById('mapOverlay').classList.remove('map-open');
+    document.body.style.overflow = '';
+};
+
+document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeMapPanel();
+});
+
+function setMapStatus(html) {
+    document.getElementById('mapStatus').innerHTML = html;
+}
+
+function loadLeaflet(cb) {
+    if (window.L && leafletReady) { cb(); return; }
+    if (window.L) { leafletReady = true; cb(); return; }
+
+    var css = document.createElement('link');
+    css.rel = 'stylesheet';
+    css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(css);
+
+    var js = document.createElement('script');
+    js.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    js.onload = function () { leafletReady = true; cb(); };
+    document.head.appendChild(js);
+}
+
+function initMap(address) {
+    var container = document.getElementById('builtinMap');
+
+    if (!mapInstance) {
+        mapInstance = L.map(container, { zoomControl: true });
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://openstreetmap.org">OpenStreetMap</a> contributors',
+            maxZoom: 19
+        }).addTo(mapInstance);
+    } else {
+        if (destMarker)  { mapInstance.removeLayer(destMarker);  destMarker  = null; }
+        if (userMarker)  { mapInstance.removeLayer(userMarker);  userMarker  = null; }
+        if (routeLayer)  { mapInstance.removeLayer(routeLayer);  routeLayer  = null; }
+    }
+    mapInstance.invalidateSize();
+
+    function doGeocode(query) {
+        return fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(query), {
+            headers: { 'Accept': 'application/json', 'Accept-Language': 'en' }
+        }).then(function (r) { return r.json(); });
+    }
+
+    /* Build a chain of progressively simpler address queries */
+    function buildFallbacks(addr) {
+        var queries = [addr];
+        // 1. Strip leading building/unit descriptor before first comma
+        var noBuilding = addr.replace(/^[^,]*(?:bldg|building|unit|rm|room|fl|floor|blk|block|apt|suite|ste)[^,]*,\s*/i, '').trim();
+        if (noBuilding && noBuilding !== addr) queries.push(noBuilding);
+        // 2. Drop everything before the first comma (building name / apt)
+        var afterFirstComma = addr.replace(/^[^,]+,\s*/, '').trim();
+        if (afterFirstComma && afterFirstComma !== addr && afterFirstComma !== noBuilding) queries.push(afterFirstComma);
+        // 3. Street + city/state: keep only the last two comma-parts (e.g. "123 Main St, Naperville, IL 60540" → "Naperville, IL 60540")
+        var parts = addr.split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+        if (parts.length >= 3) {
+            // street + last two parts
+            queries.push(parts[0] + ', ' + parts.slice(-2).join(', '));
+            // just last two parts (city + state/zip)
+            queries.push(parts.slice(-2).join(', '));
+        }
+        // Deduplicate
+        return queries.filter(function(q, i, arr) { return arr.indexOf(q) === i && q.length > 3; });
+    }
+
+    /* Try each fallback in sequence, stop on first hit */
+    function geocodeWithFallbacks(queries, idx) {
+        if (idx >= queries.length) return Promise.resolve(null);
+        return doGeocode(queries[idx]).then(function(results) {
+            if (results && results.length) return results;
+            return geocodeWithFallbacks(queries, idx + 1);
+        });
+    }
+
+    /* Build Google Maps directions URL, optionally with origin coords */
+    function gmDirectionsUrl(destAddr, originLat, originLon) {
+        var base = 'https://www.google.com/maps/dir/?api=1';
+        if (originLat != null) base += '&origin=' + originLat + ',' + originLon;
+        base += '&destination=' + encodeURIComponent(destAddr);
+        return base;
+    }
+
+    function showDirectionsBtn(destAddr, originLat, originLon) {
+        var url = gmDirectionsUrl(destAddr, originLat, originLon);
+        // Update the Open in Maps button to include origin if we have it
+        if (originLat != null) {
+            document.getElementById('mapPanelGmBtn').href = url;
+        }
+        setMapStatus(
+            '<i class="bi bi-exclamation-circle" style="color:#f59e0b;"></i> Could not pin address on map &mdash; '
+            + '<a href="' + url + '" target="_blank" rel="noopener" style="color:#2563eb;font-weight:700;">'
+            + '<i class="bi bi-google"></i> Get Directions in Google Maps</a>'
+        );
+    }
+
+    setMapStatus('<i class="bi bi-search" style="color:#3b82f6;"></i> Locating address…');
+
+    var fallbacks = buildFallbacks(address);
+    geocodeWithFallbacks(fallbacks, 0).then(function(results) {
+        if (!results) {
+            /* Geocoding totally failed — still try to get user location for a better GM link */
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    function(pos) { showDirectionsBtn(address, pos.coords.latitude, pos.coords.longitude); },
+                    function()    { showDirectionsBtn(address, null, null); },
+                    { timeout: 6000, enableHighAccuracy: true }
+                );
+            } else {
+                showDirectionsBtn(address, null, null);
+            }
+            return;
+        }
+
+        var dLat = parseFloat(results[0].lat);
+        var dLon = parseFloat(results[0].lon);
+
+        var destIcon = L.divIcon({
+            className: '',
+            html: '<div style="width:18px;height:18px;background:#ef4444;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2.5px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.35);"></div>',
+            iconSize: [18, 18],
+            iconAnchor: [9, 18]
+        });
+        destMarker = L.marker([dLat, dLon], { icon: destIcon })
+            .addTo(mapInstance)
+            .bindPopup('<strong>Destination</strong><br><span style="font-size:0.8rem;color:#475569;">' + address + '</span>', { maxWidth: 220 })
+            .openPopup();
+
+        mapInstance.setView([dLat, dLon], 15);
+
+        if (navigator.geolocation) {
+            setMapStatus('<i class="bi bi-crosshair spin" style="color:#3b82f6;"></i> Getting your location…');
+            navigator.geolocation.getCurrentPosition(
+                function (pos) {
+                    var uLat = pos.coords.latitude;
+                    var uLon = pos.coords.longitude;
+
+                    // Update GM button to include origin
+                    document.getElementById('mapPanelGmBtn').href = gmDirectionsUrl(address, uLat, uLon);
+
+                    userMarker = L.circleMarker([uLat, uLon], {
+                        radius: 9, fillColor: '#3b82f6', color: '#1d4ed8',
+                        fillOpacity: 0.9, weight: 2.5
+                    }).addTo(mapInstance).bindPopup('<strong>You are here</strong>');
+
+                    mapInstance.fitBounds([[dLat, dLon], [uLat, uLon]], { padding: [50, 50] });
+
+                    // Fetch route from OSRM
+                    fetch('https://router.project-osrm.org/route/v1/driving/'
+                        + uLon + ',' + uLat + ';'
+                        + dLon + ',' + dLat
+                        + '?overview=full&geometries=geojson')
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        if (data.routes && data.routes.length) {
+                            var dist = (data.routes[0].distance / 1609.34).toFixed(1);
+                            var mins = Math.round(data.routes[0].duration / 60);
+                            routeLayer = L.geoJSON(data.routes[0].geometry, {
+                                style: { color: '#3b82f6', weight: 5, opacity: 0.75 }
+                            }).addTo(mapInstance);
+                            mapInstance.fitBounds(routeLayer.getBounds(), { padding: [50, 50] });
+                            setMapStatus(
+                                '<i class="bi bi-car-front-fill" style="color:#3b82f6;"></i>&nbsp;'
+                                + dist + ' mi &nbsp;'
+                                + '<i class="bi bi-clock" style="color:#64748b;"></i>&nbsp;~' + mins + ' min'
+                                + '&nbsp;&nbsp;&middot;&nbsp;&nbsp;'
+                                + '<a href="' + document.getElementById('mapPanelGmBtn').href + '" target="_blank" rel="noopener" style="color:#2563eb;font-weight:600;"><i class="bi bi-google"></i> Turn-by-turn in Google Maps</a>'
+                            );
+                        } else {
+                            setMapStatus('<i class="bi bi-map" style="color:#3b82f6;"></i> Destination shown &mdash; <a href="' + document.getElementById('mapPanelGmBtn').href + '" target="_blank" rel="noopener" style="color:#2563eb;font-weight:600;"><i class="bi bi-google"></i> Get Directions</a>');
+                        }
+                    })
+                    .catch(function () {
+                        setMapStatus('<i class="bi bi-map" style="color:#3b82f6;"></i> Destination shown &mdash; <a href="' + document.getElementById('mapPanelGmBtn').href + '" target="_blank" rel="noopener" style="color:#2563eb;font-weight:600;"><i class="bi bi-google"></i> Get Directions</a>');
+                    });
+                },
+                function () {
+                    setMapStatus('<i class="bi bi-map-fill" style="color:#3b82f6;"></i> Destination shown &mdash; <a href="' + document.getElementById('mapPanelGmBtn').href + '" target="_blank" rel="noopener" style="color:#2563eb;font-weight:600;"><i class="bi bi-google"></i> Open in Google Maps</a>');
+                },
+                { timeout: 8000, enableHighAccuracy: true }
+            );
+        } else {
+            setMapStatus('<i class="bi bi-map-fill" style="color:#3b82f6;"></i> Destination shown &mdash; <a href="' + document.getElementById('mapPanelGmBtn').href + '" target="_blank" rel="noopener" style="color:#2563eb;font-weight:600;"><i class="bi bi-google"></i> Open in Google Maps</a>');
+        }
+    })
+    .catch(function () {
+        showDirectionsBtn(address, null, null);
+    });
+}
+
+})();
 </script>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>
+

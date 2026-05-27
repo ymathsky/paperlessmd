@@ -125,18 +125,6 @@ include __DIR__ . '/../includes/header.php';
                     </label>
                     <?php endforeach; ?>
                 </div>
-                <div class="mt-3">
-                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Date Range of Records</label>
-                    <div class="flex gap-3 items-center">
-                        <input type="date" name="records_from"
-                               class="flex-1 px-4 py-2 border border-slate-200 rounded-xl text-sm bg-slate-50
-                                      focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent transition focus:bg-white">
-                        <span class="text-slate-500 text-sm">to</span>
-                        <input type="date" name="records_to" value="<?= date('Y-m-d') ?>"
-                               class="flex-1 px-4 py-2 border border-slate-200 rounded-xl text-sm bg-slate-50
-                                      focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent transition focus:bg-white">
-                    </div>
-                </div>
             </div>
 
             </div><!-- /step 0 -->
@@ -161,12 +149,6 @@ include __DIR__ . '/../includes/header.php';
                     <div>
                         <label class="block text-sm font-semibold text-slate-700 mb-1.5">Date of Birth</label>
                         <input type="text" name="patient_dob" value="<?= h($formattedDob) ?>" placeholder="MM/DD/YYYY"
-                               class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
-                                      focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent transition focus:bg-white">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Social Security # (last 4 digits)</label>
-                        <input type="text" name="patient_ssn" maxlength="4" placeholder="XXXX"
                                class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
                                       focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent transition focus:bg-white">
                     </div>
@@ -305,4 +287,6 @@ include __DIR__ . '/../includes/header.php';
 </div><!-- /card -->
 </div><!-- /max-w-3xl -->
 
+<?php include __DIR__ . '/../includes/wound_photo_panel.php'; ?>
+<?php include __DIR__ . '/../includes/rx_pad_panel.php'; ?>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

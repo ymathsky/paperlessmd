@@ -172,13 +172,62 @@
     </div>
 </div>
 
+<!-- ── Floating Menu Toggle ──────────────────────────────────────────── -->
+<button id="floatMenuToggle"
+        title="Show / hide quick actions"
+        onclick="floatMenuToggleFn()"
+        class="no-print"
+        style="display:none;position:fixed;bottom:88px;right:20px;z-index:8500;
+               width:30px;height:30px;border-radius:50%;border:1.5px solid #e2e8f0;
+               background:rgba(255,255,255,0.92);backdrop-filter:blur(6px);
+               cursor:pointer;align-items:center;justify-content:center;
+               box-shadow:0 2px 8px rgba(0,0,0,.14);transition:transform .15s;">
+    <i id="floatMenuToggleIcon" class="bi bi-chevron-up" style="font-size:12px;color:#64748b;pointer-events:none;"></i>
+</button>
+<script>
+(function () {
+    var IDS  = ['wpFloatBtn', 'qnFloatBtn', 'rxPadFloatBtn'];
+    var KEY  = 'floatMenuHidden';
+    var hidden = localStorage.getItem(KEY) === '1';
+
+    function applyState() {
+        var toggleBtn = document.getElementById('floatMenuToggle');
+        var icon      = document.getElementById('floatMenuToggleIcon');
+        if (!toggleBtn) return;
+        var anyExist  = IDS.some(function (id) { return !!document.getElementById(id); });
+        if (!anyExist) { toggleBtn.style.display = 'none'; return; }
+        toggleBtn.style.display = 'flex';
+        IDS.forEach(function (id) {
+            var el = document.getElementById(id);
+            if (!el) return;
+            el.style.transition  = 'opacity .2s ease, transform .2s ease';
+            el.style.opacity     = hidden ? '0' : '1';
+            el.style.transform   = hidden ? 'scale(0.6)' : 'scale(1)';
+            el.style.pointerEvents = hidden ? 'none' : '';
+        });
+        icon.className = hidden
+            ? 'bi bi-grid-3x3-gap-fill'
+            : 'bi bi-chevron-up';
+        icon.style.color = hidden ? '#7c3aed' : '#64748b';
+    }
+
+    window.floatMenuToggleFn = function () {
+        hidden = !hidden;
+        localStorage.setItem(KEY, hidden ? '1' : '0');
+        applyState();
+    };
+
+    document.addEventListener('DOMContentLoaded', applyState);
+}());
+</script>
+
 <!-- ── AI Assistant Bubble ───────────────────────────────────────────── -->
 <div id="aiChatWrap" class="fixed bottom-6 right-6 z-[9000] no-print flex flex-col items-end gap-3">
 
     <!-- Panel (hidden by default) -->
     <div id="aiPanel"
          class="hidden flex-col bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden"
-         style="width:360px;max-height:500px"
+         style="width:min(480px,calc(100vw - 24px));max-height:min(680px,calc(100vh - 80px))"
          role="dialog" aria-label="AI Assistant">
 
         <!-- Header -->
@@ -211,7 +260,7 @@
                     <span class="ai-avatar"><i class="bi bi-heart-pulse-fill"></i></span>
                     <div>
                         <div class="ai-msg ai-msg-bot">
-                            Hi! I'm your clinical AI assistant. Ask me about documentation, ICD-10 coding, wound care, or anything else.
+                            Hi! I'm your clinical AI assistant. Ask me about documentation, ICD-10 coding, wound care, or how to use any feature in PaperlessMD.
                         </div>
                         <span class="ai-ts"></span>
                     </div>
@@ -253,11 +302,11 @@
 
     <!-- Floating bubble button -->
     <button id="aiBubble"
-            class="w-14 h-14 rounded-full text-white shadow-lg hover:shadow-xl
+            class="w-10 h-10 rounded-full text-white shadow-lg hover:shadow-xl
                    hover:scale-105 transition-all duration-200 flex items-center justify-center"
             style="background:linear-gradient(135deg,#1d4ed8,#2563eb)"
             aria-label="Open AI Assistant" title="Clinical AI Assistant">
-        <i class="bi bi-heart-pulse-fill text-xl"></i>
+        <i class="bi bi-heart-pulse-fill text-sm"></i>
     </button>
 </div>
 <?php endif; ?>
@@ -283,6 +332,178 @@ window._pdCsrf = '<?= htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8') ?>';
 <script src="<?= BASE_URL ?>/assets/js/voice.js" defer></script>
 <script src="<?= BASE_URL ?>/assets/js/offline.js" defer></script>
 <script src="<?= BASE_URL ?>/assets/js/ai-assistant.js" defer></script>
+<?php if (!empty($_SESSION['user_id'])): ?>
+<!-- ── Push Notification Permission Banner ──────────────────────────────────
+     Slides up once when Notification.permission === 'default'.
+     Permanently dismissed via localStorage key pd_push_dismissed.
+──────────────────────────────────────────────────────────────────────────── -->
+<div id="pushPromptBanner"
+     class="no-print"
+     style="display:none;position:fixed;left:50%;
+            bottom:calc(76px + env(safe-area-inset-bottom,0px));
+            z-index:9997;width:100%;max-width:380px;padding:0 12px;
+            transition:opacity 0.3s ease,transform 0.3s ease;
+            opacity:0;transform:translateX(-50%) translateY(16px);">
+    <div id="pushPromptCard"
+         class="bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 flex items-start gap-3">
+        <div class="flex-shrink-0 w-10 h-10 rounded-xl bg-sky-500 flex items-center justify-center">
+            <i class="bi bi-bell-fill text-white text-lg"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+            <p class="text-sm font-semibold text-slate-800">Enable push notifications</p>
+            <p class="text-xs text-slate-500 mt-1">
+                Get real-time alerts for messages, visits, form signatures, and more.
+            </p>
+            <div class="flex gap-2 mt-3">
+                <button id="pushPromptEnable"
+                        class="px-3 py-2 rounded-lg bg-sky-500 text-white text-xs font-semibold"
+                        style="border:none;cursor:pointer;">
+                    Enable notifications
+                </button>
+                <button id="pushPromptDismiss"
+                        class="px-3 py-2 rounded-lg bg-slate-100 text-slate-600 text-xs font-semibold"
+                        style="border:none;cursor:pointer;">
+                    Not now
+                </button>
+            </div>
+        </div>
+        <button id="pushPromptClose"
+                class="flex-shrink-0 text-slate-400"
+                style="background:none;border:none;cursor:pointer;padding:2px 0 0;line-height:1;">
+            <i class="bi bi-x-lg" style="font-size:14px;"></i>
+        </button>
+    </div>
+</div>
+
+<script>
+/* ── Web Push subscription ────────────────────────────────────────────────────
+   On load: re-syncs existing subscription or auto-subscribes if permission was
+   already granted. Shows the banner if permission is still 'default'.
+──────────────────────────────────────────────────────────────────────────── */
+(function () {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    if (!window._pdCsrf || !window._pdBase) return;
+
+    var BASE   = window._pdBase;
+    var LS_KEY = 'pd_push_dismissed';
+
+    // ── Dark mode: tint the card if html.dark is active ──────────────────────
+    (function () {
+        var card = document.getElementById('pushPromptCard');
+        if (!card) return;
+        if (document.documentElement.classList.contains('dark')) {
+            card.style.backgroundColor = '#1e293b';
+            card.style.borderColor     = '#334155';
+            card.querySelector('p.text-slate-800').style.color = '#f1f5f9';
+            card.querySelector('p.text-slate-500').style.color = '#94a3b8';
+        }
+    }());
+
+    function urlBase64ToUint8Array(b64) {
+        var padding = '='.repeat((4 - b64.length % 4) % 4);
+        var base64  = (b64 + padding).replace(/-/g, '+').replace(/_/g, '/');
+        var raw     = atob(base64);
+        var arr     = new Uint8Array(raw.length);
+        for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+        return arr;
+    }
+
+    function sendSubscription(sub) {
+        var json = sub.toJSON();
+        return fetch(BASE + '/api/push_subscribe.php', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({
+                csrf:     window._pdCsrf,
+                action:   'subscribe',
+                endpoint: json.endpoint,
+                keys:     json.keys,
+            }),
+        });
+    }
+
+    function doSubscribe(reg, appServerKey) {
+        return reg.pushManager.subscribe({
+            userVisibleOnly:      true,
+            applicationServerKey: appServerKey,
+        }).then(function (sub) {
+            sendSubscription(sub).catch(function () {});
+        });
+    }
+
+    var banner = document.getElementById('pushPromptBanner');
+
+    function showBanner() {
+        if (!banner) return;
+        banner.style.display = 'block';
+        requestAnimationFrame(function () {
+            requestAnimationFrame(function () {
+                banner.style.opacity   = '1';
+                banner.style.transform = 'translateX(-50%) translateY(0)';
+            });
+        });
+    }
+
+    function hideBanner() {
+        if (!banner) return;
+        banner.style.opacity   = '0';
+        banner.style.transform = 'translateX(-50%) translateY(16px)';
+        setTimeout(function () { banner.style.display = 'none'; }, 320);
+    }
+
+    ['pushPromptDismiss', 'pushPromptClose'].forEach(function (id) {
+        var btn = document.getElementById(id);
+        if (btn) btn.addEventListener('click', function () {
+            localStorage.setItem(LS_KEY, '1');
+            hideBanner();
+        });
+    });
+
+    navigator.serviceWorker.ready.then(function (reg) {
+        fetch(BASE + '/api/push_subscribe.php?vapid')
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (!data.publicKey) return;
+                var appServerKey = urlBase64ToUint8Array(data.publicKey);
+
+                reg.pushManager.getSubscription().then(function (existing) {
+                    if (existing) {
+                        // Already subscribed — re-sync to server (idempotent upsert)
+                        sendSubscription(existing).catch(function () {});
+                        return;
+                    }
+
+                    var perm = Notification.permission;
+
+                    if (perm === 'granted') {
+                        // Permission already granted but no subscription — subscribe silently
+                        doSubscribe(reg, appServerKey).catch(function (e) {
+                            console.warn('[Push] auto-subscribe failed:', e);
+                        });
+                    } else if (perm === 'default' && !localStorage.getItem(LS_KEY)) {
+                        // Show opt-in banner
+                        showBanner();
+                        var enableBtn = document.getElementById('pushPromptEnable');
+                        if (enableBtn) {
+                            enableBtn.addEventListener('click', function () {
+                                hideBanner();
+                                Notification.requestPermission().then(function (p) {
+                                    if (p !== 'granted') return;
+                                    doSubscribe(reg, appServerKey).catch(function (e) {
+                                        console.warn('[Push] subscribe failed:', e);
+                                    });
+                                });
+                            });
+                        }
+                    }
+                    // permission === 'denied' → do nothing
+                });
+            })
+            .catch(function () { /* vapid endpoint not yet available */ });
+    });
+}());
+</script>
+<?php endif; ?>
 <?php if (in_array($_SESSION['role'] ?? '', ['ma', 'admin'])): ?>
 <script>
 /* ── MA Location Tracking ─────────────────────────────────────────────
@@ -295,12 +516,29 @@ window._pdCsrf = '<?= htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8') ?>';
 (function () {
     if (!navigator.geolocation || !window._pdCsrf) return;
 
-    var INTERVAL_MS   = 5 * 60 * 1000; // max 1 update per 5 minutes
+    var INTERVAL_MS   = 60 * 1000; // max 1 update per minute
     var BASE          = window._pdBase || '';
     var LOC_SYNC_TAG  = 'pd-location-sync';
     var LOC_IDB_NAME  = 'pd-location-queue';
     var LOC_IDB_STORE = 'queue';
     var lastSentAt    = 0;
+
+    /* ── Update the GPS status badge (schedule page) ── */
+    function setGpsBadge(state) {
+        var badge = document.getElementById('gpsStatusBadge');
+        if (!badge) return;
+        if (state === 'active') {
+            badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-700 border border-emerald-200';
+            badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block"></span> Location On';
+        } else if (state === 'denied') {
+            badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-700 border border-red-200 cursor-pointer';
+            badge.innerHTML = '<i class="bi bi-geo-alt-fill"></i> Location Off — tap to enable';
+            badge.title = 'Location access was denied. Please enable it in your browser settings.';
+        } else {
+            badge.className = 'inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-full bg-slate-100 text-slate-500 border border-slate-200';
+            badge.innerHTML = '<i class="bi bi-geo-alt"></i> Locating…';
+        }
+    }
 
     /* ── IndexedDB helpers ── */
     function openLocDB() {
@@ -346,6 +584,7 @@ window._pdCsrf = '<?= htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8') ?>';
 
     /* ── watchPosition handler (throttled) ── */
     function onPosition(pos) {
+        setGpsBadge('active');
         var now = Date.now();
         if (now - lastSentAt < INTERVAL_MS) return;
         lastSentAt = now;
@@ -357,17 +596,35 @@ window._pdCsrf = '<?= htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8') ?>';
         });
     }
 
+    function onError(err) {
+        setGpsBadge(err.code === 1 ? 'denied' : 'unavailable');
+    }
+
+    setGpsBadge('searching');
+
     // watchPosition gives continuous updates efficiently — no polling needed
-    navigator.geolocation.watchPosition(
+    var watchId = navigator.geolocation.watchPosition(
         onPosition,
-        function () { /* denied or unavailable */ },
-        { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 }
+        onError,
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
     );
 
     // When the tab comes back into focus, force an immediate update
     document.addEventListener('visibilitychange', function () {
         if (!document.hidden) { lastSentAt = 0; }
     });
+
+    // Expose a force-send function so Navigate buttons can push immediately
+    window._pdSendLocation = function () {
+        navigator.geolocation.getCurrentPosition(
+            function (pos) {
+                lastSentAt = 0;
+                onPosition(pos);
+            },
+            function () {},
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+        );
+    };
 })();
 </script>
 <?php endif; ?>
@@ -697,5 +954,217 @@ window._pdCsrf = '<?= htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8') ?>';
 }());
 </script>
 <?php endif; ?>
+
+<?php include __DIR__ . '/videocall.php'; ?>
+
+<?php
+// ── Mobile Bottom Tab Bar ─────────────────────────────────────────────────
+// Visible only on small screens (md:hidden). Mirrors the sidebar nav links.
+// $activeNav is set by the page before including header/footer.
+$_bnActive = $activeNav ?? '';
+$_bnItems = [
+    ['href' => '/dashboard.php', 'key' => 'dashboard', 'icon' => 'bi-speedometer2',   'label' => 'Home'],
+    ['href' => '/schedule.php',  'key' => 'schedule',  'icon' => 'bi-calendar3',      'label' => 'Schedule',  'billingHide' => true],
+    ['href' => '/patients.php',  'key' => 'patients',  'icon' => 'bi-people-fill',    'label' => 'Patients'],
+    ['href' => '/messages.php',  'key' => 'messages',  'icon' => 'bi-chat-dots-fill', 'label' => 'Messages',  'badge' => $_unreadMessages ?? 0],
+];
+?>
+<nav id="bottomNav"
+     class="md:hidden no-print fixed bottom-0 left-0 right-0 z-50 flex items-stretch"
+     style="background:#0f1f3d;border-top:1px solid rgba(255,255,255,0.08);
+            padding-bottom:env(safe-area-inset-bottom,0px);height:calc(60px + env(safe-area-inset-bottom,0px));">
+
+    <?php foreach ($_bnItems as $_item):
+        if (!empty($_item['billingHide']) && isBilling()) continue;
+        $_isActive = $_bnActive === $_item['key'];
+    ?>
+    <a href="<?= BASE_URL . $_item['href'] ?>"
+       style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+              text-decoration:none;transition:background 0.15s;position:relative;
+              <?= $_isActive ? 'background:rgba(255,255,255,0.10);' : '' ?>"
+       onmouseover="this.style.background='rgba(255,255,255,0.07)'"
+       onmouseout="this.style.background='<?= $_isActive ? 'rgba(255,255,255,0.10)' : 'transparent' ?>'">
+        <?php if (!empty($_item['badge']) && $_item['badge'] > 0): ?>
+        <span style="position:absolute;top:8px;right:calc(50% - 16px);
+                     background:#ef4444;color:#fff;font-size:9px;font-weight:800;
+                     min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;
+                     justify-content:center;padding:0 3px;line-height:1;border:2px solid #0f1f3d;">
+            <?= min((int)$_item['badge'], 99) ?>
+        </span>
+        <?php endif; ?>
+        <i class="bi <?= $_item['icon'] ?>"
+           style="font-size:20px;line-height:1;color:<?= $_isActive ? '#fff' : '#64748b' ?>;
+                  transition:color 0.15s;<?= $_isActive ? 'filter:drop-shadow(0 0 6px rgba(99,102,241,0.6));' : '' ?>"></i>
+        <span style="font-size:10px;font-weight:<?= $_isActive ? '700' : '500' ?>;
+                     color:<?= $_isActive ? '#e2e8f0' : '#475569' ?>;letter-spacing:0.02em;line-height:1;">
+            <?= $_item['label'] ?>
+        </span>
+        <?php if ($_isActive): ?>
+        <span style="position:absolute;top:0;left:50%;transform:translateX(-50%);
+                     width:32px;height:2px;background:#6366f1;border-radius:0 0 3px 3px;"></span>
+        <?php endif; ?>
+    </a>
+    <?php endforeach; ?>
+
+    <!-- "More" tab — opens sidebar -->
+    <button onclick="document.getElementById('sidebar').classList.toggle('-translate-x-full');document.getElementById('sidebarBackdrop').classList.toggle('hidden');"
+            style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+                   background:transparent;border:none;cursor:pointer;transition:background 0.15s;position:relative;"
+            onmouseover="this.style.background='rgba(255,255,255,0.07)'"
+            onmouseout="this.style.background='transparent'">
+        <?php if (!empty($_totalNotifCount) && $_totalNotifCount > 0): ?>
+        <span style="position:absolute;top:8px;right:calc(50% - 16px);
+                     background:#ef4444;color:#fff;font-size:9px;font-weight:800;
+                     min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;
+                     justify-content:center;padding:0 3px;line-height:1;border:2px solid #0f1f3d;">
+            <?= min((int)$_totalNotifCount, 9) ?>
+        </span>
+        <?php endif; ?>
+        <i class="bi bi-grid-3x3-gap-fill" style="font-size:20px;line-height:1;color:#64748b;"></i>
+        <span style="font-size:10px;font-weight:500;color:#475569;letter-spacing:0.02em;line-height:1;">More</span>
+    </button>
+</nav>
+
+<!-- ── Alpine Toast Notifications ──────────────────────────────────────────── -->
+<div x-data
+     class="fixed z-[99998] flex flex-col-reverse gap-2 no-print"
+     style="bottom:calc(76px + env(safe-area-inset-bottom,0px));right:12px;
+            max-width:320px;width:calc(100vw - 24px);pointer-events:none;">
+    <template x-for="toast in $store.pdToasts.items" :key="toast.id">
+        <div x-show="toast.show"
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="opacity-0 translate-y-3 scale-95"
+             x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+             x-transition:leave="transition ease-in duration-200"
+             x-transition:leave-start="opacity-100 scale-100"
+             x-transition:leave-end="opacity-0 scale-95"
+             style="pointer-events:auto;display:flex;align-items:center;gap:11px;
+                    padding:11px 12px;border-radius:16px;cursor:default;
+                    background:#0f172a;border:1px solid rgba(255,255,255,0.07);
+                    box-shadow:0 12px 36px rgba(0,0,0,0.45);">
+            <!-- Colored icon bubble -->
+            <div :style="'flex-shrink:0;width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;background:' + toast.bgAccent">
+                <i :class="toast.icon" style="font-size:16px;color:#fff;"></i>
+            </div>
+            <!-- Message -->
+            <span x-text="toast.message"
+                  style="flex:1;font-size:13.5px;font-weight:600;color:#f1f5f9;line-height:1.4;"></span>
+            <!-- Close -->
+            <button @click="$store.pdToasts.remove(toast.id)"
+                    style="background:rgba(255,255,255,0.08);border:none;color:#94a3b8;cursor:pointer;
+                           width:24px;height:24px;border-radius:50%;display:flex;align-items:center;
+                           justify-content:center;flex-shrink:0;font-size:14px;line-height:1;
+                           transition:background 0.15s;"
+                    onmouseover="this.style.background='rgba(255,255,255,0.16)'"
+                    onmouseout="this.style.background='rgba(255,255,255,0.08)'">&times;</button>
+        </div>
+    </template>
+</div>
+
+<!-- ── Alpine Confirm Dialog ───────────────────────────────────────────────── -->
+<div x-data
+     x-show="$store.pdConfirm.visible"
+     x-transition:enter="transition ease-out duration-200"
+     x-transition:enter-start="opacity-0"
+     x-transition:enter-end="opacity-100"
+     x-transition:leave="transition ease-in duration-150"
+     x-transition:leave-start="opacity-100"
+     x-transition:leave-end="opacity-0"
+     class="fixed inset-0 z-[99999] flex items-center justify-center p-4 no-print"
+     style="background:rgba(15,23,42,0.65);backdrop-filter:blur(4px);display:none;"
+     @keydown.escape.window="$store.pdConfirm.answer(false)">
+    <div x-show="$store.pdConfirm.visible"
+         x-transition:enter="transition ease-out duration-250"
+         x-transition:enter-start="opacity-0 scale-95 translate-y-2"
+         x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+         style="background:#fff;border-radius:20px;padding:28px 24px;max-width:360px;width:100%;
+                box-shadow:0 24px 64px rgba(0,0,0,0.25);text-align:center;">
+        <div style="width:52px;height:52px;background:#fef3c7;border-radius:50%;
+                    display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">
+            <i class="bi bi-question-circle-fill" style="font-size:24px;color:#d97706;"></i>
+        </div>
+        <p x-text="$store.pdConfirm.message"
+           style="font-size:16px;font-weight:700;color:#1e293b;margin:0 0 6px;line-height:1.4;"></p>
+        <p x-text="$store.pdConfirm.subtext"
+           x-show="$store.pdConfirm.subtext"
+           style="font-size:13px;color:#64748b;margin:0 0 22px;"></p>
+        <div style="display:flex;gap:10px;margin-top:22px;">
+            <button @click="$store.pdConfirm.answer(false)"
+                    style="flex:1;padding:12px;background:#f1f5f9;color:#475569;border:none;
+                           border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;">
+                Cancel
+            </button>
+            <button @click="$store.pdConfirm.answer(true)"
+                    :style="$store.pdConfirm.confirmStyle"
+                    style="flex:1;padding:12px;border:none;border-radius:12px;
+                           font-size:14px;font-weight:700;cursor:pointer;color:#fff;">
+                <i :class="$store.pdConfirm.confirmIcon"></i>
+                <span x-text="$store.pdConfirm.confirmLabel"></span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+/* ── Alpine Stores: Toasts + Confirm Dialog ─────────────────────────────── */
+document.addEventListener('alpine:init', () => {
+
+    Alpine.store('pdToasts', {
+        items: [],
+        _styles: {
+            success: { bgAccent: '#059669', icon: 'bi bi-check-circle-fill' },
+            error:   { bgAccent: '#dc2626', icon: 'bi bi-x-circle-fill' },
+            warning: { bgAccent: '#d97706', icon: 'bi bi-exclamation-triangle-fill' },
+            info:    { bgAccent: '#2563eb', icon: 'bi bi-info-circle-fill' },
+            loading: { bgAccent: '#475569', icon: 'bi bi-hourglass-split' },
+        },
+        add(message, type = 'success', duration = 4000) {
+            const id  = Date.now() + Math.random();
+            const cfg = this._styles[type] || this._styles.success;
+            this.items.push({ id, message, show: true, ...cfg });
+            if (duration > 0) setTimeout(() => this.remove(id), duration);
+            return id;
+        },
+        remove(id) {
+            const t = this.items.find(t => t.id === id);
+            if (t) t.show = false;
+            setTimeout(() => { this.items = this.items.filter(t => t.id !== id); }, 300);
+        },
+    });
+
+    Alpine.store('pdConfirm', {
+        visible:      false,
+        message:      '',
+        subtext:      '',
+        confirmLabel: 'Confirm',
+        confirmIcon:  'bi bi-check-lg',
+        confirmStyle: 'background:#2563eb;',
+        _resolve:     null,
+        show(opts) {
+            if (typeof opts === 'string') opts = { message: opts };
+            this.message      = opts.message      || 'Are you sure?';
+            this.subtext      = opts.subtext      || '';
+            this.confirmLabel = opts.confirmLabel  || 'Confirm';
+            this.confirmIcon  = opts.confirmIcon   || 'bi bi-check-lg';
+            this.confirmStyle = opts.confirmStyle  || 'background:#2563eb;';
+            this.visible      = true;
+            return new Promise(resolve => { this._resolve = resolve; });
+        },
+        answer(val) {
+            this.visible = false;
+            if (this._resolve) { this._resolve(val); this._resolve = null; }
+        },
+    });
+
+});
+
+/* ── Global helpers ─────────────────────────────────────────────────── */
+window.pdToast   = (msg, type = 'success', duration = 4000) => Alpine.store('pdToasts').add(msg, type, duration);
+window.pdConfirm = (opts) => Alpine.store('pdConfirm').show(opts);
+</script>
+
+<!-- Flowbite JS (component interactions) -->
+<script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js"></script>
+
 </body>
 </html>

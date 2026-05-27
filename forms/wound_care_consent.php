@@ -10,6 +10,10 @@ $pStmt->execute([$patient_id]);
 $patient = $pStmt->fetch();
 if (!$patient) { header('Location: ' . BASE_URL . '/patients.php'); exit; }
 
+$_coName = ($patient['company'] ?? '') === 'Visiting Medical Physician Inc.' ? 'Visiting Medical Physician Inc.' : 'Beyond Wound Care Inc.';
+$_coUC   = strtoupper($_coName);
+$_coAbb  = ($_coName === 'Visiting Medical Physician Inc.') ? 'VMP' : 'BWC';
+
 // One-signature rule
 $_dupQ = $pdo->prepare("SELECT id FROM form_submissions WHERE patient_id = ? AND form_type = 'wound_care_consent' AND status IN ('signed','uploaded') AND DATE(created_at) = CURDATE() LIMIT 1");
 $_dupQ->execute([$patient_id]);
@@ -204,4 +208,6 @@ include __DIR__ . '/../includes/header.php';
 </div><!-- /card -->
 </div><!-- /max-w-3xl -->
 
+<?php include __DIR__ . '/../includes/wound_photo_panel.php'; ?>
+<?php include __DIR__ . '/../includes/rx_pad_panel.php'; ?>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

@@ -30,12 +30,19 @@ if ($statusFilter !== 'all') {
     $params[] = $statusFilter;
 }
 
-// MA filter — non-admin users only see their own assigned patients
-$maFilter = '';
-if (!isAdmin()) {
-    $where[]  = 'p.assigned_ma = ?';
-    $params[] = (int)$_SESSION['user_id'];
-} elseif (isset($_GET['ma']) && (int)$_GET['ma'] > 0) {
+// Patient visibility:
+//   admin / pcc / provider → see all patients (admin can also filter by MA)
+//   ma / scheduler / billing → own assigned patients OR patients with a schedule entry for them
+$maFilter  = '';
+$seesAll   = isAdmin() || isPcc() || isProvider();
+if (!$seesAll) {
+    $uid = (int)$_SESSION['user_id'];
+    $where[]  = "(p.assigned_ma = ? OR EXISTS (
+        SELECT 1 FROM `schedule` sc WHERE sc.patient_id = p.id AND sc.ma_id = ?
+    ))";
+    $params[] = $uid;
+    $params[] = $uid;
+} elseif (isAdmin() && isset($_GET['ma']) && (int)$_GET['ma'] > 0) {
     $maFilter = (int)$_GET['ma'];
     $where[]  = 'p.assigned_ma = ?';
     $params[] = $maFilter;
@@ -73,22 +80,32 @@ $cs->execute($countParams);
 $total = (int)$cs->fetchColumn();
 $pages = (int)ceil($total / $perPage);
 
-/* ── Analytics (always across ALL patients, not filtered) ─── */
-$analytics = $pdo->query("
+/* ── Analytics (filtered by user role) ─── */
+$_anSql = "
     SELECT
         p.company,
-        COUNT(*)                                                            AS total,
-        SUM(p.status = 'active')                                           AS active,
-        SUM(p.status = 'inactive')                                         AS inactive,
-        SUM(p.status = 'discharged')                                       AS discharged,
-        COUNT(DISTINCT fs.id)                                              AS forms,
-        SUM(fs.status = 'signed')                                          AS pending_upload,
-        COUNT(DISTINCT wp.id)                                              AS photos
+        COUNT(DISTINCT p.id)                                                        AS total,
+        COUNT(DISTINCT CASE WHEN p.status = 'active'     THEN p.id END)            AS active,
+        COUNT(DISTINCT CASE WHEN p.status = 'inactive'   THEN p.id END)            AS inactive,
+        COUNT(DISTINCT CASE WHEN p.status = 'discharged' THEN p.id END)            AS discharged,
+        COUNT(DISTINCT fs.id)                                                       AS forms,
+        COUNT(DISTINCT wp.id)                                                       AS photos
     FROM patients p
     LEFT JOIN form_submissions fs ON fs.patient_id = p.id
     LEFT JOIN wound_photos wp     ON wp.patient_id = p.id
-    GROUP BY p.company
-")->fetchAll(PDO::FETCH_GROUP | PDO::FETCH_UNIQUE);
+";
+if ($seesAll) {
+    $_anSql .= " GROUP BY p.company";
+    $analytics = $pdo->query($_anSql)->fetchAll(PDO::FETCH_GROUP | PDO::FETCH_UNIQUE);
+} else {
+    $_anUid = (int)$_SESSION['user_id'];
+    $_anSql .= " WHERE (p.assigned_ma = ? OR EXISTS (
+        SELECT 1 FROM `schedule` sc WHERE sc.patient_id = p.id AND sc.ma_id = ?
+    )) GROUP BY p.company";
+    $_anStmt = $pdo->prepare($_anSql);
+    $_anStmt->execute([$_anUid, $_anUid]);
+    $analytics = $_anStmt->fetchAll(PDO::FETCH_GROUP | PDO::FETCH_UNIQUE);
+}
 
 // Normalise so both companies always have a row
 $companies = [
@@ -97,7 +114,7 @@ $companies = [
 ];
 foreach ($companies as $name => $_) {
     if (!isset($analytics[$name])) {
-        $analytics[$name] = ['total'=>0,'active'=>0,'inactive'=>0,'discharged'=>0,'forms'=>0,'pending_upload'=>0,'photos'=>0];
+        $analytics[$name] = ['total'=>0,'active'=>0,'inactive'=>0,'discharged'=>0,'forms'=>0,'photos'=>0];
     }
 }
 
@@ -110,10 +127,12 @@ include __DIR__ . '/includes/header.php';
         <h2 class="text-2xl font-extrabold text-slate-800">Patients</h2>
         <p class="text-slate-500 text-sm mt-0.5"><?= number_format($total) ?> patient<?= $total !== 1 ? 's' : '' ?> found</p>
     </div>
+    <?php if (!isMa()): ?>
     <a href="<?= BASE_URL ?>/patient_add.php"
        class="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-all shadow-sm hover:shadow-md active:scale-95">
         <i class="bi bi-person-plus-fill"></i> Add Patient
     </a>
+    <?php endif; ?>
 </div>
 
 <!-- ── Analytics ─────────────────────────────────────────── -->
@@ -166,15 +185,11 @@ foreach ($companies as $coName => $coCfg):
     </div>
     <?php endif; ?>
 
-    <!-- Forms / Photos / Pending -->
-    <div class="grid grid-cols-3 gap-3">
+    <!-- Forms / Photos -->
+    <div class="grid grid-cols-2 gap-3">
         <div class="bg-slate-50 rounded-xl p-3 text-center border border-slate-100">
             <p class="text-xl font-extrabold text-slate-700"><?= number_format($row['forms']) ?></p>
             <p class="text-xs text-slate-400 mt-0.5">Total Forms</p>
-        </div>
-        <div class="bg-slate-50 rounded-xl p-3 text-center border border-slate-100">
-            <p class="text-xl font-extrabold <?= $row['pending_upload'] > 0 ? 'text-amber-600' : 'text-slate-700' ?>"><?= $row['pending_upload'] ?></p>
-            <p class="text-xs text-slate-400 mt-0.5">Pending Upload</p>
         </div>
         <div class="bg-slate-50 rounded-xl p-3 text-center border border-slate-100">
             <p class="text-xl font-extrabold text-violet-600"><?= number_format($row['photos']) ?></p>
@@ -252,7 +267,56 @@ foreach ($companies as $coName => $coCfg):
         <p class="text-sm mt-1">Try adjusting your search or <a href="<?= BASE_URL ?>/patient_add.php" class="text-blue-600 hover:underline">add a new patient</a>.</p>
     </div>
     <?php else: ?>
-    <div class="overflow-x-auto">
+
+    <!-- ── Mobile card list (< sm) ─────────────────────────────────── -->
+    <div class="sm:hidden divide-y divide-slate-100">
+        <?php foreach ($patients as $p):
+            $stMap2 = [
+                'active'     => ['bg-emerald-100 text-emerald-700', 'Active'],
+                'inactive'   => ['bg-amber-100 text-amber-700',     'Inactive'],
+                'discharged' => ['bg-red-100 text-red-700',         'Discharged'],
+            ];
+            [$stCls2, $stLabel2] = $stMap2[$p['status'] ?? 'active'] ?? $stMap2['active'];
+            $ptAge2 = $p['dob'] ? (int)(new DateTime($p['dob']))->diff(new DateTime('today'))->y : null;
+        ?>
+        <a href="<?= BASE_URL ?>/patient_view.php?id=<?= $p['id'] ?>"
+           class="flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50 active:bg-slate-100 transition-colors">
+            <!-- Avatar -->
+            <?php if (!empty($p['photo_url'])): ?>
+            <img src="<?= h($p['photo_url']) ?>" alt="" class="w-11 h-11 rounded-xl object-cover flex-shrink-0 border border-slate-100 shadow-sm">
+            <?php else: ?>
+            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 grid place-items-center text-white text-sm font-bold flex-shrink-0 shadow-sm">
+                <?= strtoupper(substr($p['first_name'], 0, 1) . substr($p['last_name'], 0, 1)) ?>
+            </div>
+            <?php endif; ?>
+            <!-- Info -->
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <span class="font-semibold text-slate-800 text-sm"><?= h($p['last_name'] . ', ' . $p['first_name']) ?></span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold <?= $stCls2 ?>"><?= $stLabel2 ?></span>
+                </div>
+                <div class="flex items-center gap-x-3 gap-y-0.5 flex-wrap mt-0.5">
+                    <?php if ($ptAge2 !== null): ?>
+                    <span class="text-xs text-slate-400"><?= $ptAge2 ?> yrs</span>
+                    <?php endif; ?>
+                    <?php if ($p['phone']): ?>
+                    <span class="text-xs text-slate-400"><i class="bi bi-telephone mr-0.5"></i><?= h($p['phone']) ?></span>
+                    <?php endif; ?>
+                    <?php if ($p['form_count'] > 0): ?>
+                    <span class="text-xs font-semibold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-md"><i class="bi bi-file-earmark mr-0.5"></i><?= $p['form_count'] ?></span>
+                    <?php endif; ?>
+                    <?php if ($p['photo_count'] > 0): ?>
+                    <span class="text-xs font-semibold text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded-md"><i class="bi bi-camera mr-0.5"></i><?= $p['photo_count'] ?></span>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <i class="bi bi-chevron-right text-slate-300 text-xs flex-shrink-0"></i>
+        </a>
+        <?php endforeach; ?>
+    </div>
+
+    <!-- ── Desktop table (≥ sm) ───────────────────────────────────── -->
+    <div class="hidden sm:block overflow-x-auto">
         <table class="w-full text-sm">
             <thead>
                 <tr class="bg-slate-50 text-left border-b border-slate-100">
@@ -358,7 +422,7 @@ foreach ($companies as $coName => $coCfg):
                 <?php endforeach; ?>
             </tbody>
         </table>
-    </div>
+    </div><!-- /desktop table -->
 
     <?php if ($pages > 1): ?>
     <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-between">

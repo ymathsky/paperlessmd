@@ -58,6 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'status'               => $newStatus,
         'discharged_at'        => $newDischargedAt,
         'assigned_ma'          => isAdmin() ? ((int)($_POST['assigned_ma'] ?? 0) ?: null) : ($patient['assigned_ma'] ?: null),
+        'assigned_provider'    => isAdmin() ? trim($_POST['assigned_provider'] ?? '') : ($patient['assigned_provider'] ?? ''),
     ];
 
     // Photo uploads — keep existing if no new file sent
@@ -81,7 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 insurance=?, insurance_id=?, pcp=?, race=?,
                 pharmacy_name=?, pharmacy_phone=?, pharmacy_address=?,
                 insurance_photo=?, insurance_photo_back=?, sss_photo=?,
-                status=?, discharged_at=?, assigned_ma=?
+                status=?, discharged_at=?, assigned_ma=?, assigned_provider=?
             WHERE id=?");
         $stmt->execute([
             $vals['first_name'], $vals['last_name'], $vals['dob'] ?: null,
@@ -90,7 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $vals['pharmacy_name'], $vals['pharmacy_phone'], $vals['pharmacy_address'],
             $vals['insurance_photo'], $vals['insurance_photo_back'], $vals['sss_photo'],
             $vals['status'], $vals['discharged_at'],
-            $vals['assigned_ma'],
+            $vals['assigned_ma'], $vals['assigned_provider'] ?: null,
             $id
         ]);
         auditLog($pdo, 'patient_edit', 'patient', $id, $vals['first_name'] . ' ' . $vals['last_name']);
@@ -329,6 +330,25 @@ include __DIR__ . '/includes/header.php';
                         </div>
                     </div>
                 </div>
+
+                <!-- Assigned Provider -->
+                <?php if (isAdmin()): ?>
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">
+                        <i class="bi bi-person-video3 mr-1"></i> Assigned Provider
+                    </label>
+                    <select name="assigned_provider"
+                            class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
+                                   focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition">
+                        <option value="">— Unassigned —</option>
+                        <?php foreach ($maStaff as $sf): if ($sf['role'] !== 'provider' && $sf['role'] !== 'admin') continue; ?>
+                        <option value="<?= h($sf['full_name']) ?>" <?= ($vals['assigned_provider'] ?? '') === $sf['full_name'] ? 'selected' : '' ?>>
+                            <?= h($sf['full_name']) ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <?php endif; ?>
 
                 <!-- Assigned MA -->
                 <div class="mb-6">

@@ -4,8 +4,8 @@
  * Provides offline-first caching and triggers form queue sync on reconnect.
  * ──────────────────────────────────────────────────────────────────────── */
 
-const STATIC_CACHE   = 'pd-static-v3';
-const PAGES_CACHE    = 'pd-pages-v3';
+const STATIC_CACHE   = 'pd-static-v4';
+const PAGES_CACHE    = 'pd-pages-v4';
 const SYNC_TAG       = 'pd-form-sync';
 const LOC_SYNC_TAG   = 'pd-location-sync';
 const LOC_IDB_NAME   = 'pd-location-queue';
@@ -185,3 +185,49 @@ async function flushLocationQueue() {
         }
     }
 }
+
+// ── Web Push ──────────────────────────────────────────────────────────────────
+
+self.addEventListener('push', event => {
+    console.log('[SW] push event received', event.data ? 'with data' : '(no data)');
+    let data = { title: 'PaperlessMD', body: 'You have a new notification.' };
+    try {
+        if (event.data) data = { ...data, ...event.data.json() };
+    } catch (e) { console.error('[SW] push parse error:', e); }
+
+    const options = {
+        body:    data.body  || '',
+        icon:    BASE + '/assets/img/pwa-icon-192.png',
+        badge:   BASE + '/assets/img/apple-touch-icon.png',
+        vibrate: [200, 100, 200],
+        data:    { url: data.url || BASE + '/dashboard.php' },
+        tag:     data.tag  || 'pd-push',
+        renotify: true,
+    };
+
+    event.waitUntil(
+        self.registration.showNotification(data.title, options)
+            .catch(e => console.error('[SW] showNotification failed:', e))
+    );
+});
+
+self.addEventListener('notificationclick', event => {
+    event.notification.close();
+    const target = event.notification.data?.url || BASE + '/dashboard.php';
+
+    event.waitUntil(
+        self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+            .then(clients => {
+                // Focus an existing tab if one is already open on that URL
+                for (const client of clients) {
+                    if (client.url === target && 'focus' in client) {
+                        return client.focus();
+                    }
+                }
+                // Otherwise open a new tab
+                if (self.clients.openWindow) {
+                    return self.clients.openWindow(target);
+                }
+            })
+    );
+});

@@ -481,4 +481,5 @@ $colorMap = [
 })();
 </script>
 
+<?php $patient_id = $patientId; include __DIR__ . '/includes/wound_photo_panel.php'; ?>
 <?php include __DIR__ . '/includes/footer.php'; ?>

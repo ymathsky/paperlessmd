@@ -8,7 +8,7 @@ $pageTitle = 'Add Patient';
 $activeNav = 'patients';
 
 $error = '';
-$vals  = ['first_name'=>'','last_name'=>'','dob'=>'','phone'=>'','email'=>'','address'=>'','insurance'=>'','insurance_id'=>'','pcp'=>'','race'=>'','pharmacy_name'=>'','pharmacy_phone'=>'','pharmacy_address'=>'','assigned_ma'=>''];
+$vals  = ['first_name'=>'','last_name'=>'','dob'=>'','phone'=>'','email'=>'','address'=>'','insurance'=>'','insurance_id'=>'','pcp'=>'','race'=>'','pharmacy_name'=>'','pharmacy_phone'=>'','pharmacy_address'=>'','assigned_ma'=>'','assigned_provider'=>''];
 
 // Load staff for MA assignment dropdown
 $maStaff = $pdo->query("SELECT id, full_name, role FROM staff WHERE active=1 ORDER BY full_name")->fetchAll();
@@ -30,6 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'pharmacy_phone'   => trim($_POST['pharmacy_phone']   ?? ''),
         'pharmacy_address' => trim($_POST['pharmacy_address'] ?? ''),
         'assigned_ma'      => isAdmin() ? ((int)($_POST['assigned_ma'] ?? 0) ?: null) : (int)$_SESSION['user_id'],
+        'assigned_provider' => isAdmin() ? trim($_POST['assigned_provider'] ?? '') : '',
     ];
     // Photo uploads
     foreach (['insurance_photo', 'insurance_photo_back', 'sss_photo'] as $_pk) {
@@ -43,15 +44,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             (first_name, last_name, dob, phone, email, address, insurance, insurance_id, pcp,
              race, pharmacy_name, pharmacy_phone, pharmacy_address,
              insurance_photo, insurance_photo_back, sss_photo,
-             assigned_ma, created_at)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW())");
+             assigned_ma, assigned_provider, created_at)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW())");
         $stmt->execute([
             $vals['first_name'], $vals['last_name'], $vals['dob'] ?: null,
             $vals['phone'], $vals['email'], $vals['address'],
             $vals['insurance'], $vals['insurance_id'], $vals['pcp'],
             $vals['race'], $vals['pharmacy_name'], $vals['pharmacy_phone'], $vals['pharmacy_address'],
             $vals['insurance_photo'], $vals['insurance_photo_back'], $vals['sss_photo'],
-            $vals['assigned_ma'],
+            $vals['assigned_ma'], $vals['assigned_provider'] ?: null,
         ]);
         $id = $pdo->lastInsertId();
         auditLog($pdo, 'patient_add', 'patient', (int)$id, $vals['first_name'] . ' ' . $vals['last_name']);
@@ -269,6 +270,25 @@ include __DIR__ . '/includes/header.php';
                         </div>
                     </div>
                 </div>
+
+                <!-- Assigned Provider -->
+                <?php if (isAdmin()): ?>
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">
+                        <i class="bi bi-person-video3 mr-1"></i> Assigned Provider
+                    </label>
+                    <select name="assigned_provider"
+                            class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
+                                   focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition">
+                        <option value="">— Unassigned —</option>
+                        <?php foreach ($maStaff as $sf): if ($sf['role'] !== 'provider' && $sf['role'] !== 'admin') continue; ?>
+                        <option value="<?= h($sf['full_name']) ?>" <?= ($vals['assigned_provider'] ?? '') === $sf['full_name'] ? 'selected' : '' ?>>
+                            <?= h($sf['full_name']) ?>
+                        </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <?php endif; ?>
 
                 <!-- Assigned MA -->
                 <div class="mb-6">

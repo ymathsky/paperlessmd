@@ -9,11 +9,10 @@ $pStmt = $pdo->prepare("SELECT * FROM patients WHERE id = ?");
 $pStmt->execute([$patient_id]);
 $patient = $pStmt->fetch();
 if (!$patient) { header('Location: ' . BASE_URL . '/patients.php'); exit; }
-// $_coName / $_coUC / $_coAbb are now set dynamically per-form via form_company_selector.php
-// Default values used only for initial PHP render; JS updates the spans on selection change.
-$_coName = 'Beyond Wound Care Inc.';
+// Set company name based on patient's registered company
+$_coName = ($patient['company'] ?? '') === 'Visiting Medical Physician Inc.' ? 'Visiting Medical Physician Inc.' : 'Beyond Wound Care Inc.';
 $_coUC   = strtoupper($_coName);
-$_coAbb  = 'BWC';
+$_coAbb  = ($_coName === 'Visiting Medical Physician Inc.') ? 'VMP' : 'BWC';
 
 // One-signature rule
 $_dupQ = $pdo->prepare("SELECT id FROM form_submissions WHERE patient_id = ? AND form_type = 'informed_consent_wound' AND status IN ('signed','uploaded') AND DATE(created_at) = CURDATE() LIMIT 1");
@@ -76,6 +75,7 @@ include __DIR__ . '/../includes/header.php';
             </div>
 
             <!-- Full consent text (read-only display) -->
+            <?php ob_start(); ?>
             <div class="bg-slate-50 border border-slate-200 rounded-xl p-5 text-sm text-slate-700 space-y-4 leading-relaxed max-h-[480px] overflow-y-auto">
                 <p>Patient/caregiver hereby voluntarily consents to wound care treatment by the provider (MD/NP) of <strong><span class="co-name-uc-display">BEYOND WOUND CARE INC.</span></strong>. Patient/Caregiver understands that this consent form will be valid and remain in effect as long as the patient remains active and receives services and treatments at <span class="co-name-uc-display">BEYOND WOUND CARE INC.</span>. A new consent form will be obtained when a patient is discharged and returns for services and treatments. <strong>Patient has the right to give or refuse consent to any proposed service or treatment.</strong></p>
 
@@ -95,8 +95,12 @@ include __DIR__ . '/../includes/header.php';
 
                 <p>By signing below, patient consents to the care, treatment and services described in this document and orally by the physician, consents to the creation of images to record his or her wounds and consents to the transfer of health information protected by HIPAA. The Physician has explained to the patient (or his or her legal representative), the nature of the treatment, reasonable alternatives, benefits, risks, side effects, likelihood of achieving patient's goals, complications and consequences which are/or may be associated with the treatment or procedure(s).</p>
             </div>
-
-            <!-- MA name -->
+            <?php
+            $_icwOut = ob_get_clean();
+            $_icwOut = str_replace('BEYOND WOUND CARE INC.', h($_coUC), $_icwOut);
+            $_icwOut = str_replace('>BWC<', '>'.h($_coAbb).'<', $_icwOut);
+            echo $_icwOut;
+            ?>
             <div class="max-w-xs">
                 <label class="block text-sm font-semibold text-slate-700 mb-1.5">MA / Staff Name</label>
                 <input type="text" name="ma_name" value="<?= h($_SESSION['full_name'] ?? '') ?>"
@@ -125,4 +129,6 @@ include __DIR__ . '/../includes/header.php';
 </div>
 </div>
 
+<?php include __DIR__ . '/../includes/wound_photo_panel.php'; ?>
+<?php include __DIR__ . '/../includes/rx_pad_panel.php'; ?>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

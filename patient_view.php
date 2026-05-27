@@ -40,7 +40,8 @@ if ($visitId) {
 
 // Forms submitted for this patient
 $formsStmt = $pdo->prepare("
-    SELECT fs.*, s.full_name AS ma_name
+    SELECT fs.*, s.full_name AS ma_name,
+           COALESCE(NULLIF(fs.provider_name,''), s.full_name) AS display_provider
     FROM form_submissions fs
     LEFT JOIN staff s ON s.id = fs.ma_id
     WHERE fs.patient_id = ?
@@ -51,9 +52,24 @@ $forms = $formsStmt->fetchAll();
 
 // Wound photos
 $photosStmt = $pdo->prepare("
-    SELECT wp.*, s.full_name AS ma_name
+    SELECT wp.*, s.full_name AS ma_name,
+           wm_ai.area_cm2, wm_ai.length_cm AS ai_length_cm, wm_ai.width_cm AS ai_width_cm,
+           wm_ai.ruler_detected AS meas_ruler, wm_ai.annotated_photo_path,
+           wm_ai.granulation_pct, wm_ai.slough_pct, wm_ai.eschar_pct, wm_ai.analysis_confidence,
+           wm_man.area_cm2 AS man_area_cm2, wm_man.length_cm AS man_length_cm,
+           wm_man.width_cm AS man_width_cm, wm_man.depth_cm AS man_depth_cm,
+           wm_man.measured_at AS man_measured_at,
+           wm_man.annotated_photo_path AS man_annotated_path,
+           sm.full_name AS man_by_name, sm.role AS man_by_role
     FROM wound_photos wp
     LEFT JOIN staff s ON s.id = wp.uploaded_by
+    LEFT JOIN wound_measurements wm_ai ON wm_ai.id = (
+               SELECT id FROM wound_measurements
+               WHERE photo_id = wp.id AND entry_type = 'ai' ORDER BY id DESC LIMIT 1)
+    LEFT JOIN wound_measurements wm_man ON wm_man.id = (
+               SELECT id FROM wound_measurements
+               WHERE photo_id = wp.id AND entry_type = 'manual' ORDER BY id DESC LIMIT 1)
+    LEFT JOIN staff sm ON sm.id = wm_man.recorded_by
     WHERE wp.patient_id = ?
     ORDER BY wp.wound_location ASC, wp.created_at ASC
 ");
@@ -71,7 +87,7 @@ $formDefs = [
     'il_disclosure'      => ['label' => 'IL Disclosure Auth.',       'icon' => 'bi-file-earmark-text',   'bg' => 'bg-slate-100',   'text' => 'text-slate-600'],
     'informed_consent_wound' => ['label' => 'Informed Consent – Wound Care', 'icon' => 'bi-file-earmark-medical',     'bg' => 'bg-red-100',     'text' => 'text-red-700'],
     'rpm_consent'            => ['label' => 'RPM Consent',                       'icon' => 'bi-broadcast',                'bg' => 'bg-teal-100',    'text' => 'text-teal-700'],
-    'new_patient_pocket'     => ['label' => 'New Patient Pocket',                 'icon' => 'bi-folder2-open',             'bg' => 'bg-indigo-100',  'text' => 'text-indigo-700'],
+    'new_patient_pocket'     => ['label' => 'New Patient Pocket<br><span class="text-rose-500 font-normal">Wound Care</span>',                 'icon' => 'bi-folder2-open',             'bg' => 'bg-indigo-100',  'text' => 'text-indigo-700'],
 ];
 
 $statusCfg = [
@@ -141,7 +157,8 @@ $lastVisit = null;
 try {
     $lvStmt = $pdo->prepare("
         SELECT sc.visit_date, sc.visit_time, sc.status, sc.notes, sc.visit_type,
-               s.full_name AS ma_name
+               s.full_name AS ma_name,
+               COALESCE(NULLIF(sc.provider_name,''), s.full_name) AS display_provider
         FROM `schedule` sc
         LEFT JOIN staff s ON s.id = sc.ma_id
         WHERE sc.patient_id = ? AND sc.status IN ('completed','en_route')
@@ -202,6 +219,7 @@ try {
 }
 
 $extraJs = '';
+$isPartial = isset($_GET['_pt']);
 if ($activeTab === 'meds') {
     $csrfJs = csrfToken();
     ob_start(); ?>
@@ -219,6 +237,59 @@ if ($activeTab === 'meds') {
         });
         return r.json();
     }
+
+    // ── Import from Practice Fusion PDF ──────────────────────────────────────
+    (function() {
+        const fileInput = document.getElementById('pfMedFileInput');
+        const statusEl  = document.getElementById('pfMedStatus');
+        if (!fileInput) return;
+        fileInput.addEventListener('change', async function() {
+            const file = this.files[0];
+            if (!file) return;
+            this.value = '';
+            const btn = document.getElementById('importPfMedBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Importing…';
+            statusEl.style.display = 'block';
+            statusEl.style.background = '#f0f9ff';
+            statusEl.style.color = '#0369a1';
+            statusEl.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Parsing PDF…';
+            try {
+                const fd = new FormData();
+                fd.append('pdf', file);
+                fd.append('patient_id', PID);
+                fd.append('csrf', CSRF);
+                const r = await fetch(BASE + '/api/import_pf_pdf.php', {method:'POST', body:fd});
+                const d = await r.json();
+                if (!d.ok) throw new Error(d.error || 'Parse failed');
+                if (!d.meds || !d.meds.length) {
+                    statusEl.style.background = '#fef9c3';
+                    statusEl.style.color = '#854d0e';
+                    statusEl.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i> No medications found in PDF.';
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-file-earmark-arrow-up"></i> Import from PF';
+                    return;
+                }
+                // Add each med via the existing API
+                let added = 0, skipped = 0;
+                for (const med of d.meds) {
+                    const res = await medApi({action:'add', med_name: med.name, med_frequency: med.frequency || ''});
+                    if (res.ok) added++; else skipped++;
+                }
+                statusEl.style.background = '#f0fdf4';
+                statusEl.style.color = '#15803d';
+                statusEl.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> Imported <strong>' + added + '</strong> medication' + (added !== 1 ? 's' : '') +
+                    (skipped ? ' (' + skipped + ' skipped/duplicate)' : '') + ' from PF PDF.';
+                setTimeout(() => location.reload(), 1200);
+            } catch(err) {
+                statusEl.style.background = '#fef2f2';
+                statusEl.style.color = '#dc2626';
+                statusEl.innerHTML = '<i class="bi bi-x-circle-fill me-1"></i> ' + (err.message || 'Import failed');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-file-earmark-arrow-up"></i> Import from PF';
+            }
+        });
+    })();
 
     // Add medication
     const addBtn = document.getElementById('addMedBtn');
@@ -279,15 +350,15 @@ if ($activeTab === 'meds') {
                 const res = await medApi({action: 'update', id: medId, med_name: name, med_frequency: freq});
                 btn.disabled = false;
                 if (res.ok) { location.reload(); }
-                else { alert(res.error || 'Error updating'); }
+                else { pdToast(res.error || 'Error updating', 'error'); }
                 return;
             }
             if (e.target.closest('.dc-med-btn')) {
                 const medName = row.querySelector('.med-name-disp').textContent;
-                if (!confirm('Discontinue "' + medName + '"?\n\nThis updates the master medication list.')) return;
+                if (!await pdConfirm({message: 'Discontinue "' + medName + '"?', subtext: 'This updates the master medication list.', confirmLabel: 'Discontinue', confirmIcon: 'bi bi-x-circle-fill', confirmStyle: 'background:#dc2626;'})) return;
                 const res = await medApi({action: 'discontinue', id: medId});
                 if (res.ok) { location.reload(); }
-                else { alert(res.error || 'Error'); }
+                else { pdToast(res.error || 'Error', 'error'); }
                 return;
             }
             if (e.target.closest('.history-btn')) {
@@ -327,7 +398,7 @@ if ($activeTab === 'meds') {
             const medId = parseInt(row.dataset.medId);
             const res = await medApi({action: 'reactivate', id: medId});
             if (res.ok) { location.reload(); }
-            else { alert(res.error || 'Error'); }
+            else { pdToast(res.error || 'Error', 'error'); }
         });
     }
 
@@ -340,10 +411,10 @@ if ($activeTab === 'meds') {
             if (!row) return;
             const medId = parseInt(row.dataset.medId);
             const name  = row.querySelector('.med-name-disp') ? row.querySelector('.med-name-disp').textContent : 'this medication';
-            if (!confirm('Permanently delete "' + name + '"? This cannot be undone.')) return;
+            if (!await pdConfirm({message: 'Permanently delete "' + name + '"?', subtext: 'This cannot be undone.', confirmLabel: 'Delete', confirmIcon: 'bi bi-trash3', confirmStyle: 'background:#dc2626;'})) return;
             const res = await medApi({action: 'delete', id: medId});
             if (res.ok) { location.reload(); }
-            else { alert(res.error || 'Error'); }
+            else { pdToast(res.error || 'Error', 'error'); }
         });
     }
 
@@ -415,6 +486,7 @@ if ($activeTab === 'wounds' && canAccessClinical()) {
                 action: 'add', csrf: CSRF, patient_id: PID,
                 measured_at: fd.get('measured_at'),
                 wound_site:  fd.get('wound_site'),
+                wound_type:  fd.get('wound_type'),
                 length_cm:   fd.get('length_cm'),
                 width_cm:    fd.get('width_cm'),
                 depth_cm:    fd.get('depth_cm'),
@@ -451,7 +523,7 @@ if ($activeTab === 'wounds' && canAccessClinical()) {
         const del = e.target.closest('.del-wound-btn');
         if (!del || !ADMIN) return;
         const mid = parseInt(del.dataset.id);
-        if (!confirm('Delete this measurement? This cannot be undone.')) return;
+        if (!await pdConfirm({message: 'Delete this measurement?', subtext: 'This cannot be undone.', confirmLabel: 'Delete', confirmIcon: 'bi bi-trash3', confirmStyle: 'background:#dc2626;'})) return;
         del.disabled = true;
         const r = await fetch(BASE + '/api/wounds.php', {
             method: 'POST',
@@ -463,7 +535,7 @@ if ($activeTab === 'wounds' && canAccessClinical()) {
             document.querySelector('[data-wound-row="' + mid + '"]')?.remove();
             rebuildChart();
         } else {
-            alert(d.error || 'Error deleting.');
+            pdToast(d.error || 'Error deleting.', 'error');
             del.disabled = false;
         }
     });
@@ -488,21 +560,14 @@ if ($activeTab === 'wounds' && canAccessClinical()) {
 
     let chartInstance = null;
 
-    function buildDatasets(data) {
-        const sites = [...new Set(data.map(d => d.site))];
-        return sites.map((site, i) => {
-            const pts = data.filter(d => d.site === site);
-            return {
-                label: site,
-                data: pts.map(p => ({x: p.date, y: p.area})),
-                borderColor: COLORS[i % COLORS.length],
-                backgroundColor: COLORS[i % COLORS.length] + '22',
-                tension: 0.35,
-                pointRadius: 5,
-                pointHoverRadius: 7,
-                fill: false,
-            };
-        });
+    function fmtChartDate(d) {
+        // d is "YYYY-MM-DD HH:MM:SS" or "YYYY-MM-DD"
+        const dt = new Date(d.replace(' ', 'T'));
+        return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
+    }
+
+    function getLabels(data) {
+        return [...new Set(data.map(d => d.date))].sort();
     }
 
     function rebuildChart() {
@@ -510,26 +575,53 @@ if ($activeTab === 'wounds' && canAccessClinical()) {
         const remaining = [];
         document.querySelectorAll('[data-wound-row]').forEach(row => {
             remaining.push({
-                id:     parseInt(row.dataset.woundRow),
-                date:   row.dataset.date,
-                site:   row.dataset.site,
-                area:   parseFloat(row.dataset.area),
+                id:   parseInt(row.dataset.woundRow),
+                date: row.dataset.date,
+                site: row.dataset.site,
+                area: parseFloat(row.dataset.area),
             });
         });
         remaining.sort((a,b) => a.date.localeCompare(b.date));
 
         if (chartInstance) {
-            chartInstance.data.datasets = buildDatasets(remaining.map(r => ({...r, length:0, width:0})));
+            const labels = getLabels(remaining);
+            chartInstance.data.labels   = labels.map(fmtChartDate);
+            chartInstance.data.datasets = buildDatasets(remaining, labels);
             chartInstance.update();
         }
     }
 
+    // Override buildDatasets to accept sorted labels and produce index-aligned data
+    function buildDatasets(data, labels) {
+        if (!labels) labels = getLabels(data);
+        const sites = [...new Set(data.map(d => d.site))];
+        return sites.map((site, i) => {
+            const pts = data.filter(d => d.site === site);
+            return {
+                label: site,
+                data: labels.map(lbl => {
+                    const pt = pts.find(p => p.date === lbl);
+                    return pt ? pt.area : null;
+                }),
+                borderColor: COLORS[i % COLORS.length],
+                backgroundColor: COLORS[i % COLORS.length] + '22',
+                tension: 0.35,
+                pointRadius: 5,
+                pointHoverRadius: 7,
+                fill: false,
+                spanGaps: false,
+            };
+        });
+    }
+
     const ctx = document.getElementById('woundChart');
     if (ctx && rawData.length > 0) {
-        const datasets = buildDatasets(rawData);
+        const sortedRaw = [...rawData].sort((a,b) => a.date.localeCompare(b.date));
+        const labels    = getLabels(sortedRaw);
+        const datasets  = buildDatasets(sortedRaw, labels);
         chartInstance = new Chart(ctx, {
             type: 'line',
-            data: { datasets },
+            data: { labels: labels.map(fmtChartDate), datasets },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
@@ -538,13 +630,12 @@ if ($activeTab === 'wounds' && canAccessClinical()) {
                     legend: { position: 'bottom', labels: { usePointStyle: true, padding: 16, font: { size: 12 } } },
                     tooltip: {
                         callbacks: {
-                            label: ctx => ` ${ctx.dataset.label}: ${ctx.parsed.y} cm²`,
+                            label: c => ` ${c.dataset.label}: ${c.parsed.y} cm²`,
                         }
                     }
                 },
                 scales: {
                     x: {
-                        type: 'category',
                         title: { display: true, text: 'Date', font: { size: 11 } },
                         grid: { color: '#f1f5f9' },
                     },
@@ -557,6 +648,63 @@ if ($activeTab === 'wounds' && canAccessClinical()) {
             }
         });
     }
+
+    // ── Edit Wound Measurement ─────────────────────────────────────────────────────────
+    const woundEditModal = document.getElementById('woundEditModal');
+    document.addEventListener('click', e => {
+        const btn = e.target.closest('.edit-wound-btn');
+        if (!btn) return;
+        document.getElementById('woundEditId').value    = btn.dataset.id;
+        document.getElementById('woundEditDate').value  = btn.dataset.date;
+        document.getElementById('woundEditSite').value  = btn.dataset.site;
+        document.getElementById('woundEditType').value  = btn.dataset.type  || '';
+        document.getElementById('woundEditLen').value   = btn.dataset.len;
+        document.getElementById('woundEditWid').value   = btn.dataset.wid;
+        document.getElementById('woundEditDep').value   = btn.dataset.dep   || '';
+        document.getElementById('woundEditNotes').value = btn.dataset.notes || '';
+        document.getElementById('woundEditErr').style.display = 'none';
+        woundEditModal.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    });
+
+    window.closeWoundEditModal = function() {
+        woundEditModal.style.display = 'none';
+        document.body.style.overflow = '';
+    };
+
+    window.submitWoundEdit = async function() {
+        const id    = parseInt(document.getElementById('woundEditId').value);
+        const date  = document.getElementById('woundEditDate').value;
+        const site  = document.getElementById('woundEditSite').value.trim();
+        const type  = document.getElementById('woundEditType').value.trim();
+        const len   = parseFloat(document.getElementById('woundEditLen').value);
+        const wid   = parseFloat(document.getElementById('woundEditWid').value);
+        const dep   = parseFloat(document.getElementById('woundEditDep').value) || 0;
+        const notes = document.getElementById('woundEditNotes').value.trim();
+        const errEl = document.getElementById('woundEditErr');
+        errEl.style.display = 'none';
+        if (!site || len <= 0 || wid <= 0) {
+            errEl.textContent = 'Wound site, length, and width are required.';
+            errEl.style.display = 'block';
+            return;
+        }
+        try {
+            const r = await fetch(BASE + '/api/wounds.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ action: 'edit', csrf: CSRF, id,
+                    measured_at: date, wound_site: site, wound_type: type,
+                    length_cm: len, width_cm: wid, depth_cm: dep, notes }),
+            });
+            const d = await r.json();
+            if (!d.ok) throw new Error(d.error || 'Could not update.');
+            closeWoundEditModal();
+            location.reload();
+        } catch(err) {
+            errEl.textContent = err.message;
+            errEl.style.display = 'block';
+        }
+    };
 })();
 </script>
 <?php
@@ -686,7 +834,7 @@ if ($activeTab === 'diagnoses' && canAccessClinical()) {
     }
 
     window.diagRemove = async function(diagId, btn) {
-        if (!confirm('Remove this diagnosis?')) return;
+        if (!await pdConfirm({message: 'Remove this diagnosis?', confirmLabel: 'Remove', confirmIcon: 'bi bi-trash3', confirmStyle: 'background:#dc2626;'})) return;
         btn.disabled = true;
         try {
             const r = await fetch(BASE + '/api/diagnoses.php', {
@@ -698,10 +846,10 @@ if ($activeTab === 'diagnoses' && canAccessClinical()) {
             if (data.ok) {
                 btn.closest('.diag-row').remove();
             } else {
-                alert(data.error || 'Could not remove.');
+                pdToast(data.error || 'Could not remove.', 'error');
                 btn.disabled = false;
             }
-        } catch { alert('Network error.'); btn.disabled = false; }
+        } catch { pdToast('Network error.', 'error'); btn.disabled = false; }
     };
 
     function showErr(msg) {
@@ -908,9 +1056,10 @@ if ($activeTab === 'audit' && isAdmin()) {
     $patientAudit = $auditStmt->fetchAll();
 }
 
-include __DIR__ . '/includes/header.php';
+if (!$isPartial) include __DIR__ . '/includes/header.php';
 // Inline script for status widget (always needed on this page)
 $statusCsrfInline = csrfToken();
+if ($isPartial) ob_start(); // buffer + discard page chrome in partial requests
 ?>
 <script>
 (function(){
@@ -1042,10 +1191,13 @@ $statusCsrfInline = csrfToken();
 <?php endif; ?>
 
 <!-- Breadcrumb -->
-<nav class="flex items-center gap-2 text-sm text-slate-400 mb-6">
-    <a href="<?= BASE_URL ?>/patients.php" class="hover:text-blue-600 transition-colors font-medium">Patients</a>
-    <i class="bi bi-chevron-right text-xs"></i>
-    <span class="text-slate-700 font-semibold"><?= h($patient['first_name'] . ' ' . $patient['last_name']) ?></span>
+<nav class="flex items-center gap-1.5 text-sm mb-5">
+    <a href="<?= BASE_URL ?>/patients.php"
+       class="inline-flex items-center gap-1 text-slate-400 hover:text-blue-600 transition-colors font-medium">
+        <i class="bi bi-people text-xs"></i> Patients
+    </a>
+    <i class="bi bi-chevron-right text-[10px] text-slate-300"></i>
+    <span class="text-slate-700 font-semibold truncate"><?= h($patient['first_name'] . ' ' . $patient['last_name']) ?></span>
 </nav>
 
 <?php if ($activeVisit): ?>
@@ -1106,7 +1258,7 @@ function completeVisit(visitId) {
         } else {
             btn.disabled = false;
             btn.innerHTML = '<i class="bi bi-check-circle-fill"></i> Mark Complete';
-            alert(d.error || 'Could not update visit.');
+            pdToast(d.error || 'Could not update visit.', 'error');
         }
     })
     .catch(() => { btn.disabled = false; btn.innerHTML = '<i class="bi bi-check-circle-fill"></i> Mark Complete'; });
@@ -1115,8 +1267,11 @@ function completeVisit(visitId) {
 <?php endif; ?>
 
 <!-- Patient Header Card -->
-<div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 mb-6">
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+<div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-6">
+    <!-- Gradient accent stripe -->
+    <div class="h-1.5 bg-gradient-to-r from-blue-500 via-violet-500 to-indigo-500"></div>
+    <div class="p-5">
+    <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div class="flex items-center gap-4">
             <!-- Patient avatar: photo if set, else initials gradient -->
             <div class="relative flex-shrink-0 group" id="ptAvatarWrap">
@@ -1124,11 +1279,11 @@ function completeVisit(visitId) {
                 <img id="ptAvatarImg"
                      src="<?= h($patient['photo_url']) ?>"
                      alt="<?= h($patient['first_name']) ?>"
-                     class="w-14 h-14 rounded-2xl object-cover shadow-lg border-2 border-white ring-2 ring-blue-100">
+                     class="w-16 h-16 rounded-2xl object-cover shadow-md border-2 border-white ring-2 ring-blue-100">
                 <?php else: ?>
                 <div id="ptAvatarImg"
-                     class="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 grid place-items-center
-                            text-white font-extrabold text-xl shadow-lg">
+                     class="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 grid place-items-center
+                            text-white font-extrabold text-2xl shadow-md">
                     <?= strtoupper(substr($patient['first_name'],0,1) . substr($patient['last_name'],0,1)) ?>
                 </div>
                 <?php endif; ?>
@@ -1211,9 +1366,10 @@ function completeVisit(visitId) {
         </div>
     </div>
 
+    </div><!-- /p-5 -->
     <?php if ($patient['address'] || $patient['pcp'] || $patient['email'] || !empty($patient['race']) || !empty($patient['insurance_id']) || !empty($patient['pharmacy_name'])): ?>
-    <div class="mt-4 pt-4 border-t border-slate-100 flex flex-wrap gap-x-6 gap-y-1 text-sm text-slate-500">
-        <?php if ($patient['email']): ?><span><i class="bi bi-envelope mr-1"></i><?= h($patient['email']) ?></span><?php endif; ?>
+    <div class="px-5 pb-4 pt-0 border-t border-slate-50 flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-slate-500">
+        <?php if ($patient['email']): ?><span style="word-break:break-all"><i class="bi bi-envelope mr-1"></i><?= h($patient['email']) ?></span><?php endif; ?>
         <?php if ($patient['address']): ?><span><i class="bi bi-geo-alt mr-1"></i><?= h($patient['address']) ?></span><?php endif; ?>
         <?php if ($patient['pcp']): ?><span><i class="bi bi-person-badge mr-1"></i>PCP: <?= h($patient['pcp']) ?></span><?php endif; ?>
         <?php if (!empty($patient['race'])): ?><span><i class="bi bi-people mr-1"></i><?= h($patient['race']) ?></span><?php endif; ?>
@@ -1225,7 +1381,7 @@ function completeVisit(visitId) {
     </div>
 
     <?php if (!empty($patient['insurance_photo']) || !empty($patient['insurance_photo_back']) || !empty($patient['sss_photo'])): ?>
-    <div class="mt-3 pt-3 border-t border-slate-100">
+    <div class="px-5 pb-4 pt-3 border-t border-slate-100">
         <p class="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">Documents on file</p>
         <div class="flex flex-wrap gap-3">
             <?php foreach ([
@@ -1248,9 +1404,45 @@ function completeVisit(visitId) {
     <?php endif; ?>
     <?php endif; ?>
 
+    <?php if (!empty($patient['pharmacy_name']) || !empty($patient['assigned_ma_name'])): ?>
+    <div class="px-5 py-4 border-t border-slate-100">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <?php if (!empty($patient['pharmacy_name'])): ?>
+            <div>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">
+                    <i class="bi bi-prescription2 text-emerald-500 mr-1"></i> Pharmacy Details
+                </p>
+                <div class="space-y-1 text-sm">
+                    <div class="font-semibold text-slate-700"><?= h($patient['pharmacy_name']) ?></div>
+                    <?php if (!empty($patient['pharmacy_phone'])): ?>
+                    <div class="text-slate-500"><i class="bi bi-telephone mr-1 text-slate-400"></i><?= h($patient['pharmacy_phone']) ?></div>
+                    <?php endif; ?>
+                    <?php if (!empty($patient['pharmacy_address'])): ?>
+                    <div class="text-slate-500"><i class="bi bi-geo-alt mr-1 text-slate-400"></i><?= h($patient['pharmacy_address']) ?></div>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php endif; ?>
+            <?php if (!empty($patient['assigned_ma_name'])): ?>
+            <div>
+                <p class="text-xs font-bold text-slate-400 uppercase tracking-wide mb-2">
+                    <i class="bi bi-person-badge text-blue-500 mr-1"></i> Assigned MA
+                </p>
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 bg-blue-100 rounded-full grid place-items-center shrink-0">
+                        <i class="bi bi-person-fill text-blue-600 text-sm"></i>
+                    </div>
+                    <span class="text-sm font-semibold text-slate-700"><?= h($patient['assigned_ma_name']) ?></span>
+                </div>
+            </div>
+            <?php endif; ?>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <?php if (canAccessClinical()): ?>
     <!-- Inline Status Change -->
-    <div class="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center gap-3 no-print" id="status-widget">
+    <div class="px-5 py-3 border-t border-slate-100 flex flex-wrap items-center gap-3 no-print" id="status-widget">
         <span class="text-xs font-bold text-slate-500 uppercase tracking-wide">Change Status:</span>
         <?php
         $statusOpts = ['active'=>['emerald','Active'], 'inactive'=>['amber','Inactive'], 'discharged'=>['red','Discharged']];
@@ -1345,14 +1537,14 @@ function completeVisit(visitId) {
     </div>
     <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
 
-        <!-- MA who visited -->
+<!-- Provider -->
         <div class="flex items-start gap-2.5 bg-slate-50 rounded-xl p-3">
             <div class="w-8 h-8 rounded-lg bg-blue-100 grid place-items-center flex-shrink-0">
                 <i class="bi bi-person-fill text-blue-600 text-sm"></i>
             </div>
             <div class="min-w-0">
-                <p class="text-xs text-slate-400 font-medium">MA</p>
-                <p class="text-sm font-semibold text-slate-700 truncate"><?= h($lastVisit['ma_name'] ?? 'Unknown') ?></p>
+                <p class="text-xs text-slate-400 font-medium">Provider</p>
+                <p class="text-sm font-semibold text-slate-700 truncate"><?= h($lastVisit['display_provider'] ?? 'Unknown') ?></p>
             </div>
         </div>
 
@@ -1442,7 +1634,7 @@ $vtDef    = VISIT_TYPES[$checklistVisitType] ?? VISIT_TYPES['routine'];
 $required = $vtDef['required'];
 $allDone  = count(array_diff($required, $completedForms)) === 0;
 ?>
-<?php if ($checklistVisitType && canAccessClinical()): ?>
+<?php if ($checklistVisitType && canAccessClinical() && !isMa()): ?>
 <div class="bg-white rounded-2xl shadow-sm border <?= $allDone ? 'border-emerald-200' : 'border-amber-200' ?> p-4 mb-6 no-print">
     <div class="flex items-center gap-2 mb-3">
         <i class="bi bi-list-check <?= $allDone ? 'text-emerald-500' : 'text-amber-500' ?> text-lg"></i>
@@ -1479,7 +1671,7 @@ $allDone  = count(array_diff($required, $completedForms)) === 0;
 </div>
 <?php endif; ?>
 
-<?php if (canAccessClinical()): ?>
+<?php if (canAccessClinical() && !isMa()): ?>
 <div class="mb-6">
     <h3 class="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3">Start a Form</h3>
 
@@ -1546,11 +1738,17 @@ $allDone  = count(array_diff($required, $completedForms)) === 0;
             <span class="text-xs font-semibold text-slate-700 text-center leading-snug"><?= $def['label'] ?></span>
         </a>
         <?php endforeach; ?>
+        <a href="<?= BASE_URL ?>/forms/new_patient_pocket.php?patient_id=<?= $id ?>&np_type=primary_care"
+           class="form-tile flex flex-col items-center gap-2.5 p-4 bg-white rounded-2xl border-2 border-slate-100
+                  hover:border-blue-300 hover:shadow-md transition-all group cursor-pointer">
+            <div class="w-12 h-12 bg-indigo-100 rounded-xl grid place-items-center transition-colors group-hover:scale-105">
+                <i class="bi bi-folder2-open text-indigo-700 text-xl"></i>
+            </div>
+            <span class="text-xs font-semibold text-slate-700 text-center leading-snug">New Patient Pocket<br><span class="text-indigo-500 font-normal">Primary Care</span></span>
+        </a>
     </div>
     <?php endif; ?>
 </div>
-
-<!-- Wound Care link -->
 <?php if ($canStartForms): ?>
 <a href="<?= BASE_URL ?>/forms/wound_care.php?patient_id=<?= $id ?>"
    class="inline-flex items-center gap-2 mb-6 px-5 py-3 bg-violet-600 hover:bg-violet-700 text-white
@@ -1567,81 +1765,227 @@ $allDone  = count(array_diff($required, $completedForms)) === 0;
 <?php endif; // canAccessClinical form tiles ?>
 
 <!-- Tab Nav -->
-<div class="flex gap-1 mb-4 bg-slate-100 p-1 rounded-2xl w-fit">
-    <a href="?id=<?= $id ?>&tab=forms"
-       class="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all <?= $activeTab === 'forms' ? 'bg-white text-blue-700 shadow' : 'text-slate-500 hover:text-slate-700' ?>">
-        <i class="bi bi-file-earmark-text mr-1.5"></i>Forms
-        <?php if (count($forms)): ?>
-        <span class="ml-1 bg-blue-100 text-blue-700 text-xs px-1.5 py-0.5 rounded-full"><?= count($forms) ?></span>
+<style>
+/* Prevent horizontal scroll from full-bleed tab bar negative margins */
+.page-fade { overflow-x: clip; }
+@keyframes pvSpin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
+/* Lightbox responsive */
+.pvlb-body    { display:flex; flex:1; min-height:0; overflow:hidden; }
+.pvlb-imgwrap { flex:1; min-width:0; }
+.pvlb-sidebar { width:240px; flex-shrink:0; overflow-y:auto; }
+@media (max-width:640px) {
+    #pvLbDialog { border-radius:1rem !important; max-height:96vh; }
+    .pvlb-body    { flex-direction:column; overflow-y:auto !important; overflow-x:hidden; }
+    .pvlb-imgwrap { flex:none; min-height:52vw; max-height:56vw; }
+    .pvlb-sidebar { width:100% !important; border-left:none !important; border-top:1px solid #f1f5f9; }
+}
+/* Overlay controls — fade at rest, reveal on hover (desktop) / always show (touch) */
+.pvlb-overlay { opacity:0.12; transition:opacity .22s ease; }
+#pvLbDialog:hover .pvlb-overlay,
+#pvLbDialog.pvlb-show-ui .pvlb-overlay { opacity:1; }
+@media (max-width:640px) { .pvlb-overlay { opacity:1 !important; } }
+/* Sidebar toggle */
+#pvLbDialog.pvlb-no-sidebar .pvlb-sidebar { display:none !important; }
+#pvLbSidebarToggle { color:#94a3b8; transition:color .15s; }
+#pvLbDialog:not(.pvlb-no-sidebar) #pvLbSidebarToggle { color:#7c3aed; }
+/* Annotation bar */
+#pvAnnotateBar { display:none; position:absolute; top:.625rem; left:50%; transform:translateX(-50%);
+    z-index:20; background:rgba(0,0,0,.82); border-radius:.875rem;
+    padding:.25rem .375rem; align-items:center; gap:.2rem;
+    overflow-x:auto; max-width:calc(100% - .5rem); white-space:nowrap; }
+#pvAnnotateBar button {
+    width:1.75rem; height:1.75rem; border:none; border-radius:.5rem; cursor:pointer;
+    display:inline-flex; align-items:center; justify-content:center; font-size:.75rem;
+    background:transparent; color:#fff; flex-shrink:0; }
+#pvAnnotateBar button:hover { background:rgba(255,255,255,.15); }
+.pv-ann-sep { display:inline-block; width:1px; height:1.25rem; background:rgba(255,255,255,.2); margin:0 .1rem; vertical-align:middle; flex-shrink:0; }
+/* Forms table — compact on mobile */
+@media(max-width:767px){
+  .form-tbl td, .form-tbl th { padding-left:6px; padding-right:6px; }
+  .form-tbl td:first-child, .form-tbl th:first-child { padding-left:10px; }
+  .form-tbl .form-act-btn { padding:6px 8px; }
+  .form-tbl .btn-txt { display:none; }
+  .form-tbl .form-icon-box { padding:5px; }
+  .form-tbl .form-icon-box i { font-size:.8125rem; }
+  .form-tbl .form-name-flex { gap:8px; }
+  .form-name-text { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+}
+.pt-tab-bar::-webkit-scrollbar{display:none}
+.pt-tab { flex-shrink:0; display:inline-flex; align-items:center; gap:5px; position:relative;
+           padding:9px 13px; border-radius:12px; font-size:.8125rem; font-weight:600;
+           white-space:nowrap; transition:all .15s; -webkit-tap-highlight-color:transparent; }
+.pt-tab-active { background:#fff; box-shadow:0 1px 4px rgba(0,0,0,.12); }
+.pt-tab-inactive { color:#64748b; }
+.pt-tab-inactive:hover { color:#334155; background:rgba(0,0,0,.04); }
+.pt-badge { display:inline-flex; align-items:center; justify-content:center;
+            font-size:.625rem; font-weight:700; min-width:18px; height:18px;
+            padding:0 4px; border-radius:99px; line-height:1; }
+/* Mobile: icon-only tabs that fill the full bar width */
+@media(max-width:767px){
+  .pt-tab-bar { overflow-x:visible; gap:1px; }
+  .pt-tab { flex:1; justify-content:center; padding:9px 2px; gap:0; min-width:0; }
+  .pt-tab i { font-size:1rem; }
+  .pt-tab > span:not(.pt-badge) { display:none; }
+  .pt-badge { position:absolute; top:3px; right:3px; min-width:14px; height:14px;
+              padding:0 2px; font-size:.5rem; border-radius:99px; }
+}
+</style>
+<div class="sticky top-14 md:top-0 z-30 -mx-4 sm:-mx-6 px-3 sm:px-5 py-2 mb-5 bg-white/97 backdrop-blur-sm
+            border-b border-slate-100 shadow-sm no-print" style="transition:box-shadow .2s;">
+    <div class="pt-tab-bar flex gap-0.5 overflow-x-auto relative" style="scrollbar-width:none;-webkit-overflow-scrolling:touch;">
+        <a href="?id=<?= $id ?>&tab=forms"
+           onclick="ptTab('forms');return false;" data-tab="forms"
+           class="pt-tab <?= $activeTab==='forms' ? 'pt-tab-active text-blue-700' : 'pt-tab-inactive' ?>">
+            <i class="bi bi-file-earmark-text"></i>
+            <span>Forms</span>
+            <?php if (count($forms)): ?><span class="pt-badge bg-blue-100 text-blue-700"><?= count($forms) ?></span><?php endif; ?>
+        </a>
+        <?php if (canAccessClinical()): ?>
+        <a href="?id=<?= $id ?>&tab=meds"
+           onclick="ptTab('meds');return false;" data-tab="meds"
+           class="pt-tab <?= $activeTab==='meds' ? 'pt-tab-active text-emerald-700' : 'pt-tab-inactive' ?>">
+            <i class="bi bi-capsule"></i>
+            <span>Meds</span>
+            <?php if (!empty($activeMedsList)): ?><span class="pt-badge bg-emerald-100 text-emerald-700"><?= count($activeMedsList) ?></span><?php endif; ?>
+        </a>
+        <a href="?id=<?= $id ?>&tab=photos"
+           onclick="ptTab('photos');return false;" data-tab="photos"
+           class="pt-tab <?= $activeTab==='photos' ? 'pt-tab-active text-violet-700' : 'pt-tab-inactive' ?>">
+            <i class="bi bi-camera"></i>
+            <span>Photos</span>
+            <?php if (count($photos)): ?><span class="pt-badge bg-violet-100 text-violet-700"><?= count($photos) ?></span><?php endif; ?>
+        </a>
+        <a href="?id=<?= $id ?>&tab=wounds"
+           onclick="ptTab('wounds');return false;" data-tab="wounds"
+           class="pt-tab <?= $activeTab==='wounds' ? 'pt-tab-active text-rose-700' : 'pt-tab-inactive' ?>">
+            <i class="bi bi-rulers"></i>
+            <span>Wounds</span>
+            <?php if (!empty($woundMeasurements)): ?><span class="pt-badge bg-rose-100 text-rose-700"><?= count($woundMeasurements) ?></span><?php endif; ?>
+        </a>
+        <a href="?id=<?= $id ?>&tab=diagnoses"
+           onclick="ptTab('diagnoses');return false;" data-tab="diagnoses"
+           class="pt-tab <?= $activeTab==='diagnoses' ? 'pt-tab-active text-orange-700' : 'pt-tab-inactive' ?>">
+            <i class="bi bi-clipboard2-pulse"></i>
+            <span>Diagnoses</span>
+            <?php if (!empty($diagList)): ?><span class="pt-badge bg-orange-100 text-orange-700"><?= count($diagList) ?></span><?php endif; ?>
+        </a>
+        <a href="?id=<?= $id ?>&tab=vitals"
+           onclick="ptTab('vitals');return false;" data-tab="vitals"
+           class="pt-tab <?= $activeTab==='vitals' ? 'pt-tab-active text-sky-700' : 'pt-tab-inactive' ?>">
+            <i class="bi bi-activity"></i>
+            <span>Vitals</span>
+            <?php if (!empty($vitalsRows)): ?><span class="pt-badge bg-sky-100 text-sky-700"><?= count($vitalsRows) ?></span><?php endif; ?>
+        </a>
+        <a href="?id=<?= $id ?>&tab=care"
+           onclick="ptTab('care');return false;" data-tab="care"
+           class="pt-tab <?= $activeTab==='care' ? 'pt-tab-active text-teal-700' : 'pt-tab-inactive' ?>">
+            <i class="bi bi-chat-square-text-fill"></i>
+            <span>Care</span>
+            <?php $cnCount = !empty($careNotes['top']) ? count($careNotes['top']) : 0; ?>
+            <?php if ($cnCount): ?><span class="pt-badge bg-teal-100 text-teal-700"><?= $cnCount ?></span><?php endif; ?>
+        </a>
+        <a href="?id=<?= $id ?>&tab=notes"
+           onclick="ptTab('notes');return false;" data-tab="notes"
+           class="pt-tab <?= $activeTab==='notes' ? 'pt-tab-active text-blue-700' : 'pt-tab-inactive' ?>">
+            <i class="bi bi-journal-medical"></i>
+            <span>Notes</span>
+            <?php if (!empty($soapNotes)): ?><span class="pt-badge bg-blue-100 text-blue-700"><?= count($soapNotes) ?></span><?php endif; ?>
+        </a>
+        <?php endif; // canAccessClinical ?>
+        <?php if (isAdmin()): ?>
+        <a href="?id=<?= $id ?>&tab=audit"
+           onclick="ptTab('audit');return false;" data-tab="audit"
+           class="pt-tab <?= $activeTab==='audit' ? 'pt-tab-active text-slate-800' : 'pt-tab-inactive' ?>">
+            <i class="bi bi-shield-lock"></i>
+            <span>Audit</span>
+            <?php if (!empty($patientAudit)): ?><span class="pt-badge bg-slate-200 text-slate-600"><?= count($patientAudit) ?></span><?php endif; ?>
+        </a>
         <?php endif; ?>
-    </a>
-    <?php if (canAccessClinical()): ?>
-    <a href="?id=<?= $id ?>&tab=meds"
-       class="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all <?= $activeTab === 'meds' ? 'bg-white text-emerald-700 shadow' : 'text-slate-500 hover:text-slate-700' ?>">
-        <i class="bi bi-capsule mr-1.5"></i>Meds
-        <?php if (!empty($activeMedsList)): ?>
-        <span class="ml-1 bg-emerald-100 text-emerald-700 text-xs px-1.5 py-0.5 rounded-full"><?= count($activeMedsList) ?></span>
-        <?php endif; ?>
-    </a>
-    <a href="?id=<?= $id ?>&tab=photos"
-       class="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all <?= $activeTab === 'photos' ? 'bg-white text-violet-700 shadow' : 'text-slate-500 hover:text-slate-700' ?>">
-        <i class="bi bi-camera mr-1.5"></i>Photos
-        <?php if (count($photos)): ?>
-        <span class="ml-1 bg-violet-100 text-violet-700 text-xs px-1.5 py-0.5 rounded-full"><?= count($photos) ?></span>
-        <?php endif; ?>
-    </a>
-    <a href="?id=<?= $id ?>&tab=wounds"
-       class="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all <?= $activeTab === 'wounds' ? 'bg-white text-rose-700 shadow' : 'text-slate-500 hover:text-slate-700' ?>">
-        <i class="bi bi-rulers mr-1.5"></i>Wounds
-        <?php if (!empty($woundMeasurements)): ?>
-        <span class="ml-1 bg-rose-100 text-rose-700 text-xs px-1.5 py-0.5 rounded-full"><?= count($woundMeasurements) ?></span>
-        <?php endif; ?>
-    </a>
-    <a href="?id=<?= $id ?>&tab=diagnoses"
-       class="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all <?= $activeTab === 'diagnoses' ? 'bg-white text-orange-700 shadow' : 'text-slate-500 hover:text-slate-700' ?>">
-        <i class="bi bi-clipboard2-pulse mr-1.5"></i>Diagnoses
-        <?php if (!empty($diagList)): ?>
-        <span class="ml-1 bg-orange-100 text-orange-700 text-xs px-1.5 py-0.5 rounded-full"><?= count($diagList) ?></span>
-        <?php endif; ?>
-    </a>
-    <!-- Vitals Trends tab -->
-    <a href="?id=<?= $id ?>&tab=vitals"
-       class="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all <?= $activeTab === 'vitals' ? 'bg-white text-rose-700 shadow' : 'text-slate-500 hover:text-slate-700' ?>">
-        <i class="bi bi-activity mr-1.5"></i>Vitals
-        <?php if (!empty($vitalsRows)): ?>
-        <span class="ml-1 bg-rose-100 text-rose-700 text-xs px-1.5 py-0.5 rounded-full"><?= count($vitalsRows) ?></span>
-        <?php endif; ?>
-    </a>
-    <!-- Care Notes tab -->
-    <a href="?id=<?= $id ?>&tab=care"
-       class="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all <?= $activeTab === 'care' ? 'bg-white text-teal-700 shadow' : 'text-slate-500 hover:text-slate-700' ?>">
-        <i class="bi bi-chat-square-text-fill mr-1.5"></i>Care
-        <?php
-        $cnCount = !empty($careNotes['top']) ? count($careNotes['top']) : 0;
-        if ($cnCount): ?>
-        <span class="ml-1 bg-teal-100 text-teal-700 text-xs px-1.5 py-0.5 rounded-full"><?= $cnCount ?></span>
-        <?php endif; ?>
-    </a>
-    <!-- SOAP Notes tab -->
-    <a href="?id=<?= $id ?>&tab=notes"
-       class="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all <?= $activeTab === 'notes' ? 'bg-white text-blue-700 shadow' : 'text-slate-500 hover:text-slate-700' ?>">
-        <i class="bi bi-journal-medical mr-1.5"></i>Notes
-        <?php if (!empty($soapNotes)): ?>
-        <span class="ml-1 bg-blue-100 text-blue-700 text-xs px-1.5 py-0.5 rounded-full"><?= count($soapNotes) ?></span>
-        <?php endif; ?>
-    </a>
-    <?php endif; // canAccessClinical tabs ?>
-    <?php if (isAdmin()): ?>
-    <a href="?id=<?= $id ?>&tab=audit"
-       class="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all <?= $activeTab === 'audit' ? 'bg-white text-slate-800 shadow' : 'text-slate-500 hover:text-slate-700' ?>">
-        <i class="bi bi-shield-lock mr-1.5"></i>Audit
-        <?php if (!empty($patientAudit)): ?>
-        <span class="ml-1 bg-slate-200 text-slate-600 text-xs px-1.5 py-0.5 rounded-full"><?= count($patientAudit) ?></span>
-        <?php endif; ?>
-    </a>
-    <?php endif; ?>
+    </div>
 </div>
+<?php if ($isPartial): ob_end_clean(); endif; ?>
+<script>
+/* ── Ajax tab switching ──────────────────────────────────────── */
+(function(){
+    var _ptPID     = <?= (int)$id ?>;
+    var _ptLoading = false;
+    var _ptColors  = {
+        forms:'text-blue-700', meds:'text-emerald-700', photos:'text-violet-700',
+        wounds:'text-rose-700', diagnoses:'text-orange-700', vitals:'text-sky-700',
+        care:'text-teal-700', notes:'text-blue-700', audit:'text-slate-800'
+    };
 
+    function execScripts(container) {
+        var scripts = Array.from(container.querySelectorAll('script'));
+        var chain = Promise.resolve();
+        scripts.forEach(function(old) {
+            chain = chain.then(function() {
+                return new Promise(function(resolve) {
+                    var s = document.createElement('script');
+                    if (old.src) {
+                        if (document.querySelector('script[src="' + old.src + '"]')) {
+                            resolve(); return; // already loaded, skip
+                        }
+                        s.src    = old.src;
+                        s.onload  = resolve;
+                        s.onerror = resolve;
+                        document.body.appendChild(s);
+                    } else {
+                        s.textContent = old.textContent;
+                        document.body.appendChild(s);
+                        resolve();
+                    }
+                });
+            });
+        });
+        return chain;
+    }
+
+    window.ptTab = function(name) {
+        if (_ptLoading) return;
+        _ptLoading = true;
+        history.pushState({tab: name}, '', '?id=' + _ptPID + '&tab=' + encodeURIComponent(name));
+
+        // Update tab nav active states
+        var allColors = Object.values(_ptColors);
+        document.querySelectorAll('.pt-tab').forEach(function(el) {
+            var t = el.dataset.tab;
+            if (!t) return;
+            el.classList.remove('pt-tab-active', 'pt-tab-inactive');
+            allColors.forEach(function(c){ el.classList.remove(c); });
+            if (t === name) {
+                el.classList.add('pt-tab-active', _ptColors[t] || 'text-blue-700');
+            } else {
+                el.classList.add('pt-tab-inactive');
+            }
+        });
+
+        var body = document.getElementById('pt-tab-body');
+        body.style.opacity = '0.4';
+        body.style.transition = 'opacity .15s';
+
+        fetch('?id=' + _ptPID + '&tab=' + encodeURIComponent(name) + '&_pt=1')
+            .then(function(r){ return r.text(); })
+            .then(function(html){
+                body.innerHTML = html;
+                body.style.opacity = '1';
+                execScripts(body);
+                _ptLoading = false;
+            })
+            .catch(function(){
+                body.style.opacity = '1';
+                _ptLoading = false;
+                location.href = '?id=' + _ptPID + '&tab=' + encodeURIComponent(name);
+            });
+    };
+
+    window.addEventListener('popstate', function(e){
+        if (e.state && e.state.tab) ptTab(e.state.tab);
+    });
+    history.replaceState({tab: <?= json_encode($activeTab) ?>}, '', location.href);
+})();
+</script>
+<div id="pt-tab-body">
 <!-- Forms Tab -->
 <?php if ($activeTab === 'forms'): ?>
 <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
@@ -1715,8 +2059,8 @@ $allDone  = count(array_diff($required, $completedForms)) === 0;
         <span id="filterCount" class="text-xs text-slate-400 ml-auto hidden"></span>
     </div>
 
-    <div class="overflow-x-auto">
-        <table class="w-full text-sm">
+    <div>
+        <table class="w-full text-sm form-tbl">
             <thead>
                 <tr class="bg-slate-50 text-left border-b border-slate-100">
                     <th class="pl-5 pr-2 py-3.5 w-8">
@@ -1725,10 +2069,10 @@ $allDone  = count(array_diff($required, $completedForms)) === 0;
                                title="Select all">
                     </th>
                     <th class="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wide">Form</th>
-                    <th class="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wide hidden md:table-cell">MA</th>
+                    <th class="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wide hidden md:table-cell">Provider</th>
                     <th class="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wide hidden sm:table-cell">Date</th>
                     <th class="px-4 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wide">Status</th>
-                    <th class="px-4 py-3.5"></th>
+                    <th class="px-4 py-3.5 hidden md:table-cell"></th>
                 </tr>
             </thead>
             <?php
@@ -1755,26 +2099,27 @@ $allDone  = count(array_diff($required, $completedForms)) === 0;
                     $sc = $statusCfg[$f['status']] ?? $statusCfg['draft'];
                     $rowDate = substr($f['created_at'], 0, 10); // YYYY-MM-DD
                 ?>
-                <tr class="hover:bg-slate-50/70 transition-colors form-row"
+                <tr class="hover:bg-slate-50/70 transition-colors form-row md:cursor-default cursor-pointer"
                     data-type="<?= h($f['form_type']) ?>"
-                    data-date="<?= h($rowDate) ?>">
-                    <td class="pl-5 pr-2 py-4">
+                    data-date="<?= h($rowDate) ?>"
+                    onclick="window.location='<?= BASE_URL ?>/view_document.php?id=<?= $f['id'] ?>'">
+                    <td class="pl-5 pr-2 py-4" onclick="event.stopPropagation()">
                         <input type="checkbox" class="form-chk w-3.5 h-3.5 text-blue-600 border-slate-300 rounded cursor-pointer"
                                value="<?= $f['id'] ?>" onchange="updateBatch()">
                     </td>
                     <td class="px-4 py-4">
-                        <div class="flex items-center gap-3">
-                            <span class="<?= $fd['bg'] ?> <?= $fd['text'] ?> p-2 rounded-xl">
+                        <div class="form-name-flex flex items-center gap-3">
+                            <span class="form-icon-box flex-shrink-0 <?= $fd['bg'] ?> <?= $fd['text'] ?> p-2 rounded-xl">
                                 <i class="bi <?= $fd['icon'] ?> text-base"></i>
                             </span>
-                            <div>
-                                <span class="font-medium text-slate-700"><?= $fd['label'] ?></span>
+                            <div class="min-w-0">
+                                <span class="form-name-text font-medium text-slate-700"><?= $fd['label'] ?></span>
                                 <?php
                                 $fvVer      = $fvMap[$f['id']] ?? 1;
                                 $fvTot      = $fvTotal[$f['form_type']] ?? 1;
                                 $fvIsLatest = ($fvLatest[$f['form_type']] ?? null) === $f['id'];
                                 if ($fvTot > 1): ?>
-                                <span class="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full
+                                <span class="block mt-0.5 ml-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full w-fit
                                              <?= $fvIsLatest ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-400' ?>">
                                     <?= $fvIsLatest ? 'Latest' : 'v' . $fvVer . ' of ' . $fvTot ?>
                                 </span>
@@ -1782,20 +2127,32 @@ $allDone  = count(array_diff($required, $completedForms)) === 0;
                             </div>
                         </div>
                     </td>
-                    <td class="px-4 py-4 text-slate-500 hidden md:table-cell"><?= h($f['ma_name'] ?? '—') ?></td>
+                    <td class="px-4 py-4 text-slate-500 hidden md:table-cell"><?= h($f['display_provider'] ?? '—') ?></td>
                     <td class="px-4 py-4 text-slate-500 hidden sm:table-cell"><?= date('M j, Y g:ia', strtotime($f['created_at'])) ?></td>
                     <td class="px-4 py-4">
+                        <div class="flex items-center gap-2">
                         <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold <?= $sc['bg'] ?> <?= $sc['text'] ?>">
                             <span class="w-1.5 h-1.5 rounded-full <?= $sc['dot'] ?>"></span>
                             <?= $sc['label'] ?>
                         </span>
+
+                        </div>
                     </td>
-                    <td class="px-4 py-4">
+                    <td class="px-4 py-4 text-right hidden md:table-cell">
+                        <div class="flex items-center justify-end gap-2 flex-wrap">
                         <a href="<?= BASE_URL ?>/view_document.php?id=<?= $f['id'] ?>"
-                           class="inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-800 font-semibold text-xs
+                           class="form-act-btn inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-800 font-semibold text-xs
                                   bg-blue-50 hover:bg-blue-100 px-3.5 py-2 rounded-xl transition-colors">
-                            View
+                            <i class="bi bi-eye-fill"></i><span class="btn-txt"> View</span>
                         </a>
+                        <?php if ($f['form_type'] === 'vital_cs' && canAccessClinical()): ?>
+                        <a href="<?= BASE_URL ?>/forms/vital_cs.php?patient_id=<?= $id ?>&edit=1"
+                           class="form-act-btn inline-flex items-center gap-1.5 text-amber-600 hover:text-amber-800 font-semibold text-xs
+                                  bg-amber-50 hover:bg-amber-100 px-3.5 py-2 rounded-xl transition-colors">
+                            <i class="bi bi-pencil-fill"></i><span class="btn-txt"> Edit CS</span>
+                        </a>
+                        <?php endif; ?>
+                        </div>
                     </td>
                 </tr>
                 <?php endforeach; ?>
@@ -1885,9 +2242,19 @@ document.getElementById('chkAll').addEventListener('change', function () {
 
     <!-- Add medication card -->
     <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
-        <h4 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-            <i class="bi bi-plus-circle-fill text-emerald-600"></i> Add Medication
-        </h4>
+        <div class="flex items-center justify-between mb-3">
+            <h4 class="text-sm font-bold text-slate-700 flex items-center gap-2">
+                <i class="bi bi-plus-circle-fill text-emerald-600"></i> Add Medication
+            </h4>
+            <button id="importPfMedBtn" onclick="document.getElementById('pfMedFileInput').click()"
+                    style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;font-size:12px;font-weight:600;
+                           background:#059669;color:#fff;border:none;border-radius:8px;cursor:pointer;transition:background 0.15s;"
+                    onmouseover="this.style.background='#047857'" onmouseout="this.style.background='#059669'">
+                <i class="bi bi-file-earmark-arrow-up"></i> Import from PF
+            </button>
+            <input type="file" id="pfMedFileInput" accept="application/pdf,.pdf" style="display:none;">
+        </div>
+        <div id="pfMedStatus" style="display:none;padding:7px 12px;border-radius:8px;font-size:12px;margin-bottom:10px;"></div>
         <div class="flex flex-col sm:flex-row gap-3">
             <input id="newMedName" type="text"
                    class="flex-[3] px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50
@@ -2056,14 +2423,36 @@ foreach ($photos as $ph) {
 }
 // Pass photo data to JS
 $photosJson = json_encode(array_map(fn($p) => [
-    'id'       => (int)$p['id'],
-    'filename' => $p['filename'],
-    'location' => $p['wound_location'] ?: 'Unspecified',
-    'date'     => date('M j, Y', strtotime($p['created_at'])),
-    'date_raw' => $p['created_at'],
-    'desc'     => $p['description'] ?? '',
-    'ma'       => $p['ma_name'] ?? '',
-    'url'      => BASE_URL . '/uploads/photos/' . $p['filename'],
+    'id'            => (int)$p['id'],
+    'filename'      => $p['filename'],
+    'location'      => $p['wound_location'] ?: 'Unspecified',
+    'date'          => date('M j, Y', strtotime($p['created_at'])),
+    'date_raw'      => $p['created_at'],
+    'desc'          => $p['description'] ?? '',
+    'ma'            => $p['ma_name'] ?? '',
+    'url'           => BASE_URL . '/uploads/photos/' . $p['filename'],
+    'annotated_url'     => $p['annotated_photo_path'] ?? null,
+    'man_annotated_url' => $p['man_annotated_path']   ?? null,
+    'area_cm2'      => $p['area_cm2']    !== null ? (float)$p['area_cm2']    : null,
+    'length_cm'     => $p['ai_length_cm'] !== null ? (float)$p['ai_length_cm'] : null,
+    'width_cm'      => $p['ai_width_cm']  !== null ? (float)$p['ai_width_cm']  : null,
+    'ruler'         => (bool)($p['meas_ruler'] ?? false),
+    'gran_pct'      => $p['granulation_pct'] !== null ? (int)$p['granulation_pct'] : null,
+    'slough_pct'    => $p['slough_pct']      !== null ? (int)$p['slough_pct']      : null,
+    'eschar_pct'    => $p['eschar_pct']      !== null ? (int)$p['eschar_pct']      : null,
+    'confidence'    => $p['analysis_confidence'] ?? null,
+    'visit_type'    => $p['visit_type'] ?? null,
+    'manual_length' => $p['length_cm']  !== null ? (float)$p['length_cm']  : null,
+    'manual_width'  => $p['width_cm']   !== null ? (float)$p['width_cm']   : null,
+    'manual_depth'  => $p['depth_cm']   !== null ? (float)$p['depth_cm']   : null,
+    'man_area_cm2'  => $p['man_area_cm2']  !== null ? (float)$p['man_area_cm2']  : null,
+    'man_length_cm' => $p['man_length_cm'] !== null ? (float)$p['man_length_cm'] : null,
+    'man_width_cm'  => $p['man_width_cm']  !== null ? (float)$p['man_width_cm']  : null,
+    'man_depth_cm'  => $p['man_depth_cm']  !== null ? (float)$p['man_depth_cm']  : null,
+    'man_by_name'   => $p['man_by_name']   ?? null,
+    'man_by_role'   => $p['man_by_role']   ?? null,
+    'man_date'      => isset($p['man_measured_at']) && $p['man_measured_at']
+                        ? date('M j, Y', strtotime($p['man_measured_at'])) : null,
 ], $photos));
 ?>
 
@@ -2186,13 +2575,46 @@ $photosJson = json_encode(array_map(fn($p) => [
                     <!-- Selection badge -->
                     <div class="photo-badge hidden absolute top-2 right-2 w-7 h-7 rounded-full flex items-center
                                 justify-center text-white text-xs font-extrabold shadow-lg z-10"></div>
+                    <!-- Analyzed badge -->
+                    <?php if (!empty($ph['annotated_photo_path'])): ?>
+                    <div style="position:absolute;top:.375rem;left:.375rem;width:1.375rem;height:1.375rem;
+                                background:#7c3aed;border-radius:9999px;display:flex;align-items:center;
+                                justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.3);z-index:11;"
+                         title="AI Analyzed">
+                        <i class="bi bi-rulers" style="color:#fff;font-size:.55rem;"></i>
+                    </div>
+                    <?php endif; ?>
                 </div>
                 <div class="p-3">
-                    <p class="text-xs font-semibold text-slate-700 truncate"><?= h($location) ?></p>
-                    <p class="text-xs text-slate-400 mt-0.5"><?= date('M j, Y', strtotime($ph['created_at'])) ?></p>
-                    <?php if ($ph['description']): ?>
-                    <p class="text-xs text-slate-500 mt-1 line-clamp-2"><?= h($ph['description']) ?></p>
-                    <?php endif; ?>
+                    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.25rem;">
+                        <div style="min-width:0;">
+                            <p class="text-xs font-semibold text-slate-700 truncate"><?= h($location) ?></p>
+                            <p class="text-xs text-slate-400 mt-0.5"><?= date('M j, Y', strtotime($ph['created_at'])) ?></p>
+                            <?php if ($ph['description']): ?>
+                            <p class="text-xs text-slate-500 mt-1 line-clamp-2"><?= h($ph['description']) ?></p>
+                            <?php endif; ?>
+                        </div>
+                        <?php if (!isBilling()): ?>
+                        <div style="display:flex;gap:.125rem;flex-shrink:0;">
+                            <button onclick="event.stopPropagation();pvEditPhoto(<?= (int)$ph['id'] ?>)"
+                                    title="Edit photo details"
+                                    style="width:22px;height:22px;border:none;background:none;cursor:pointer;color:#94a3b8;
+                                           border-radius:.375rem;display:flex;align-items:center;justify-content:center;padding:0;"
+                                    onmouseover="this.style.color='#7c3aed';this.style.background='#ede9fe'"
+                                    onmouseout="this.style.color='#94a3b8';this.style.background='none'">
+                                <i class="bi bi-pencil" style="font-size:.7rem;"></i>
+                            </button>
+                            <button onclick="event.stopPropagation();pvDeletePhoto(<?= (int)$ph['id'] ?>)"
+                                    title="Delete photo"
+                                    style="width:22px;height:22px;border:none;background:none;cursor:pointer;color:#94a3b8;
+                                           border-radius:.375rem;display:flex;align-items:center;justify-content:center;padding:0;"
+                                    onmouseover="this.style.color='#ef4444';this.style.background='#fef2f2'"
+                                    onmouseout="this.style.color='#94a3b8';this.style.background='none'">
+                                <i class="bi bi-trash3" style="font-size:.7rem;"></i>
+                            </button>
+                        </div>
+                        <?php endif; ?>
+                    </div>
                 </div>
             </div>
             <?php endforeach; ?>
@@ -2250,8 +2672,14 @@ $photosJson = json_encode(array_map(fn($p) => [
         card.querySelector('.photo-badge').classList.add('hidden');
     }
 
+    // Photo IDs in display order (for lightbox prev/next)
+    const photoIds = PHOTOS.map(p => p.id);
+
     window.photoCardClick = function(card) {
-        if (!compareMode) return;
+        if (!compareMode) {
+            openPhotoLightbox(parseInt(card.dataset.photoId));
+            return;
+        }
         const pid = parseInt(card.dataset.photoId);
 
         // If already selected, deselect it
@@ -2331,8 +2759,1110 @@ $photosJson = json_encode(array_map(fn($p) => [
             progressBar.classList.add('hidden');
         }
     }
+    // ── Lightbox ────────────────────────────────────────────────────────────
+    let lbCurrent = 0;
+
+    window.openPhotoLightbox = function(id) {
+        lbCurrent = photoIds.indexOf(id);
+        renderPhotoLb();
+        const lb = document.getElementById('pvLightbox');
+        lb.style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+        // Briefly show overlays so user knows controls are there
+        const dlg = document.getElementById('pvLbDialog');
+        dlg.classList.add('pvlb-show-ui');
+        setTimeout(() => dlg.classList.remove('pvlb-show-ui'), 1800);
+    };
+    window.closePhotoLightbox = function() {
+        document.getElementById('pvLightbox').style.display = 'none';
+        document.body.style.overflow = '';
+    };
+    window.pvLbToggleSidebar = function() {
+        document.getElementById('pvLbDialog').classList.toggle('pvlb-no-sidebar');
+    };
+    window.pvLbStep = function(dir) {
+        lbCurrent = (lbCurrent + dir + PHOTOS.length) % PHOTOS.length;
+        renderPhotoLb();
+    };
+    // ── Zoom ────────────────────────────────────────────────────────────────
+    let lbScale = 1, lbTx = 0, lbTy = 0;
+    const MIN_SCALE = 1, MAX_SCALE = 5;
+
+    function applyZoom() {
+        const img = document.getElementById('pvLbImg');
+        img.style.transform = `translate(${lbTx}px,${lbTy}px) scale(${lbScale})`;
+        document.getElementById('pvLbZoomLabel').textContent = Math.round(lbScale * 100) + '%';
+    }
+    function resetZoom() {
+        lbScale = 1; lbTx = 0; lbTy = 0;
+        const img = document.getElementById('pvLbImg');
+        img.style.transition = 'transform 0.15s ease';
+        applyZoom();
+    }
+    window.pvLbZoom = function(delta) {
+        lbScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, lbScale + delta));
+        if (lbScale === 1) { lbTx = 0; lbTy = 0; }
+        const img = document.getElementById('pvLbImg');
+        img.style.transition = 'transform 0.15s ease';
+        applyZoom();
+    };
+    window.pvLbZoomReset = resetZoom;
+
+    // Scroll-wheel zoom + drag — deferred until pvLightbox HTML is in the DOM
+    document.addEventListener('DOMContentLoaded', function() {
+        var imgWrap = document.getElementById('pvLbImgWrap');
+        if (!imgWrap) return;
+
+        // Scroll-wheel zoom
+        imgWrap.addEventListener('wheel', function(e) {
+            if (document.getElementById('pvLightbox').style.display === 'none') return;
+            e.preventDefault();
+            const delta = e.deltaY < 0 ? 0.2 : -0.2;
+            lbScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, lbScale + delta));
+            if (lbScale === 1) { lbTx = 0; lbTy = 0; }
+            const img = document.getElementById('pvLbImg');
+            img.style.transition = 'none';
+            applyZoom();
+        }, { passive: false });
+
+        // Click-drag + touch-drag to pan
+        (function() {
+            const wrap = imgWrap;
+            const img  = document.getElementById('pvLbImg');
+            let dragging = false, startX, startY, startTx, startTy;
+
+            wrap.addEventListener('pointerdown', function(e) {
+                if (e.pointerType === 'mouse' && e.button !== 0) return;
+                e.preventDefault();
+                wrap.setPointerCapture(e.pointerId);
+                dragging = true;
+                startX = e.clientX; startY = e.clientY;
+                startTx = lbTx; startTy = lbTy;
+                img.style.transition = 'none';
+                wrap.style.cursor = 'grabbing';
+            });
+            wrap.addEventListener('pointermove', function(e) {
+                if (!dragging) return;
+                e.preventDefault();
+                lbTx = startTx + (e.clientX - startX);
+                lbTy = startTy + (e.clientY - startY);
+                applyZoom();
+            });
+            wrap.addEventListener('pointerup',     function(e) { dragging = false; wrap.style.cursor = 'grab'; });
+            wrap.addEventListener('pointercancel', function(e) { dragging = false; wrap.style.cursor = 'grab'; });
+
+            let lastDist = null;
+            wrap.addEventListener('touchstart', function(e) {
+                if (e.touches.length === 2) {
+                    lastDist = Math.hypot(
+                        e.touches[0].clientX - e.touches[1].clientX,
+                        e.touches[0].clientY - e.touches[1].clientY);
+                }
+            }, { passive: true });
+            wrap.addEventListener('touchmove', function(e) {
+                if (e.touches.length !== 2 || !lastDist) return;
+                e.preventDefault();
+                const dist = Math.hypot(
+                    e.touches[0].clientX - e.touches[1].clientX,
+                    e.touches[0].clientY - e.touches[1].clientY);
+                lbScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, lbScale * (dist / lastDist)));
+                lastDist = dist;
+                if (lbScale <= 1) { lbTx = 0; lbTy = 0; lbScale = 1; }
+                img.style.transition = 'none';
+                applyZoom();
+            }, { passive: false });
+            wrap.addEventListener('touchend', function() { lastDist = null; });
+        })();
+    });
+
+    function renderPhotoLb() {
+        resetZoom();
+        const p = PHOTOS[lbCurrent];
+        document.getElementById('pvLbImg').src             = p.url;
+        document.getElementById('pvLbTitle').textContent   = p.location;
+        document.getElementById('pvLbDate').textContent    = p.date;
+        document.getElementById('pvLbTitleMeta').textContent = p.location;
+        document.getElementById('pvLbDateMeta').textContent  = p.date;
+        document.getElementById('pvLbMa').textContent      = p.ma || '—';
+        document.getElementById('pvLbDownload').href       = p.url;
+        const descEl = document.getElementById('pvLbDescBlock');
+        if (p.desc) {
+            document.getElementById('pvLbDesc').textContent = p.desc;
+            descEl.style.display = '';
+        } else { descEl.style.display = 'none'; }
+        document.getElementById('pvLbNav').style.display = PHOTOS.length > 1 ? '' : 'none';
+        document.getElementById('pvLbCount').textContent = (lbCurrent + 1) + ' / ' + PHOTOS.length;
+        // Reset then restore analysis state
+        pvLbShowImg('orig');
+        pvLbRestoreAnalysis(p);
+    }
+
+    // ── Analysis helpers ──────────────────────────────────────────────
+    let _pvAnnotatedUrl = null;
+
+    function pvLbRestoreAnalysis(p) {
+        ['pvLbSpinner','pvLbAnalyzeError','pvLbResult'].forEach(id =>
+            document.getElementById(id).style.display = 'none');
+        document.getElementById('pvLbAnalyzeBtn').style.display = '';
+        document.getElementById('pvLbImgToggle').style.display = 'none';
+        document.getElementById('pvLbManualResult').style.display = 'none';
+        _pvAnnotatedUrl = null;
+
+        if (p.area_cm2 !== null && p.area_cm2 !== undefined) {
+            _pvAnnotatedUrl = p.man_annotated_url || p.annotated_url || null;
+            pvLbPopulateResults({
+                area_cm2:       p.area_cm2,
+                length_cm:      p.length_cm,
+                width_cm:       p.width_cm,
+                ruler_detected: p.ruler,
+                annotated_url:  p.man_annotated_url || p.annotated_url,
+                tissue_info: (p.gran_pct !== null && p.gran_pct !== undefined) ? {
+                    granulation_pct: p.gran_pct,
+                    slough_pct:      p.slough_pct,
+                    eschar_pct:      p.eschar_pct,
+                    confidence:      p.confidence
+                } : null,
+                method: p.confidence ? 'gpt4o' : 'opencv'
+            });
+            const btn = document.getElementById('pvLbAnalyzeBtn');
+            btn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Re-analyze';
+        }
+        pvLbShowManualResult(p);
+    }
+
+    function pvLbShowManualResult(p) {
+        const el = document.getElementById('pvLbManualResult');
+        if (p.man_area_cm2 === null || p.man_area_cm2 === undefined) {
+            el.style.display = 'none';
+            return;
+        }
+        document.getElementById('pvLbMMArea').textContent   =
+            Number(p.man_area_cm2).toFixed(2);
+        document.getElementById('pvLbMMLength').textContent =
+            (p.man_length_cm != null) ? Number(p.man_length_cm).toFixed(1) : '—';
+        document.getElementById('pvLbMMWidth').textContent  =
+            (p.man_width_cm  != null) ? Number(p.man_width_cm).toFixed(1)  : '—';
+
+        const roleLabel = { admin:'Admin', ma:'MA', provider:'Provider',
+                            pcc:'PCC', billing:'Billing', scheduler:'Scheduler' };
+        const rLabel = roleLabel[p.man_by_role] || p.man_by_role || '';
+        const parts  = [];
+        if (p.man_by_name) parts.push(p.man_by_name);
+        if (rLabel)        parts.push('(' + rLabel + ')');
+        if (p.man_date)    parts.push('\u00b7 ' + p.man_date);
+        document.getElementById('pvLbManAttrib').textContent = parts.join(' ');
+
+        // Show annotated toggle if only manual annotated exists (no AI analysis ran)
+        if (p.man_annotated_url && !_pvAnnotatedUrl) {
+            _pvAnnotatedUrl = p.man_annotated_url;
+            document.getElementById('pvLbImgToggle').style.display = '';
+            pvLbShowImg('annotated');
+        }
+        el.style.display = '';
+    }
+
+    window.pvLbShowImg = function(which) {
+        const img       = document.getElementById('pvLbImg');
+        const btnOrig   = document.getElementById('pvLbBtnOrig');
+        const btnAnnot  = document.getElementById('pvLbBtnAnnotated');
+        if (which === 'annotated' && _pvAnnotatedUrl) {
+            img.src = _pvAnnotatedUrl;
+            btnOrig.style.color  = 'rgba(255,255,255,.5)'; btnOrig.style.background  = 'transparent';
+            btnAnnot.style.color = '#fff';                 btnAnnot.style.background = 'rgba(255,255,255,.2)';
+        } else {
+            img.src = PHOTOS[lbCurrent].url;
+            btnAnnot.style.color = 'rgba(255,255,255,.5)'; btnAnnot.style.background = 'transparent';
+            btnOrig.style.color  = '#fff';                 btnOrig.style.background  = 'rgba(255,255,255,.2)';
+        }
+    };
+
+    window.pvLbAnalyze = function() {
+        const p = PHOTOS[lbCurrent];
+        const BASE_URL_JS = <?= json_encode(BASE_URL) ?>;
+        document.getElementById('pvLbAnalyzeBtn').style.display  = 'none';
+        document.getElementById('pvLbAnalyzeError').style.display = 'none';
+        document.getElementById('pvLbResult').style.display       = 'none';
+        document.getElementById('pvLbSpinner').style.display      = 'flex';
+
+        fetch(p.url)
+            .then(r => r.blob())
+            .then(blob => new Promise((res, rej) => {
+                const fr = new FileReader();
+                fr.onload  = () => res(fr.result);
+                fr.onerror = rej;
+                fr.readAsDataURL(blob);
+            }))
+            .then(dataUrl => fetch(BASE_URL_JS + '/api/wound_measure.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: dataUrl, patient_id: p.patient_id || <?= $id ?>, photo_id: p.id })
+            }))
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('pvLbSpinner').style.display = 'none';
+                if (!data.success) throw new Error(data.error || 'Analysis failed');
+                _pvAnnotatedUrl = data.annotated_url || null;
+                // Cache result in PHOTOS array
+                const ph = PHOTOS[lbCurrent];
+                ph.area_cm2     = data.area_cm2;
+                ph.length_cm    = data.length_cm;
+                ph.width_cm     = data.width_cm;
+                ph.ruler        = !!data.ruler_detected;
+                ph.annotated_url = _pvAnnotatedUrl;
+                if (data.tissue_info) {
+                    ph.gran_pct   = data.tissue_info.granulation_pct;
+                    ph.slough_pct = data.tissue_info.slough_pct;
+                    ph.eschar_pct = data.tissue_info.eschar_pct;
+                    ph.confidence = data.tissue_info.confidence;
+                }
+                pvLbPopulateResults(data);
+                const btn = document.getElementById('pvLbAnalyzeBtn');
+                btn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Re-analyze';
+                btn.style.display = '';
+            })
+            .catch(err => {
+                document.getElementById('pvLbSpinner').style.display = 'none';
+                document.getElementById('pvLbAnalyzeBtn').style.display = '';
+                const errEl = document.getElementById('pvLbAnalyzeError');
+                errEl.innerHTML = '<i class="bi bi-x-circle-fill" style="margin-right:.25rem;"></i>' +
+                    (err.message || 'Analysis failed. Please try again.');
+                errEl.style.display = '';
+            });
+    };
+
+    function pvLbPopulateResults(data) {
+        document.getElementById('pvLbMArea').textContent   =
+            (data.area_cm2   != null) ? Number(data.area_cm2).toFixed(2)  : '—';
+        document.getElementById('pvLbMLength').textContent =
+            (data.length_cm  != null) ? Number(data.length_cm).toFixed(1) : '—';
+        document.getElementById('pvLbMWidth').textContent  =
+            (data.width_cm   != null) ? Number(data.width_cm).toFixed(1)  : '—';
+
+        // Badges
+        const badgeStyle = 'display:inline-flex;align-items:center;gap:.2rem;font-size:.6rem;font-weight:700;' +
+                           'padding:.2rem .5rem;border-radius:9999px;border:1px solid;';
+        const badges = document.getElementById('pvLbMBadges');
+        const rulerOk = data.ruler_detected ?? data.ruler ?? false;
+        badges.innerHTML = rulerOk
+            ? `<span style="${badgeStyle}background:#f0fdf4;border-color:#bbf7d0;color:#15803d;"><i class="bi bi-check-circle-fill"></i> Ruler detected</span>`
+            : `<span style="${badgeStyle}background:#fffbeb;border-color:#fde68a;color:#92400e;"><i class="bi bi-exclamation-triangle-fill"></i> No ruler</span>`;
+        const method = data.method || '';
+        if (method === 'gpt4o') {
+            badges.innerHTML += `<span style="${badgeStyle}background:#f5f3ff;border-color:#ddd6fe;color:#6d28d9;"><i class="bi bi-stars"></i> GPT-4o</span>`;
+        } else if (method === 'opencv') {
+            badges.innerHTML += `<span style="${badgeStyle}background:#f8fafc;border-color:#e2e8f0;color:#475569;"><i class="bi bi-eye-fill"></i> OpenCV</span>`;
+        } else if (method === 'manual') {
+            badges.innerHTML += `<span style="${badgeStyle}background:#faf5ff;border-color:#e9d5ff;color:#7c3aed;"><i class="bi bi-pencil-fill"></i> Manual</span>`;
+        }
+        const ti = data.tissue_info;
+        if (ti && (ti.confidence === 'high' || ti.confidence === 'medium')) {
+            badges.innerHTML += `<span style="${badgeStyle}background:#f0f9ff;border-color:#bae6fd;color:#0369a1;"><i class="bi bi-shield-check"></i> ${ti.confidence} conf.</span>`;
+        }
+
+        // No ruler warning (suppress for manual entries)
+        document.getElementById('pvLbNoRulerWarn').style.display = (rulerOk || method === 'manual') ? 'none' : '';
+
+        // Tissue bar
+        const tissueBlock = document.getElementById('pvLbTissueBlock');
+        if (ti && ti.granulation_pct != null) {
+            const g = ti.granulation_pct || 0, s = ti.slough_pct || 0, e = ti.eschar_pct || 0;
+            document.getElementById('pvLbTissueBar').innerHTML =
+                `<div style="width:${g}%;background:#f87171;transition:width .3s;"></div>` +
+                `<div style="width:${s}%;background:#facc15;transition:width .3s;"></div>` +
+                `<div style="width:${e}%;background:#475569;transition:width .3s;"></div>`;
+            const lblStyle = 'display:inline-flex;align-items:center;gap:.25rem;font-size:.65rem;';
+            const dot = (c) => `<span style="width:.5rem;height:.5rem;border-radius:9999px;background:${c};display:inline-block;"></span>`;
+            document.getElementById('pvLbTissueLabels').innerHTML =
+                `<span style="${lblStyle}">${dot('#f87171')}<b>${g}%</b> Gran.</span>` +
+                `<span style="${lblStyle}">${dot('#facc15')}<b>${s}%</b> Slough</span>` +
+                `<span style="${lblStyle}">${dot('#475569')}<b>${e}%</b> Eschar</span>`;
+            tissueBlock.style.display = '';
+        } else {
+            tissueBlock.style.display = 'none';
+        }
+
+        // Annotated image toggle
+        const annUrl = data.annotated_url || _pvAnnotatedUrl;
+        if (annUrl) {
+            _pvAnnotatedUrl = annUrl;
+            document.getElementById('pvLbImgToggle').style.display = '';
+            pvLbShowImg('annotated');
+        }
+
+        document.getElementById('pvLbResult').style.display = '';
+    }
+    document.addEventListener('keydown', function(e) {
+        if (document.getElementById('pvLightbox').style.display === 'none') return;
+        if (e.key === 'Escape')     closePhotoLightbox();
+        if (e.key === 'ArrowLeft')  pvLbStep(-1);
+        if (e.key === 'ArrowRight') pvLbStep(1);
+        if (e.key === '+' || e.key === '=') pvLbZoom(0.25);
+        if (e.key === '-')                  pvLbZoom(-0.25);
+        if (e.key === '0')                  pvLbZoomReset();
+    });
+
+    // ── Photo Edit / Delete ──────────────────────────────────────────────────────────
+    const PV_CSRF     = <?= json_encode($photoCsrf) ?>;
+    const PV_BASE     = <?= json_encode(BASE_URL) ?>;
+
+    window.pvEditPhoto = function(pid) {
+        const p = photoMap[pid];
+        if (!p) return;
+        document.getElementById('pvEditPhotoId').value  = pid;
+        document.getElementById('pvEditLocText').value  = (p.location === 'Unspecified') ? '' : (p.location || '');
+        document.getElementById('pvEditNoteText').value = p.desc || '';
+        document.getElementById('pvEditLength').value   = p.manual_length != null ? p.manual_length : '';
+        document.getElementById('pvEditWidth').value    = p.manual_width  != null ? p.manual_width  : '';
+        document.getElementById('pvEditDepth').value    = p.manual_depth  != null ? p.manual_depth  : '';
+        document.querySelectorAll('.pv-edit-loc-btn').forEach(function(btn) {
+            const active = btn.textContent.trim() === p.location;
+            btn.style.borderColor = active ? '#7c3aed' : '#e2e8f0';
+            btn.style.background  = active ? '#ede9fe' : '#f8fafc';
+            btn.style.color       = active ? '#6d28d9' : '#475569';
+        });
+        document.querySelectorAll('.pv-edit-visit-btn').forEach(function(btn) {
+            const active = btn.dataset.vtype === p.visit_type;
+            btn.style.borderColor = active ? '#7c3aed' : '#e2e8f0';
+            btn.style.background  = active ? '#ede9fe' : '#f8fafc';
+            btn.style.color       = active ? '#6d28d9' : '#475569';
+        });
+        document.getElementById('pvEditPhotoErr').style.display = 'none';
+        document.getElementById('pvEditPhotoModal').style.display = 'flex';
+        document.body.style.overflow = 'hidden';
+    };
+    window.pvEditPhotoLb  = function() { pvEditPhoto(PHOTOS[lbCurrent].id); };
+    window.pvEditLocSelect = function(btn, loc) {
+        document.querySelectorAll('.pv-edit-loc-btn').forEach(function(b) {
+            b.style.borderColor = '#e2e8f0'; b.style.background = '#f8fafc'; b.style.color = '#475569';
+        });
+        btn.style.borderColor = '#7c3aed'; btn.style.background = '#ede9fe'; btn.style.color = '#6d28d9';
+        document.getElementById('pvEditLocText').value = loc;
+    };
+    window.pvEditVisitSelect = function(btn, vtype) {
+        // Toggle off if already active
+        const isActive = btn.style.borderColor === 'rgb(124, 58, 237)';
+        document.querySelectorAll('.pv-edit-visit-btn').forEach(function(b) {
+            b.style.borderColor = '#e2e8f0'; b.style.background = '#f8fafc'; b.style.color = '#475569';
+        });
+        if (!isActive) {
+            btn.style.borderColor = '#7c3aed'; btn.style.background = '#ede9fe'; btn.style.color = '#6d28d9';
+        }
+    };
+    window.pvCloseEditPhoto = function() {
+        document.getElementById('pvEditPhotoModal').style.display = 'none';
+        document.body.style.overflow = '';
+    };
+    window.pvSaveEditPhoto = async function() {
+        const pid      = parseInt(document.getElementById('pvEditPhotoId').value);
+        const loc      = document.getElementById('pvEditLocText').value.trim();
+        const note     = document.getElementById('pvEditNoteText').value.trim();
+        const lenVal   = document.getElementById('pvEditLength').value.trim();
+        const widVal   = document.getElementById('pvEditWidth').value.trim();
+        const depVal   = document.getElementById('pvEditDepth').value.trim();
+        const activeVBtn = document.querySelector('.pv-edit-visit-btn[style*="rgb(124, 58, 237)"]');
+        const visitType  = activeVBtn ? activeVBtn.dataset.vtype : null;
+        const errEl = document.getElementById('pvEditPhotoErr');
+        errEl.style.display = 'none';
+        try {
+            const r = await fetch(PV_BASE + '/api/update_wound_photo.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    csrf: PV_CSRF, photo_id: pid,
+                    wound_location: loc, description: note,
+                    visit_type: visitType,
+                    length_cm: lenVal !== '' ? parseFloat(lenVal) : '',
+                    width_cm:  widVal !== '' ? parseFloat(widVal) : '',
+                    depth_cm:  depVal !== '' ? parseFloat(depVal) : ''
+                })
+            });
+            const d = await r.json();
+            if (!d.ok) throw new Error(d.error || 'Update failed');
+            photoMap[pid].location     = loc || 'Unspecified';
+            photoMap[pid].desc         = note;
+            photoMap[pid].visit_type   = visitType;
+            photoMap[pid].manual_length = lenVal !== '' ? parseFloat(lenVal) : null;
+            photoMap[pid].manual_width  = widVal !== '' ? parseFloat(widVal) : null;
+            photoMap[pid].manual_depth  = depVal !== '' ? parseFloat(depVal) : null;
+            // If server returned measurement data, update the manual section
+            if (d.area_cm2 !== null && d.area_cm2 !== undefined) {
+                photoMap[pid].man_area_cm2  = d.area_cm2;
+                photoMap[pid].man_length_cm = d.length_cm;
+                photoMap[pid].man_width_cm  = d.width_cm;
+                photoMap[pid].man_by_name   = d.man_by_name || '';
+                photoMap[pid].man_by_role   = d.man_by_role || '';
+                photoMap[pid].man_date      = d.man_date    || '';
+                const pidx = PHOTOS.findIndex(function(ph) { return ph.id === pid; });
+                if (pidx !== -1) {
+                    PHOTOS[pidx].man_area_cm2  = d.area_cm2;
+                    PHOTOS[pidx].man_length_cm = d.length_cm;
+                    PHOTOS[pidx].man_width_cm  = d.width_cm;
+                    PHOTOS[pidx].man_by_name   = d.man_by_name || '';
+                    PHOTOS[pidx].man_by_role   = d.man_by_role || '';
+                    PHOTOS[pidx].man_date      = d.man_date    || '';
+                }
+            }
+            // Update annotated image if server regenerated it
+            if (d.annotated_url) {
+                const annUrl = d.annotated_url + '?ts=' + Date.now();
+                photoMap[pid].annotated_url = d.annotated_url;
+                const pidx2 = PHOTOS.findIndex(function(ph) { return ph.id === pid; });
+                if (pidx2 !== -1) PHOTOS[pidx2].annotated_url = d.annotated_url;
+                // If lightbox is showing this photo, refresh annotated view
+                if (document.getElementById('pvLightbox').style.display !== 'none' &&
+                    PHOTOS[lbCurrent] && PHOTOS[lbCurrent].id === pid) {
+                    _pvAnnotatedUrl = d.annotated_url;
+                    document.getElementById('pvLbImg').src = annUrl;
+                    document.getElementById('pvLbImgToggle').style.display = '';
+                    pvLbShowImg('annotated');
+                }
+            }
+            const card = document.querySelector('[data-photo-id="' + pid + '"]');
+            if (card) {
+                const ps = card.querySelectorAll('p');
+                if (ps[0]) ps[0].textContent = loc || 'Unspecified';
+            }
+            pvCloseEditPhoto();
+            if (document.getElementById('pvLightbox').style.display !== 'none' &&
+                PHOTOS[lbCurrent] && PHOTOS[lbCurrent].id === pid) {
+                renderPhotoLb();
+            }
+        } catch(err) {
+            errEl.textContent = err.message;
+            errEl.style.display = 'block';
+        }
+    };
+    window.pvDeletePhoto = async function(pid) {
+        if (!await pdConfirm({message: 'Delete this wound photo?', subtext: 'This cannot be undone.', confirmLabel: 'Delete', confirmIcon: 'bi bi-trash3', confirmStyle: 'background:#dc2626;'})) return;
+        try {
+            const r = await fetch(PV_BASE + '/api/update_wound_photo.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ csrf: PV_CSRF, photo_id: pid, action: 'delete' })
+            });
+            const d = await r.json();
+            if (!d.ok) { pdToast(d.error || 'Delete failed', 'error'); return; }
+            const idx = PHOTOS.findIndex(function(p) { return p.id === pid; });
+            if (idx !== -1) PHOTOS.splice(idx, 1);
+            delete photoMap[pid];
+            const card = document.querySelector('[data-photo-id="' + pid + '"]');
+            if (card) card.remove();
+            if (document.getElementById('pvLightbox').style.display !== 'none') {
+                if (PHOTOS.length === 0) { closePhotoLightbox(); }
+                else { lbCurrent = Math.min(lbCurrent, PHOTOS.length - 1); renderPhotoLb(); }
+            }
+        } catch(e) { pdToast(e.message, 'error'); }
+    };
+    window.pvDeletePhotoLb = function() { pvDeletePhoto(PHOTOS[lbCurrent].id); };
+
+    // ── Manual Canvas Annotation ─────────────────────────────────────────────
+    let _pvAnnTool = 'pen', _pvAnnColor = '#ef4444', _pvAnnWidth = 3;
+    let _pvAnnDrawing = false, _pvAnnStartX = 0, _pvAnnStartY = 0;
+    let _pvAnnHistory = [], _pvAnnRectSnap = null, _pvAnnHandlers = {};
+
+    function pvAnnDrawArrow(ctx, x1, y1, x2, y2) {
+        const dx = x2 - x1, dy = y2 - y1;
+        const len = Math.sqrt(dx*dx + dy*dy);
+        if (len < 2) return;
+        const headLen = Math.min(32, len * 0.38);
+        const angle   = Math.atan2(dy, dx);
+        ctx.beginPath();
+        ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - headLen * Math.cos(angle - Math.PI/6), y2 - headLen * Math.sin(angle - Math.PI/6));
+        ctx.moveTo(x2, y2);
+        ctx.lineTo(x2 - headLen * Math.cos(angle + Math.PI/6), y2 - headLen * Math.sin(angle + Math.PI/6));
+        ctx.stroke();
+    }
+
+    window.pvAnnStart = function() {
+        resetZoom();
+        const wrap   = document.getElementById('pvLbImgWrap');
+        const canvas = document.getElementById('pvAnnCanvas');
+        canvas.width  = wrap.offsetWidth;
+        canvas.height = wrap.offsetHeight;
+        canvas.getContext('2d', { willReadFrequently: true }); // prime context with read hint
+        canvas.style.display = 'block';
+        document.getElementById('pvAnnotateBar').style.display = 'flex';
+        document.getElementById('pvLbDrawBtn').style.display   = 'none';
+        document.getElementById('pvLbImgToggle').style.display = 'none';
+        _pvAnnHistory = [];
+        pvAnnBindEvents(canvas);
+    };
+    window.pvAnnCancel = function() {
+        const canvas = document.getElementById('pvAnnCanvas');
+        canvas.style.display = 'none';
+        document.getElementById('pvAnnotateBar').style.display = 'none';
+        document.getElementById('pvLbDrawBtn').style.display   = '';
+        _pvAnnHistory = []; _pvAnnRectSnap = null;
+        pvAnnUnbindEvents(canvas);
+        const p = PHOTOS[lbCurrent];
+        if (p && (p.annotated_url || _pvAnnotatedUrl)) {
+            document.getElementById('pvLbImgToggle').style.display = '';
+        }
+    };
+    window.pvAnnSetTool = function(tool, btn) {
+        _pvAnnTool = tool;
+        document.querySelectorAll('#pvAnnotateBar [id^="pvAnnBtn"]').forEach(function(b) {
+            b.style.background = 'transparent';
+        });
+        if (btn) btn.style.background = 'rgba(255,255,255,.25)';
+    };
+    window.pvAnnSetColor = function(color, btn) {
+        _pvAnnColor = color;
+        document.querySelectorAll('#pvAnnotateBar button[onclick^="pvAnnSetColor"]').forEach(function(b) {
+            b.style.borderColor = 'transparent';
+        });
+        if (btn) btn.style.borderColor = '#fff';
+    };
+    window.pvAnnSetWidth = function(w, btn) {
+        _pvAnnWidth = w;
+        document.querySelectorAll('#pvAnnotateBar button[onclick^="pvAnnSetWidth"]').forEach(function(b) {
+            b.style.borderColor = 'transparent';
+        });
+        if (btn) btn.style.borderColor = 'rgba(255,255,255,.7)';
+    };
+    window.pvAnnClear = function() {
+        const canvas = document.getElementById('pvAnnCanvas');
+        pvAnnSaveHist(canvas);
+        canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+    };
+    window.pvAnnUndo = function() {
+        if (!_pvAnnHistory.length) return;
+        const canvas = document.getElementById('pvAnnCanvas');
+        canvas.getContext('2d').putImageData(_pvAnnHistory.pop(), 0, 0);
+    };
+    function pvAnnSaveHist(canvas) {
+        _pvAnnHistory.push(canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height));
+        if (_pvAnnHistory.length > 25) _pvAnnHistory.shift();
+    }
+    function pvAnnGetPos(canvas, e) {
+        const r = canvas.getBoundingClientRect();
+        const cx = e.touches ? e.touches[0].clientX : e.clientX;
+        const cy = e.touches ? e.touches[0].clientY : e.clientY;
+        return { x: (cx - r.left) * (canvas.width / r.width),
+                 y: (cy - r.top)  * (canvas.height / r.height) };
+    }
+    function pvAnnBindEvents(canvas) {
+        const ctx = canvas.getContext('2d');
+        _pvAnnHandlers.down = function(e) {
+            e.preventDefault(); e.stopPropagation();
+            _pvAnnDrawing = true;
+            const pos = pvAnnGetPos(canvas, e);
+            _pvAnnStartX = pos.x; _pvAnnStartY = pos.y;
+            if (_pvAnnTool !== 'eraser') pvAnnSaveHist(canvas);
+            if (_pvAnnTool === 'pen') { ctx.beginPath(); ctx.moveTo(pos.x, pos.y); }
+            else if (_pvAnnTool === 'rect' || _pvAnnTool === 'arrow') {
+                _pvAnnRectSnap = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            }
+        };
+        _pvAnnHandlers.move = function(e) {
+            if (!_pvAnnDrawing) return;
+            e.preventDefault(); e.stopPropagation();
+            const pos = pvAnnGetPos(canvas, e);
+            ctx.strokeStyle = _pvAnnColor; ctx.lineWidth = _pvAnnWidth; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+            if (_pvAnnTool === 'pen') {
+                ctx.lineTo(pos.x, pos.y); ctx.stroke();
+            } else if (_pvAnnTool === 'rect') {
+                ctx.putImageData(_pvAnnRectSnap, 0, 0);
+                ctx.beginPath(); ctx.rect(_pvAnnStartX, _pvAnnStartY, pos.x - _pvAnnStartX, pos.y - _pvAnnStartY); ctx.stroke();
+            } else if (_pvAnnTool === 'arrow') {
+                ctx.putImageData(_pvAnnRectSnap, 0, 0);
+                pvAnnDrawArrow(ctx, _pvAnnStartX, _pvAnnStartY, pos.x, pos.y);
+            } else if (_pvAnnTool === 'eraser') {
+                ctx.save();
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.beginPath();
+                ctx.arc(pos.x, pos.y, _pvAnnWidth * 3, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(0,0,0,1)';
+                ctx.fill();
+                ctx.restore();
+            }
+        };
+        _pvAnnHandlers.up = function(e) {
+            if (!_pvAnnDrawing) return;
+            _pvAnnDrawing = false;
+            if (_pvAnnTool === 'pen') canvas.getContext('2d').closePath();
+            else if (_pvAnnTool === 'arrow' && _pvAnnRectSnap) {
+                // finalize arrow
+                const pos = pvAnnGetPos(canvas, e);
+                ctx.putImageData(_pvAnnRectSnap, 0, 0);
+                ctx.strokeStyle = _pvAnnColor; ctx.lineWidth = _pvAnnWidth; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+                pvAnnDrawArrow(ctx, _pvAnnStartX, _pvAnnStartY, pos.x, pos.y);
+            }
+            _pvAnnRectSnap = null;
+        };
+        canvas.addEventListener('pointerdown',  _pvAnnHandlers.down);
+        canvas.addEventListener('pointermove',  _pvAnnHandlers.move);
+        canvas.addEventListener('pointerup',    _pvAnnHandlers.up);
+        canvas.addEventListener('pointercancel',_pvAnnHandlers.up);
+    }
+    function pvAnnUnbindEvents(canvas) {
+        if (_pvAnnHandlers.down)   canvas.removeEventListener('pointerdown',  _pvAnnHandlers.down);
+        if (_pvAnnHandlers.move)   canvas.removeEventListener('pointermove',  _pvAnnHandlers.move);
+        if (_pvAnnHandlers.up)   { canvas.removeEventListener('pointerup',    _pvAnnHandlers.up);
+                                   canvas.removeEventListener('pointercancel',_pvAnnHandlers.up); }
+        _pvAnnHandlers = {};
+    }
+    window.pvAnnSave = async function() {
+        const canvas = document.getElementById('pvAnnCanvas');
+        const imgEl  = document.getElementById('pvLbImg');
+        const wrap   = document.getElementById('pvLbImgWrap');
+        const p      = PHOTOS[lbCurrent];
+        // Composite at natural resolution
+        const off = document.createElement('canvas');
+        off.width  = imgEl.naturalWidth;
+        off.height = imgEl.naturalHeight;
+        const ctx  = off.getContext('2d');
+        ctx.drawImage(imgEl, 0, 0, off.width, off.height);
+        // Map canvas coords → natural image coords
+        const imgRect  = imgEl.getBoundingClientRect();
+        const wrapRect = wrap.getBoundingClientRect();
+        const scaleC   = canvas.width / wrapRect.width;
+        const ox = (imgRect.left - wrapRect.left) * scaleC;
+        const oy = (imgRect.top  - wrapRect.top)  * (canvas.height / wrapRect.height);
+        const dw = imgRect.width  * scaleC;
+        const dh = imgRect.height * (canvas.height / wrapRect.height);
+        ctx.drawImage(canvas, ox, oy, dw, dh, 0, 0, off.width, off.height);
+        const imageData = off.toDataURL('image/png');
+
+        const saveBtn = document.getElementById('pvAnnSaveBtn');
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="bi bi-hourglass-split"></i>';
+        try {
+            const r = await fetch(PV_BASE + '/api/save_annotation.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ csrf: PV_CSRF, photo_id: p.id, image_data: imageData })
+            });
+            const d = await r.json();
+            if (!d.ok) throw new Error(d.error || 'Save failed');
+            // Update photo data
+            const annUrl = d.annotated_url + '?ts=' + Date.now();
+            _pvAnnotatedUrl = d.annotated_url;
+            p.annotated_url = d.annotated_url;
+            photoMap[p.id].annotated_url = d.annotated_url;
+            // Exit annotation mode, load annotated view
+            pvAnnCancel();
+            const lbImg = document.getElementById('pvLbImg');
+            lbImg.src = annUrl;
+            document.getElementById('pvLbImgToggle').style.display = '';
+            pvLbShowImg('annotated');
+        } catch(err) {
+            pdToast('Save failed: ' + err.message, 'error');
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="bi bi-check-lg"></i> Save';
+        }
+    };
+
 })();
 </script>
+
+<!-- Photo Edit Modal -->
+<div id="pvEditPhotoModal" style="display:none;position:fixed;inset:0;z-index:10100;
+     align-items:center;justify-content:center;padding:1rem;"
+     onclick="if(event.target===this)pvCloseEditPhoto()">
+    <div style="position:absolute;inset:0;background:rgba(0,0,0,0.65);backdrop-filter:blur(4px);"></div>
+    <div style="position:relative;background:#fff;border-radius:1.5rem;box-shadow:0 25px 60px rgba(0,0,0,.4);
+                width:100%;max-width:420px;padding:1.5rem;z-index:10;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;">
+            <h3 style="font-size:.9375rem;font-weight:700;color:#1e293b;margin:0;">
+                <i class="bi bi-pencil-fill" style="color:#7c3aed;margin-right:.5rem;"></i>Edit Photo Details
+            </h3>
+            <button onclick="pvCloseEditPhoto()"
+                    style="border:none;background:none;cursor:pointer;color:#94a3b8;width:2rem;height:2rem;
+                           border-radius:.5rem;display:flex;align-items:center;justify-content:center;font-size:1rem;">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <input type="hidden" id="pvEditPhotoId">
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;
+                          letter-spacing:.08em;margin-bottom:.5rem;">Wound Location</label>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.375rem;margin-bottom:.5rem;">
+                <?php foreach (['Left Foot','Right Foot','Left Leg','Right Leg','Sacrum','Other'] as $_eloc): ?>
+                <button type="button" class="pv-edit-loc-btn"
+                        style="padding:.4375rem .25rem;border:1.5px solid #e2e8f0;border-radius:.625rem;
+                               background:#f8fafc;color:#475569;font-size:.71875rem;cursor:pointer;transition:.1s;"
+                        onclick="pvEditLocSelect(this,'<?= addslashes($_eloc) ?>')">
+                    <?= htmlspecialchars($_eloc) ?>
+                </button>
+                <?php endforeach; ?>
+            </div>
+            <input id="pvEditLocText" type="text" placeholder="Or type location…"
+                   style="width:100%;box-sizing:border-box;padding:.5625rem .75rem;border:1.5px solid #e2e8f0;
+                          border-radius:.75rem;font-size:.875rem;outline:none;transition:border-color .15s;"
+                   onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='#e2e8f0'">
+        </div>
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;
+                          letter-spacing:.08em;margin-bottom:.375rem;">Note <span style="font-weight:400;text-transform:none;">(optional)</span></label>
+            <textarea id="pvEditNoteText" rows="3" placeholder="e.g. wound size 3×2 cm, improving…"
+                      style="width:100%;box-sizing:border-box;padding:.5625rem .75rem;border:1.5px solid #e2e8f0;
+                             border-radius:.75rem;font-size:.875rem;resize:none;outline:none;transition:border-color .15s;"
+                      onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='#e2e8f0'"></textarea>
+        </div>
+        <!-- Visit type -->
+        <div style="margin-bottom:1rem;">
+            <label style="display:block;font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;
+                          letter-spacing:.08em;margin-bottom:.5rem;">Photo Type</label>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.375rem;">
+                <?php foreach (['pre_debridement' => 'Pre-Debridement', 'post_debridement' => 'Post-Debridement', 'post_graft' => 'Post-Graft'] as $_vkey => $_vlabel): ?>
+                <button type="button" class="pv-edit-visit-btn" data-vtype="<?= $_vkey ?>"
+                        style="padding:.4375rem .25rem;border:1.5px solid #e2e8f0;border-radius:.625rem;
+                               background:#f8fafc;color:#475569;font-size:.6875rem;font-weight:600;cursor:pointer;transition:.1s;"
+                        onclick="pvEditVisitSelect(this,'<?= $_vkey ?>')">
+                    <?= htmlspecialchars($_vlabel) ?>
+                </button>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <!-- Measurements L × W × D -->
+        <div style="margin-bottom:1.25rem;">
+            <label style="display:block;font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;
+                          letter-spacing:.08em;margin-bottom:.5rem;">Measurements <span style="font-weight:400;text-transform:none;">(cm, optional)</span></label>
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;">
+                <div>
+                    <label style="font-size:.625rem;color:#94a3b8;font-weight:600;display:block;margin-bottom:.25rem;">Length</label>
+                    <input id="pvEditLength" type="number" step="0.1" min="0" max="99" placeholder="0.0"
+                           style="width:100%;box-sizing:border-box;padding:.5rem .625rem;border:1.5px solid #e2e8f0;
+                                  border-radius:.625rem;font-size:.875rem;outline:none;transition:border-color .15s;"
+                           onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='#e2e8f0'">
+                </div>
+                <div>
+                    <label style="font-size:.625rem;color:#94a3b8;font-weight:600;display:block;margin-bottom:.25rem;">Width</label>
+                    <input id="pvEditWidth" type="number" step="0.1" min="0" max="99" placeholder="0.0"
+                           style="width:100%;box-sizing:border-box;padding:.5rem .625rem;border:1.5px solid #e2e8f0;
+                                  border-radius:.625rem;font-size:.875rem;outline:none;transition:border-color .15s;"
+                           onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='#e2e8f0'">
+                </div>
+                <div>
+                    <label style="font-size:.625rem;color:#94a3b8;font-weight:600;display:block;margin-bottom:.25rem;">Depth</label>
+                    <input id="pvEditDepth" type="number" step="0.1" min="0" max="99" placeholder="0.0"
+                           style="width:100%;box-sizing:border-box;padding:.5rem .625rem;border:1.5px solid #e2e8f0;
+                                  border-radius:.625rem;font-size:.875rem;outline:none;transition:border-color .15s;"
+                           onfocus="this.style.borderColor='#7c3aed'" onblur="this.style.borderColor='#e2e8f0'">
+                </div>
+            </div>
+        </div>
+        <div style="display:flex;gap:.75rem;">
+            <button onclick="pvSaveEditPhoto()"
+                    style="flex:1;padding:.75rem;background:#7c3aed;color:#fff;border:none;border-radius:.75rem;
+                           font-size:.875rem;font-weight:700;cursor:pointer;display:flex;align-items:center;
+                           justify-content:center;gap:.375rem;"
+                    onmouseover="this.style.background='#6d28d9'" onmouseout="this.style.background='#7c3aed'">
+                <i class="bi bi-floppy-fill"></i> Save Changes
+            </button>
+            <button onclick="pvCloseEditPhoto()"
+                    style="padding:.75rem 1.25rem;background:#f1f5f9;color:#64748b;border:none;border-radius:.75rem;
+                           font-size:.875rem;font-weight:600;cursor:pointer;"
+                    onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">
+                Cancel
+            </button>
+        </div>
+        <p id="pvEditPhotoErr" style="display:none;color:#dc2626;font-size:.75rem;margin-top:.625rem;text-align:center;"></p>
+    </div>
+</div>
+
+<!-- Patient-view wound photo lightbox -->
+<div id="pvLightbox" style="display:none;position:fixed;inset:0;z-index:9999;align-items:center;justify-content:center;padding:1rem;"
+     onclick="if(event.target===this)closePhotoLightbox()">
+    <div style="position:absolute;inset:0;background:rgba(0,0,0,0.82);backdrop-filter:blur(4px);"></div>
+    <div id="pvLbDialog" style="position:relative;background:#fff;border-radius:1.5rem;box-shadow:0 25px 60px rgba(0,0,0,.4);
+                width:100%;max-width:960px;max-height:90vh;display:flex;flex-direction:column;overflow:hidden;z-index:10;">
+        <!-- Header -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.5rem;border-bottom:1px solid #f1f5f9;flex-shrink:0;">
+            <div style="display:flex;align-items:center;gap:.75rem;">
+                <div style="width:2.25rem;height:2.25rem;background:#ede9fe;border-radius:.75rem;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <i class="bi bi-camera-fill" style="color:#7c3aed;font-size:1rem;"></i>
+                </div>
+                <div>
+                    <p id="pvLbTitle" style="font-size:.875rem;font-weight:700;color:#1e293b;margin:0;"></p>
+                    <p id="pvLbDate"  style="font-size:.75rem;font-weight:600;color:#7c3aed;margin:0;"></p>
+                </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:.5rem;">
+                <span id="pvLbCount" style="font-size:.75rem;color:#94a3b8;font-weight:500;"></span>
+                <button id="pvLbSidebarToggle" onclick="pvLbToggleSidebar()" title="Toggle wound details"
+                        style="width:2.25rem;height:2.25rem;border:none;background:transparent;border-radius:.75rem;
+                               cursor:pointer;display:flex;align-items:center;justify-content:center;"
+                        onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='transparent'">
+                    <i class="bi bi-layout-sidebar-reverse" style="font-size:1rem;"></i>
+                </button>
+                <button onclick="closePhotoLightbox()"
+                        style="width:2.25rem;height:2.25rem;border:none;background:transparent;border-radius:.75rem;
+                               cursor:pointer;display:flex;align-items:center;justify-content:center;color:#94a3b8;"
+                        onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='transparent'">
+                    <i class="bi bi-x-lg" style="font-size:1rem;"></i>
+                </button>
+            </div>
+        </div>
+        <!-- Body: image left, sidebar right -->
+        <div class="pvlb-body">
+            <!-- Image panel -->
+            <div id="pvLbImgWrap" class="pvlb-imgwrap"
+                 style="background:#0f172a;position:relative;overflow:hidden;
+                        display:flex;align-items:center;justify-content:center;
+                        cursor:grab;user-select:none;min-height:320px;touch-action:none;">
+                <img id="pvLbImg" src="" alt="Wound photo"
+                     style="max-width:100%;max-height:100%;object-fit:contain;border-radius:.75rem;
+                            pointer-events:none;transform-origin:center center;
+                            transition:transform .15s ease;will-change:transform;">
+                <!-- Original/Annotated toggle -->
+                <div id="pvLbImgToggle" class="pvlb-overlay" style="display:none;position:absolute;top:.625rem;left:.625rem;
+                     background:rgba(0,0,0,.6);border-radius:.75rem;padding:.25rem;z-index:10;"
+                     onpointerdown="event.stopPropagation()" onclick="event.stopPropagation()">
+                    <button id="pvLbBtnOrig" onclick="pvLbShowImg('orig')"
+                            style="padding:.25rem .625rem;border:none;background:transparent;cursor:pointer;
+                                   border-radius:.5rem;font-size:.7rem;font-weight:600;color:rgba(255,255,255,.5);transition:.15s;">
+                        Original
+                    </button>
+                    <button id="pvLbBtnAnnotated" onclick="pvLbShowImg('annotated')"
+                            style="padding:.25rem .625rem;border:none;background:transparent;cursor:pointer;
+                                   border-radius:.5rem;font-size:.7rem;font-weight:600;color:rgba(255,255,255,.5);transition:.15s;">
+                        <i class="bi bi-rulers" style="margin-right:.2rem;"></i>Annotated
+                    </button>
+                </div>
+                <!-- Zoom controls -->
+                <div class="pvlb-overlay" style="position:absolute;bottom:.75rem;left:50%;transform:translateX(-50%);
+                            display:flex;align-items:center;gap:.25rem;
+                            background:rgba(0,0,0,.6);border-radius:9999px;padding:.25rem .5rem;z-index:10;">
+                    <button onclick="pvLbZoom(-0.25)" title="Zoom out"
+                            style="width:1.75rem;height:1.75rem;border:none;background:transparent;cursor:pointer;
+                                   color:#fff;border-radius:9999px;display:flex;align-items:center;justify-content:center;font-size:1rem;">
+                        <i class="bi bi-dash-lg"></i>
+                    </button>
+                    <button onclick="pvLbZoomReset()" id="pvLbZoomLabel"
+                            style="min-width:2.5rem;border:none;background:transparent;cursor:pointer;
+                                   color:#fff;font-size:.7rem;font-weight:700;text-align:center;">100%</button>
+                    <button onclick="pvLbZoom(0.25)" title="Zoom in"
+                            style="width:1.75rem;height:1.75rem;border:none;background:transparent;cursor:pointer;
+                                   color:#fff;border-radius:9999px;display:flex;align-items:center;justify-content:center;font-size:1rem;">
+                        <i class="bi bi-plus-lg"></i>
+                    </button>
+                </div>
+                <!-- Annotation toolbar (visible in draw mode) -->
+                <div id="pvAnnotateBar">
+                    <button id="pvAnnBtnPen"   onclick="pvAnnSetTool('pen',this)"    title="Freehand pen"  style="background:rgba(255,255,255,.25);"><i class="bi bi-pencil-fill"></i></button>
+                    <button id="pvAnnBtnArrow" onclick="pvAnnSetTool('arrow',this)"  title="Arrow"><i class="bi bi-arrow-up-right"></i></button>
+                    <button id="pvAnnBtnRect"  onclick="pvAnnSetTool('rect',this)"   title="Rectangle"><i class="bi bi-square"></i></button>
+                    <button id="pvAnnBtnErase" onclick="pvAnnSetTool('eraser',this)" title="Eraser"><i class="bi bi-eraser"></i></button>
+                    <span class="pv-ann-sep"></span>
+                    <button onclick="pvAnnSetColor('#000000',this)" title="Black"
+                            style="width:.9rem;height:.9rem;border-radius:9999px;border:2px solid transparent;
+                                   background:#000;padding:0;"></button>
+                    <button onclick="pvAnnSetColor('#ef4444',this)" title="Red"
+                            style="width:.9rem;height:.9rem;border-radius:9999px;border:2px solid #fff;
+                                   background:#ef4444;padding:0;"></button>
+                    <button onclick="pvAnnSetColor('#22c55e',this)" title="Green"
+                            style="width:.9rem;height:.9rem;border-radius:9999px;border:2px solid transparent;
+                                   background:#22c55e;padding:0;"></button>
+                    <button onclick="pvAnnSetColor('#eab308',this)" title="Yellow"
+                            style="width:.9rem;height:.9rem;border-radius:9999px;border:2px solid transparent;
+                                   background:#eab308;padding:0;"></button>
+                    <button onclick="pvAnnSetColor('#fff',this)" title="White"
+                            style="width:.9rem;height:.9rem;border-radius:9999px;border:2px solid rgba(255,255,255,.35);
+                                   background:#fff;padding:0;"></button>
+                    <span class="pv-ann-sep"></span>
+                    <button onclick="pvAnnSetWidth(3,this)" title="Thin"
+                            style="border:2px solid rgba(255,255,255,.5);">
+                        <div style="width:.65rem;height:2px;background:#fff;border-radius:1px;"></div></button>
+                    <button onclick="pvAnnSetWidth(6,this)" title="Medium"
+                            style="border:2px solid transparent;">
+                        <div style="width:.65rem;height:4px;background:#fff;border-radius:2px;"></div></button>
+                    <button onclick="pvAnnSetWidth(10,this)" title="Thick"
+                            style="border:2px solid transparent;">
+                        <div style="width:.65rem;height:7px;background:#fff;border-radius:3px;"></div></button>
+                    <span class="pv-ann-sep"></span>
+                    <button onclick="pvAnnUndo()"  title="Undo"  style="color:#fbbf24;"><i class="bi bi-arrow-counterclockwise"></i></button>
+                    <button onclick="pvAnnClear()" title="Clear all" style="color:#f87171;"><i class="bi bi-trash3"></i></button>
+                    <span class="pv-ann-sep"></span>
+                    <button id="pvAnnSaveBtn" onclick="pvAnnSave()"
+                            style="padding:.2rem .5rem;border-radius:.5rem;background:#4ade80;color:#14532d;font-size:.65rem;font-weight:700;width:auto;">
+                        <i class="bi bi-check-lg"></i> Save
+                    </button>
+                    <button onclick="pvAnnCancel()" title="Cancel" style="color:#f87171;"><i class="bi bi-x-lg"></i></button>
+                </div>
+                <!-- Annotation canvas -->
+                <canvas id="pvAnnCanvas" style="display:none;position:absolute;inset:0;z-index:15;cursor:crosshair;touch-action:none;"></canvas>
+                <!-- Draw trigger button (top-right overlay) -->
+                <div class="pvlb-overlay" style="position:absolute;top:.625rem;right:.625rem;z-index:12;"
+                     onpointerdown="event.stopPropagation()">
+                    <button id="pvLbDrawBtn" onclick="pvAnnStart()" title="Draw / annotate photo"
+                            style="display:flex;align-items:center;gap:.3rem;padding:.25rem .55rem;
+                                   background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:.625rem;
+                                   font-size:.68rem;font-weight:700;cursor:pointer;white-space:nowrap;"
+                            onmouseover="this.style.background='rgba(0,0,0,.85)'" onmouseout="this.style.background='rgba(0,0,0,.6)'">
+                        <i class="bi bi-pencil-fill"></i> Draw
+                    </button>
+                </div>
+                <!-- Prev / Next (inside imgwrap so they stay over the image on mobile) -->
+                <div id="pvLbNav" class="pvlb-overlay" style="position:absolute;top:50%;transform:translateY(-50%);width:100%;
+                                  display:flex;justify-content:space-between;padding:0 .75rem;pointer-events:none;z-index:9;">
+                    <button onclick="pvLbStep(-1)" onpointerdown="event.stopPropagation()"
+                            style="pointer-events:auto;width:2.5rem;height:2.5rem;border:none;cursor:pointer;
+                                   border-radius:9999px;background:rgba(0,0,0,.5);color:#fff;
+                                   display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,.3);">
+                        <i class="bi bi-chevron-left" style="font-size:.875rem;"></i>
+                    </button>
+                    <button onclick="pvLbStep(1)" onpointerdown="event.stopPropagation()"
+                            style="pointer-events:auto;width:2.5rem;height:2.5rem;border:none;cursor:pointer;
+                                   border-radius:9999px;background:rgba(0,0,0,.5);color:#fff;
+                                   display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(0,0,0,.3);">
+                        <i class="bi bi-chevron-right" style="font-size:.875rem;"></i>
+                    </button>
+                </div>
+            </div>
+            <!-- Sidebar -->
+            <div class="pvlb-sidebar" style="width:240px;flex-shrink:0;padding:1.25rem;
+                        border-left:1px solid #f1f5f9;display:flex;flex-direction:column;gap:1rem;">
+                <div>
+                    <div style="font-size:.625rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.25rem;">Wound Site</div>
+                    <p id="pvLbTitleMeta" style="font-size:.875rem;font-weight:600;color:#334155;margin:0;"></p>
+                </div>
+                <div>
+                    <div style="font-size:.625rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.25rem;">Date</div>
+                    <p id="pvLbDateMeta" style="font-size:.875rem;color:#334155;margin:0;"></p>
+                </div>
+                <div>
+                    <div style="font-size:.625rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.25rem;">Recorded by</div>
+                    <p id="pvLbMa" style="font-size:.875rem;color:#334155;margin:0;"></p>
+                </div>
+                <div id="pvLbDescBlock" style="display:none;">
+                    <div style="font-size:.625rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.25rem;">Notes</div>
+                    <p id="pvLbDesc" style="font-size:.875rem;color:#64748b;font-style:italic;line-height:1.5;margin:0;"></p>
+                </div>
+                <a id="pvLbDownload" href="#" download target="_blank"
+                   style="display:flex;align-items:center;justify-content:center;gap:.5rem;
+                          padding:.625rem 1rem;background:#1e293b;color:#fff;text-decoration:none;
+                          border-radius:.75rem;font-size:.875rem;font-weight:600;margin-top:auto;">
+                    <i class="bi bi-download"></i> Download
+                </a>
+
+                <!-- ── Analysis Panel ───────────────────────────────── -->
+                <div style="border-top:1px solid #f1f5f9;padding-top:.875rem;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.625rem;">
+                        <div style="font-size:.6rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;">
+                            <i class="bi bi-rulers" style="color:#a78bfa;margin-right:.25rem;"></i>Wound Analysis
+                        </div>
+                        <button id="pvLbAnalyzeBtn" onclick="pvLbAnalyze()"
+                                style="display:inline-flex;align-items:center;gap:.35rem;padding:.3rem .625rem;
+                                       background:#7c3aed;color:#fff;border:none;border-radius:.625rem;
+                                       font-size:.7rem;font-weight:700;cursor:pointer;transition:.15s;white-space:nowrap;"
+                                onmouseover="this.style.background='#6d28d9'" onmouseout="this.style.background='#7c3aed'">
+                            <i class="bi bi-cpu-fill"></i> Analyze
+                        </button>
+                    </div>
+
+                    <!-- Spinner -->
+                    <div id="pvLbSpinner" style="display:none;align-items:center;gap:.625rem;
+                         background:#f5f3ff;border:1px solid #ede9fe;border-radius:.75rem;
+                         padding:.625rem .875rem;margin-bottom:.5rem;">
+                        <i class="bi bi-arrow-repeat" style="color:#7c3aed;font-size:1.1rem;animation:pvSpin 1s linear infinite;"></i>
+                        <div>
+                            <p style="font-size:.75rem;font-weight:700;color:#6d28d9;margin:0;">Analyzing…</p>
+                            <p style="font-size:.65rem;color:#a78bfa;margin:0;">AI measuring wound bed</p>
+                        </div>
+                    </div>
+
+                    <!-- Error -->
+                    <div id="pvLbAnalyzeError" style="display:none;background:#fef2f2;border:1px solid #fecaca;
+                         border-radius:.75rem;padding:.5rem .75rem;font-size:.75rem;color:#dc2626;margin-bottom:.5rem;"></div>
+
+                    <!-- Results -->
+                    <div id="pvLbResult" style="display:none;">
+                        <!-- Section label -->
+                        <p style="font-size:.6rem;font-weight:700;color:#94a3b8;text-transform:uppercase;
+                                  letter-spacing:.1em;margin:0 0 .375rem;">
+                            <i class="bi bi-cpu-fill" style="margin-right:.2rem;"></i>AI Analysis
+                        </p>
+                        <!-- Measurements grid -->
+                        <div style="display:grid;grid-template-columns:repeat(3,1fr);border:1px solid #ddd6fe;
+                                    border-radius:.75rem;overflow:hidden;margin-bottom:.5rem;">
+                            <div style="padding:.5rem .25rem;text-align:center;background:#f5f3ff;">
+                                <p style="font-size:.55rem;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:.08em;margin:0 0 .15rem;">Area</p>
+                                <p id="pvLbMArea" style="font-size:1rem;font-weight:900;color:#5b21b6;margin:0;line-height:1;">—</p>
+                                <p style="font-size:.55rem;color:#a78bfa;margin:.15rem 0 0;">cm²</p>
+                            </div>
+                            <div style="padding:.5rem .25rem;text-align:center;background:#f5f3ff;border-left:1px solid #ddd6fe;border-right:1px solid #ddd6fe;">
+                                <p style="font-size:.55rem;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:.08em;margin:0 0 .15rem;">Length</p>
+                                <p id="pvLbMLength" style="font-size:1rem;font-weight:900;color:#5b21b6;margin:0;line-height:1;">—</p>
+                                <p style="font-size:.55rem;color:#a78bfa;margin:.15rem 0 0;">cm</p>
+                            </div>
+                            <div style="padding:.5rem .25rem;text-align:center;background:#f5f3ff;">
+                                <p style="font-size:.55rem;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:.08em;margin:0 0 .15rem;">Width</p>
+                                <p id="pvLbMWidth" style="font-size:1rem;font-weight:900;color:#5b21b6;margin:0;line-height:1;">—</p>
+                                <p style="font-size:.55rem;color:#a78bfa;margin:.15rem 0 0;">cm</p>
+                            </div>
+                        </div>
+                        <!-- Badges -->
+                        <div id="pvLbMBadges" style="display:flex;flex-wrap:wrap;gap:.375rem;margin-bottom:.5rem;"></div>
+                        <!-- No ruler warning -->
+                        <div id="pvLbNoRulerWarn" style="display:none;font-size:.7rem;color:#92400e;
+                             background:#fffbeb;border:1px solid #fde68a;border-radius:.625rem;
+                             padding:.375rem .625rem;margin-bottom:.5rem;">
+                            <i class="bi bi-exclamation-triangle-fill" style="margin-right:.25rem;"></i>No ruler — estimates may vary. Place a ruler next to the wound.
+                        </div>
+                        <!-- Tissue composition -->
+                        <div id="pvLbTissueBlock" style="display:none;">
+                            <p style="font-size:.6rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;margin:0 0 .375rem;">Tissue Composition</p>
+                            <div id="pvLbTissueBar" style="display:flex;border-radius:9999px;overflow:hidden;height:.875rem;margin-bottom:.375rem;"></div>
+                            <div id="pvLbTissueLabels" style="display:flex;flex-wrap:wrap;gap:.375rem .75rem;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Clinical Measurements (manual entry) -->
+                    <div id="pvLbManualResult" style="display:none;margin-top:.5rem;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.375rem;gap:.5rem;flex-wrap:wrap;">
+                            <p style="font-size:.6rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.1em;margin:0;">
+                                <i class="bi bi-pencil-fill" style="margin-right:.2rem;"></i>Clinical Measurements
+                            </p>
+                            <span id="pvLbManAttrib" style="font-size:.6rem;color:#64748b;font-weight:500;"></span>
+                        </div>
+                        <div style="display:grid;grid-template-columns:repeat(3,1fr);border:1px solid #e2e8f0;
+                                    border-radius:.75rem;overflow:hidden;">
+                            <div style="padding:.5rem .25rem;text-align:center;background:#f8fafc;">
+                                <p style="font-size:.55rem;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.08em;margin:0 0 .15rem;">Area</p>
+                                <p id="pvLbMMArea" style="font-size:1rem;font-weight:900;color:#0f172a;margin:0;line-height:1;">—</p>
+                                <p style="font-size:.55rem;color:#94a3b8;margin:.15rem 0 0;">cm²</p>
+                            </div>
+                            <div style="padding:.5rem .25rem;text-align:center;background:#f8fafc;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;">
+                                <p style="font-size:.55rem;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.08em;margin:0 0 .15rem;">Length</p>
+                                <p id="pvLbMMLength" style="font-size:1rem;font-weight:900;color:#0f172a;margin:0;line-height:1;">—</p>
+                                <p style="font-size:.55rem;color:#94a3b8;margin:.15rem 0 0;">cm</p>
+                            </div>
+                            <div style="padding:.5rem .25rem;text-align:center;background:#f8fafc;">
+                                <p style="font-size:.55rem;font-weight:700;color:#475569;text-transform:uppercase;letter-spacing:.08em;margin:0 0 .15rem;">Width</p>
+                                <p id="pvLbMMWidth" style="font-size:1rem;font-weight:900;color:#0f172a;margin:0;line-height:1;">—</p>
+                                <p style="font-size:.55rem;color:#94a3b8;margin:.15rem 0 0;">cm</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- ── /Analysis Panel ──────────────────────────────── -->
+                <?php if (!isBilling()): ?>
+                <div style="display:flex;gap:.5rem;margin-top:.5rem;">
+                    <button id="pvLbEditBtn" onclick="pvEditPhotoLb()"
+                            style="flex:1;display:flex;align-items:center;justify-content:center;gap:.375rem;
+                                   padding:.5rem .75rem;background:#ede9fe;color:#6d28d9;border:none;
+                                   border-radius:.75rem;font-size:.8rem;font-weight:600;cursor:pointer;"
+                            onmouseover="this.style.background='#ddd6fe'" onmouseout="this.style.background='#ede9fe'">
+                        <i class="bi bi-pencil-fill"></i> Edit
+                    </button>
+                    <button id="pvLbDeleteBtn" onclick="pvDeletePhotoLb()"
+                            style="flex:1;display:flex;align-items:center;justify-content:center;gap:.375rem;
+                                   padding:.5rem .75rem;background:#fef2f2;color:#dc2626;border:none;
+                                   border-radius:.75rem;font-size:.8rem;font-weight:600;cursor:pointer;"
+                            onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='#fef2f2'">
+                        <i class="bi bi-trash3"></i> Delete
+                    </button>
+                </div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
 <?php endif; ?>
 
 <!-- Wounds Tab -->
@@ -2390,6 +3920,16 @@ $photosJson = json_encode(array_map(fn($p) => [
                 </div>
             </div>
             <div class="mt-3 flex flex-col sm:flex-row gap-3">
+                <input type="text" name="wound_type" list="wound-types-list"
+                       placeholder="Wound type (e.g. Diabetic ulcer)"
+                       class="flex-1 px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50
+                              focus:outline-none focus:ring-2 focus:ring-rose-400 focus:bg-white transition">
+                <datalist id="wound-types-list">
+                    <option value="Diabetic ulcer"><option value="Venous ulcer">
+                    <option value="Arterial ulcer"><option value="Pressure injury">
+                    <option value="Surgical wound"><option value="Traumatic wound">
+                    <option value="Burn"><option value="Mixed etiology">
+                </datalist>
                 <input type="text" name="notes" placeholder="Notes (optional)"
                        class="flex-1 px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-slate-50
                               focus:outline-none focus:ring-2 focus:ring-rose-400 focus:bg-white transition">
@@ -2432,13 +3972,14 @@ $photosJson = json_encode(array_map(fn($p) => [
                     <tr class="text-left border-b border-slate-100 bg-slate-50/40">
                         <th class="px-5 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Date</th>
                         <th class="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide">Wound Site</th>
+                        <th class="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide hidden sm:table-cell">Type</th>
                         <th class="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-center">L (cm)</th>
                         <th class="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-center">W (cm)</th>
                         <th class="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-center">D (cm)</th>
                         <th class="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide text-center">Area cm²</th>
                         <th class="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide hidden md:table-cell">Notes</th>
                         <th class="px-4 py-3 text-xs font-bold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Recorded By</th>
-                        <?php if (isAdmin()): ?><th class="px-4 py-3 w-12"></th><?php endif; ?>
+                        <?php if (!isBilling()): ?><th class="px-4 py-3 w-20"></th><?php endif; ?>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-50" id="woundTableBody">
@@ -2452,12 +3993,16 @@ $photosJson = json_encode(array_map(fn($p) => [
                         data-wound-row="<?= $wm['id'] ?>"
                         data-date="<?= h($wm['measured_at']) ?>"
                         data-site="<?= h($wm['wound_site']) ?>"
+                        data-type="<?= h($wm['wound_type'] ?? '') ?>"
                         data-area="<?= $area ?>">
                         <td class="px-5 py-3.5 font-medium text-slate-700 whitespace-nowrap">
                             <?= date('M j, Y', strtotime($wm['measured_at'])) ?>
                         </td>
                         <td class="px-4 py-3.5 text-slate-600 max-w-[160px] truncate">
                             <?= h($wm['wound_site']) ?>
+                        </td>
+                        <td class="px-4 py-3.5 text-slate-500 text-xs hidden sm:table-cell max-w-[120px] truncate">
+                            <?= h($wm['wound_type'] ?? '') ?: '—' ?>
                         </td>
                         <td class="px-4 py-3.5 text-center font-mono text-slate-700"><?= number_format($wm['length_cm'], 1) ?></td>
                         <td class="px-4 py-3.5 text-center font-mono text-slate-700"><?= number_format($wm['width_cm'],  1) ?></td>
@@ -2476,14 +4021,34 @@ $photosJson = json_encode(array_map(fn($p) => [
                         <td class="px-4 py-3.5 text-slate-400 text-xs hidden lg:table-cell">
                             <?= h($wm['recorded_by_name'] ?? '—') ?>
                         </td>
-                        <?php if (isAdmin()): ?>
+                        <?php if (!isBilling()): ?>
                         <td class="px-4 py-3.5">
-                            <button class="del-wound-btn" data-id="<?= $wm['id'] ?>"
-                                    title="Delete measurement"
-                                    style="background:none;border:none;cursor:pointer;color:#94a3b8;padding:4px 6px;border-radius:8px;"
-                                    onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='#94a3b8'">
-                                <i class="bi bi-trash3 text-sm"></i>
-                            </button>
+                            <div style="display:flex;gap:.25rem;align-items:center;">
+                                <button class="edit-wound-btn"
+                                        data-id="<?= $wm['id'] ?>"
+                                        data-date="<?= h($wm['measured_at']) ?>"
+                                        data-site="<?= h($wm['wound_site']) ?>"
+                                        data-type="<?= h($wm['wound_type'] ?? '') ?>"
+                                        data-len="<?= (float)$wm['length_cm'] ?>"
+                                        data-wid="<?= (float)$wm['width_cm'] ?>"
+                                        data-dep="<?= (float)$wm['depth_cm'] ?>"
+                                        data-notes="<?= h($wm['notes'] ?? '') ?>"
+                                        title="Edit measurement"
+                                        style="background:none;border:none;cursor:pointer;color:#94a3b8;padding:4px 6px;border-radius:8px;"
+                                        onmouseover="this.style.color='#7c3aed';this.style.background='#ede9fe'"
+                                        onmouseout="this.style.color='#94a3b8';this.style.background='none'">
+                                    <i class="bi bi-pencil text-sm"></i>
+                                </button>
+                                <?php if (isAdmin()): ?>
+                                <button class="del-wound-btn" data-id="<?= $wm['id'] ?>"
+                                        title="Delete measurement"
+                                        style="background:none;border:none;cursor:pointer;color:#94a3b8;padding:4px 6px;border-radius:8px;"
+                                        onmouseover="this.style.color='#ef4444';this.style.background='#fef2f2'"
+                                        onmouseout="this.style.color='#94a3b8';this.style.background='none'">
+                                    <i class="bi bi-trash3 text-sm"></i>
+                                </button>
+                                <?php endif; ?>
+                            </div>
                         </td>
                         <?php endif; ?>
                     </tr>
@@ -2502,6 +4067,94 @@ $photosJson = json_encode(array_map(fn($p) => [
     <?php endif; ?>
 
 </div><!-- /wounds tab -->
+
+<!-- Wound Measurement Edit Modal -->
+<div id="woundEditModal" style="display:none;position:fixed;inset:0;z-index:10100;
+     align-items:center;justify-content:center;padding:1rem;"
+     onclick="if(event.target===this)closeWoundEditModal()">
+    <div style="position:absolute;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);"></div>
+    <div style="position:relative;background:#fff;border-radius:1.5rem;box-shadow:0 25px 60px rgba(0,0,0,.4);
+                width:100%;max-width:540px;padding:1.5rem;z-index:10;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;">
+            <h3 style="font-size:.9375rem;font-weight:700;color:#1e293b;margin:0;">
+                <i class="bi bi-pencil-fill" style="color:#e11d48;margin-right:.5rem;"></i>Edit Measurement
+            </h3>
+            <button onclick="closeWoundEditModal()"
+                    style="border:none;background:none;cursor:pointer;color:#94a3b8;width:2rem;height:2rem;
+                           border-radius:.5rem;display:flex;align-items:center;justify-content:center;font-size:1rem;">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <input type="hidden" id="woundEditId">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.75rem;">
+            <div>
+                <label style="display:block;font-size:.7rem;font-weight:700;color:#64748b;margin-bottom:.25rem;">Date *</label>
+                <input id="woundEditDate" type="date"
+                       style="width:100%;box-sizing:border-box;padding:.5rem .75rem;border:1.5px solid #e2e8f0;
+                              border-radius:.75rem;font-size:.875rem;outline:none;"
+                       onfocus="this.style.borderColor='#e11d48'" onblur="this.style.borderColor='#e2e8f0'">
+            </div>
+            <div>
+                <label style="display:block;font-size:.7rem;font-weight:700;color:#64748b;margin-bottom:.25rem;">Wound Site *</label>
+                <input id="woundEditSite" type="text"
+                       style="width:100%;box-sizing:border-box;padding:.5rem .75rem;border:1.5px solid #e2e8f0;
+                              border-radius:.75rem;font-size:.875rem;outline:none;"
+                       onfocus="this.style.borderColor='#e11d48'" onblur="this.style.borderColor='#e2e8f0'">
+            </div>
+            <div>
+                <label style="display:block;font-size:.7rem;font-weight:700;color:#64748b;margin-bottom:.25rem;">Wound Type</label>
+                <input id="woundEditType" type="text" list="wound-types-list" placeholder="e.g. Diabetic ulcer"
+                       style="width:100%;box-sizing:border-box;padding:.5rem .75rem;border:1.5px solid #e2e8f0;
+                              border-radius:.75rem;font-size:.875rem;outline:none;"
+                       onfocus="this.style.borderColor='#e11d48'" onblur="this.style.borderColor='#e2e8f0'">
+            </div>
+            <div>
+                <label style="display:block;font-size:.7rem;font-weight:700;color:#64748b;margin-bottom:.25rem;">Notes</label>
+                <input id="woundEditNotes" type="text" placeholder="Optional notes"
+                       style="width:100%;box-sizing:border-box;padding:.5rem .75rem;border:1.5px solid #e2e8f0;
+                              border-radius:.75rem;font-size:.875rem;outline:none;"
+                       onfocus="this.style.borderColor='#e11d48'" onblur="this.style.borderColor='#e2e8f0'">
+            </div>
+            <div>
+                <label style="display:block;font-size:.7rem;font-weight:700;color:#64748b;margin-bottom:.25rem;">Length (cm) *</label>
+                <input id="woundEditLen" type="number" min="0.1" step="0.1"
+                       style="width:100%;box-sizing:border-box;padding:.5rem .75rem;border:1.5px solid #e2e8f0;
+                              border-radius:.75rem;font-size:.875rem;outline:none;"
+                       onfocus="this.style.borderColor='#e11d48'" onblur="this.style.borderColor='#e2e8f0'">
+            </div>
+            <div>
+                <label style="display:block;font-size:.7rem;font-weight:700;color:#64748b;margin-bottom:.25rem;">Width (cm) *</label>
+                <input id="woundEditWid" type="number" min="0.1" step="0.1"
+                       style="width:100%;box-sizing:border-box;padding:.5rem .75rem;border:1.5px solid #e2e8f0;
+                              border-radius:.75rem;font-size:.875rem;outline:none;"
+                       onfocus="this.style.borderColor='#e11d48'" onblur="this.style.borderColor='#e2e8f0'">
+            </div>
+            <div>
+                <label style="display:block;font-size:.7rem;font-weight:700;color:#64748b;margin-bottom:.25rem;">Depth (cm)</label>
+                <input id="woundEditDep" type="number" min="0" step="0.1"
+                       style="width:100%;box-sizing:border-box;padding:.5rem .75rem;border:1.5px solid #e2e8f0;
+                              border-radius:.75rem;font-size:.875rem;outline:none;"
+                       onfocus="this.style.borderColor='#e11d48'" onblur="this.style.borderColor='#e2e8f0'">
+            </div>
+        </div>
+        <div style="display:flex;gap:.75rem;">
+            <button onclick="submitWoundEdit()"
+                    style="flex:1;padding:.75rem;background:#e11d48;color:#fff;border:none;border-radius:.75rem;
+                           font-size:.875rem;font-weight:700;cursor:pointer;display:flex;align-items:center;
+                           justify-content:center;gap:.375rem;"
+                    onmouseover="this.style.background='#be123c'" onmouseout="this.style.background='#e11d48'">
+                <i class="bi bi-floppy-fill"></i> Save Changes
+            </button>
+            <button onclick="closeWoundEditModal()"
+                    style="padding:.75rem 1.25rem;background:#f1f5f9;color:#64748b;border:none;border-radius:.75rem;
+                           font-size:.875rem;font-weight:600;cursor:pointer;"
+                    onmouseover="this.style.background='#e2e8f0'" onmouseout="this.style.background='#f1f5f9'">
+                Cancel
+            </button>
+        </div>
+        <p id="woundEditErr" style="display:none;color:#dc2626;font-size:.75rem;margin-top:.5rem;text-align:center;"></p>
+    </div>
+</div>
 
 <?php elseif ($activeTab === 'diagnoses' && canAccessClinical()): ?>
 <!-- Diagnoses Tab -->
@@ -2974,7 +4627,7 @@ $cnCsrf    = csrfToken();
         ta.disabled = true;
         const d = await apiFetch({ action: 'create', patient_id: PID, body, parent_id: parentId });
         if (d.ok) { location.reload(); }
-        else { alert(d.error || 'Could not post reply.'); ta.disabled = false; }
+        else { pdToast(d.error || 'Could not post reply.', 'error'); ta.disabled = false; }
     };
 
     window.openCnEdit = function(id) {
@@ -2993,20 +4646,20 @@ $cnCsrf    = csrfToken();
         if (!body) return;
         const d = await apiFetch({ action: 'edit', id, body });
         if (d.ok) { location.reload(); }
-        else { alert(d.error || 'Could not save edit.'); }
+        else { pdToast(d.error || 'Could not save edit.', 'error'); }
     };
 
     window.deleteCareNote = async function(id) {
-        if (!confirm('Delete this note? Replies will also be removed.')) return;
+        if (!await pdConfirm({message: 'Delete this note?', subtext: 'Replies will also be removed.', confirmLabel: 'Delete', confirmIcon: 'bi bi-trash3', confirmStyle: 'background:#dc2626;'})) return;
         const d = await apiFetch({ action: 'delete', id, patient_id: PID });
         if (d.ok) { location.reload(); }
-        else { alert(d.error || 'Could not delete note.'); }
+        else { pdToast(d.error || 'Could not delete note.', 'error'); }
     };
 
     window.pinCareNote = async function(id, pinned) {
         const d = await apiFetch({ action: 'pin', id, patient_id: PID, pinned });
         if (d.ok) { location.reload(); }
-        else { alert(d.error || 'Could not update pin.'); }
+        else { pdToast(d.error || 'Could not update pin.', 'error'); }
     };
 })();
 </script>
@@ -3174,8 +4827,9 @@ $cnCsrf    = csrfToken();
 </div><!-- /audit tab -->
 
 <?php endif; ?>
+</div><!-- /pt-tab-body -->
 
-<?php if (canAccessClinical()): ?>
+<?php if (!$isPartial && canAccessClinical()): ?>
 <script>
 /* ── Patient profile photo upload ───────────────────────────────────── */
 (function () {
@@ -3194,7 +4848,7 @@ $cnCsrf    = csrfToken();
 
         // Client-side size guard (10 MB)
         if (file.size > 10 * 1024 * 1024) {
-            alert('File too large — max 10 MB.');
+            pdToast('File too large — max 10 MB.', 'error');
             input.value = '';
             return;
         }
@@ -3217,7 +4871,7 @@ $cnCsrf    = csrfToken();
         fetch(BASE + '/api/patient_photo.php', { method: 'POST', body: fd })
             .then(function (r) { return r.json(); })
             .then(function (data) {
-                if (!data.ok) { alert(data.error || 'Upload failed'); spinner.outerHTML = origContent; return; }
+                if (!data.ok) { pdToast(data.error || 'Upload failed', 'error'); spinner.outerHTML = origContent; return; }
                 // Replace with new image
                 var newImg = document.createElement('img');
                 newImg.id        = 'ptAvatarImg';
@@ -3227,17 +4881,17 @@ $cnCsrf    = csrfToken();
                 spinner.replaceWith(newImg);
                 HAS_PHOTO = true;
             })
-            .catch(function () { alert('Network error during upload.'); spinner.replaceWith(document.createElement('div')); });
+            .catch(function () { pdToast('Network error during upload.', 'error'); spinner.replaceWith(document.createElement('div')); });
 
         input.value = '';
     });
 
     // Right-click avatar → remove photo
     if (wrap) {
-        wrap.addEventListener('contextmenu', function (e) {
+        wrap.addEventListener('contextmenu', async function (e) {
             if (!HAS_PHOTO) return;
             e.preventDefault();
-            if (!confirm('Remove profile photo?')) return;
+            if (!await pdConfirm({message: 'Remove profile photo?', confirmLabel: 'Remove', confirmIcon: 'bi bi-trash3', confirmStyle: 'background:#dc2626;'})) return;
             fetch(BASE + '/api/patient_photo.php', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -3245,7 +4899,7 @@ $cnCsrf    = csrfToken();
             })
             .then(function (r) { return r.json(); })
             .then(function (data) {
-                if (!data.ok) { alert(data.error || 'Error'); return; }
+                if (!data.ok) { pdToast(data.error || 'Error', 'error'); return; }
                 // Replace image with initials div
                 var imgEl = document.getElementById('ptAvatarImg');
                 var ini = document.createElement('div');
@@ -3261,4 +4915,10 @@ $cnCsrf    = csrfToken();
 </script>
 <?php endif; ?>
 
-<?php include __DIR__ . '/includes/footer.php'; ?>
+<?php
+if ($isPartial) {
+    if (isset($extraJs)) echo $extraJs;
+    exit;
+}
+include __DIR__ . '/includes/footer.php';
+?>

@@ -9,10 +9,18 @@ $sigDate = date('m/d/Y', strtotime($f['created_at']));
 $fd      = is_string($f['form_data']) ? (json_decode($f['form_data'], true) ?? []) : ($f['form_data'] ?? []);
 $maName  = h($fd['ma_name'] ?? ($f['ma_name'] ?? ''));
 
+$_coFd   = is_array($fd) ? ($fd['company'] ?? '') : '';
+$_coPt   = $patient['company'] ?? '';
+$_coSrc  = $_coFd ?: $_coPt;
+$_coName = ($_coSrc === 'Visiting Medical Physician Inc.') ? 'Visiting Medical Physician Inc.' : 'Beyond Wound Care Inc.';
+$_coUC   = strtoupper($_coName);
+$_coAbb  = ($_coName === 'Visiting Medical Physician Inc.') ? 'VMP' : 'BWC';
+
 function wcc_checked(array $fd, string $key): string {
     return !empty($fd[$key]) ? '&#10003;' : '&#9744;';
 }
 ?>
+<?php ob_start(); ?>
 <style>
   @page { size: 8in 13in; margin: 0.4in 0.5in; }
 </style>
@@ -125,3 +133,10 @@ function wcc_checked(array $fd, string $key): string {
     </div>
 
 </div><!-- /.bwc-form -->
+<?php
+$_wccOut = ob_get_clean();
+// CSS classes use lowercase "bwc-"; text uses uppercase "BEYOND WOUND CARE INC." and "BWC" — safe to replace uppercase only
+$_wccOut = str_replace('BEYOND WOUND CARE INC.', $_coUC, $_wccOut);
+$_wccOut = str_replace('BWC', $_coAbb, $_wccOut);
+echo $_wccOut;
+?>

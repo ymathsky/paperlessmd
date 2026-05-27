@@ -177,4 +177,6 @@ include __DIR__ . '/../includes/header.php';
 </div><!-- /card -->
 </div><!-- /max-w-3xl -->
 
+<?php include __DIR__ . '/../includes/wound_photo_panel.php'; ?>
+<?php include __DIR__ . '/../includes/rx_pad_panel.php'; ?>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

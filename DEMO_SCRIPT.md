@@ -2,14 +2,18 @@
 **Beyond Wound Care Inc.**
 *Full feature walk-through — live demonstration guide*
 
+> **Production URL:** `https://ecpaperlessmd.com`
+> **Version:** v2.2 · May 2026
+> **Server:** DigitalOcean NYC1 Droplet · Ubuntu 24.04 LTS · PHP 8.2 · MySQL 8
+
 ---
 
 ## PRE-FLIGHT CHECKLIST
 
 > Complete these before anyone enters the room.
 
-- [ ] Open `https://docs.md-officesupport.com` in **Chrome** on the largest screen available
-- [ ] Log in as **admin** — every feature must be visible
+- [ ] Open `https://ecpaperlessmd.com` in **Chrome** on the largest screen available
+- [ ] Log in as **admin** (`acasten` / `Welcome1!`) — every feature must be visible
 - [ ] Open a second tab on a **phone or tablet** for the mobile section
 - [ ] Confirm test patient **"John Demo"** exists with:
   - Active medication list (3–5 meds)
@@ -19,7 +23,9 @@
 - [ ] Open the **AI chat** once to confirm it loads (avoids cold-start delay during demo)
 - [ ] Clear any old draft forms on the test patient
 - [ ] Have the **DEMO_SCRIPT.md** open on a second monitor or printed — this is your cheat sheet
-- [ ] Run `migrate_patient_extras.php` on production if not yet done (adds race, insurance photo, SSS, pharmacy columns)
+- [ ] Confirm all patient tabs load without error: Forms, Meds, Photos, Wounds, Diagnoses, Vitals, Care, Notes, Audit
+- [ ] Check that the **custom PaperlessMD logo** appears in the sidebar and browser favicon (not a generic icon)
+- [ ] Open the app on mobile — confirm the sidebar slides open and all links are tappable
 
 ---
 
@@ -46,7 +52,7 @@
 | 17 | MA productivity report | 1 min |
 | 18 | Audit log | 1 min |
 | 19 | Manage staff & roles | 1 min |
-| 20 | Settings | 30 sec |
+| 20 | Settings & What's New | 1 min |
 | 21 | User profile & saved signature | 1 min |
 | 22 | Mobile experience | 2 min |
 | 23 | Offline mode & PWA | 1 min |
@@ -55,7 +61,7 @@
 | — | Q&A buffer | 5 min |
 | **Total** | | **~38 min** |
 
-> **Tip:** For a 20-minute demo, skip Parts 9, 12, 16, 17, 20, 24 and speed through Part 7.
+> **Tip:** For a 20-minute demo, skip Parts 9, 12, 16, 17, 23, 24 and speed through Part 7.
 
 ---
 
@@ -72,7 +78,7 @@
 
 ## PART 2 — Login & Security (1 minute)
 
-**Action:** Show the login page at `https://docs.md-officesupport.com`.
+**Action:** Show the login page at `https://ecpaperlessmd.com`.
 
 **Point out:**
 1. **Username + Password** — bcrypt-hashed passwords, no plain-text storage
@@ -81,7 +87,7 @@
 
 > **Say:** "Security is not an afterthought. Every login attempt is logged. Failed logins trigger alerts. All data travels over TLS."
 
-**Action:** Log in as admin. Land on the Dashboard.
+**Action:** Log in as admin (`acasten` / `Welcome1!`). Land on the Dashboard.
 
 ---
 
@@ -89,20 +95,25 @@
 
 **Point out each element:**
 
-1. **Personalized greeting** — "Good morning, [Name]" — role-aware and timezone-synced
+1. **Personalized greeting** — "Good morning, [Name]" — role-aware and timezone-synced (America/Chicago)
 2. **Today's stats row:**
    - Forms collected today
    - Wound photos today
    - Forms pending upload to Practice Fusion
    - Forms awaiting provider e-signature
-3. **Today's Schedule panel** — up to 6 visits with patient name, address, phone, visit type, status badge (Pending / En Route / Completed)
-4. **Draft forms panel** — unsigned forms flagged by age:
+3. **Quick Actions row** — one-tap icon tiles: New Patient, Find Patient, Pending Upload, All Patients, User Manual
+4. **Today's Schedule panel** — up to 6 visits with patient name, address, phone, visit type, status badge (Pending / En Route / Completed)
+5. **Draft forms panel** — unsigned forms flagged by age:
    - Amber = under 1 hour old
    - Red = overdue
    - "These are forms started but not yet signed — the MA is mid-visit or forgot to submit"
-5. **(Admin only) Weekly Analytics** — bar chart of form submissions and completed visits per day for the past 7 days
+6. **Team Notes widget** (right sidebar) — sticky notes posted by admins for the whole team:
+   - Admins can post and delete notes
+   - MAs can read notes (read-only) — keeps the team informed without extra messages
+7. **Staff Online widget** (admin only) — shows who was active in the last 15 minutes with role badge
+8. **(Admin only) Weekly Analytics** — bar chart of form submissions and completed visits per day for the past 7 days
 
-> **Say:** "From here an admin knows exactly what the whole team is doing without making a single phone call. The MA sees only their own schedule and drafts."
+> **Say:** "From here an admin knows exactly what the whole team is doing without making a single phone call. The MA sees only their own schedule and drafts — plus any team-wide announcements the admin has pinned."
 
 ---
 
@@ -225,11 +236,6 @@ Walk through the form fields:
 3. Admin can **pin** important notes so they always show at the top
 4. **Edit / Delete** own notes
 
-### Patient Timeline tab
-1. **Chronological feed** — all form submissions, photos, vitals, wounds, care notes in one scroll
-2. Color-coded by event type
-3. Filter by date range
-
 ### Audit tab (admin only)
 1. Every action taken on this patient — who viewed, who edited, who submitted forms
 2. Timestamp + IP address for every event
@@ -323,7 +329,7 @@ Walk through each type briefly:
 | Form | Key point to mention |
 |---|---|
 | **New Patient Consent** | Full intake — demographics confirm, privacy notice, emergency contact, insurance. All pharmacy and race fields pre-fill from the patient record. |
-| **New Patient Pocket** | Condensed intake — same pre-fill; requires provider signature; good for follow-up patients switching to wound care |
+| **New Patient Packet** | Condensed intake — same pre-fill; requires provider signature; good for follow-up patients switching to wound care |
 | **ABN** | Standalone ABN when billing flags a non-covered service mid-cycle |
 | **Medicare Annual Wellness Visit (AWV)** | GDS-15 depression screen, cognitive assessment, medication reconciliation, risk stratification — all in one step |
 | **Cognitive Wellness Exam** | Full dementia screening — MoCA-adapted, functional assessment, care plan |
@@ -398,23 +404,26 @@ Walk through each type briefly:
 
 **Action:** Click **Messages** in the sidebar.
 
-1. **Conversation list** — left panel, sorted by most recent; **unread count badge** on each thread
-2. Click a conversation — **threaded message view** on the right
-3. **Send a message** — type and hit Enter; shows instantly
-4. **Attachment button** — attach wound photos, PDF forms, or any file
-5. **Broadcast** option — send a message to all staff at once (admin feature)
+1. **Two-panel layout:**
+   - **Left** — Chat List with All Staff broadcast at top, then every active staff member sorted by most recent message; unread count badge on each row
+   - **Right** — Conversation thread; your messages appear on the right (blue), others on the left (white)
+2. Click **All Staff** — broadcast a message to every logged-in staff member at once
+3. Click an individual staff member — private thread opens
+4. **Send a message** — type and press Enter or click the send arrow; appears instantly
+5. **Attachment button** (📎) — attach wound photos, PDFs, or any file
+6. **Timestamps** — all message times display in the clinic's timezone (America/Chicago), not UTC
+7. **Auto-refresh every 3 seconds** — new messages appear without any page reload
 
 **Notifications:**
-1. Point to the **bell icon** in the top bar — click it to open the notification drawer
-2. Drawer shows:
+1. Point to the **bell icon** (🔔) in the top bar — badge shows unread count
+2. Click to open the notification drawer:
    - Unread messages
    - Forms pending provider signature
    - Forms pending Practice Fusion upload
    - Old draft forms (unsaved work)
-3. **Auto-refreshes every 60 seconds** — no manual refresh needed
-4. Email alerts fire for: new message, form awaiting signature, completed countersignature, visit scheduled
+3. Email alerts fire for: new message, form awaiting signature, completed countersignature, visit scheduled
 
-> **Say:** "No texting patient information on personal phones. All clinical communication happens here — logged, searchable, and HIPAA-safe."
+> **Say:** "No texting patient information on personal phones. All clinical communication happens here — logged, searchable, and HIPAA-safe. And timestamps always show clinic time, not whatever timezone the MA's phone is set to."
 
 ---
 
@@ -466,16 +475,18 @@ Ask: *"What CPT codes apply to wound debridement with a 5 cm wound?"*
 
 **Action:** Admin → **MA Locations**.
 
-1. **Leaflet map** — pins for every active MA who has shared their location
-2. **Color-coded status:**
-   - Green — active, recently updated
-   - Amber — location stale (over 10 min)
-   - Grey — location not available
-3. Click a pin — shows MA name, last known address, time of last update
-4. **Sidebar list** — all MAs listed with their current status badge
-5. Location updates automatically every 5 minutes from the MA's device (opt-in geolocation)
+1. **Two-panel layout:**
+   - **Left panel** — all active staff listed with a color-coded dot:
+     - 🟢 Green — active in the last 10 minutes
+     - 🟡 Amber — active 10–60 minutes ago
+     - ⚫ Grey — no recent activity / never logged in
+   - **Right panel** — OpenStreetMap with a pin for every MA who has shared GPS location
+2. Click a map pin — popover shows MA name and when their location was last recorded
+3. **"Last seen"** labels are in the clinic's configured timezone (America/Chicago)
+4. Location updates automatically every 5 minutes from the MA's device (browser geolocation, opt-in)
+5. Map auto-refreshes every 60 seconds
 
-> **Say:** "For a multi-MA home-visit team, this tells you exactly where everyone is without calling anyone. If an MA hasn't updated in 30 minutes you know something may be wrong."
+> **Say:** "For a multi-MA home-visit team, this tells you exactly where everyone is without calling anyone. If an MA hasn't updated in 30 minutes you know something may be wrong. And the timestamps are always in clinic time — no mental UTC math required."
 
 ---
 
@@ -516,9 +527,20 @@ Ask: *"What CPT codes apply to wound debridement with a 5 cm wound?"*
 
 **Action:** Admin → **Manage Staff**.
 
-1. **Staff list** — all users with name, role, last login, active/inactive toggle
-2. **Add Staff** button — opens the add user form
-3. **Edit** a user — change name, password, role, active status
+1. **Staff list** — all users with name, role badge, last login, active/inactive toggle
+2. **Add Staff** button — opens the redesigned add user form:
+   - Full Name + Email on one row (side by side)
+   - Icon-prefixed inputs (person, envelope, @)
+   - **Role picker** — 6 color-coded radio cards with icons and descriptions:
+     - 🔵 Medical Assistant — indigo
+     - 🟢 Provider — teal
+     - 🟣 Scheduler — violet
+     - 🟢 PCC — teal
+     - 🟡 Billing — amber
+     - 🔴 Admin — rose/red
+   - **Password strength bar** — animates from red (Weak) to green (Very strong) as you type
+   - **Show/hide password** toggle eye buttons on both password fields
+3. **Edit** a user — same form pre-filled with current values; password fields blank (leave blank to keep)
 4. **Deactivate** — one click; the user cannot log in but their records are preserved
 
 **Action:** Admin → **Roles & Permissions**.
@@ -535,7 +557,7 @@ Ask: *"What CPT codes apply to wound debridement with a 5 cm wound?"*
 
 ---
 
-## PART 20 — Settings (30 seconds)
+## PART 20 — Settings & What's New (1 minute)
 
 **Action:** Admin → **Settings**.
 
@@ -544,6 +566,19 @@ Ask: *"What CPT codes apply to wound debridement with a 5 cm wound?"*
 3. **Session timeout** — how long before inactive users are logged out automatically
 
 > **Say:** "Three settings. The system handles everything else."
+
+**Action:** Click **What's New** in the sidebar (rocket icon).
+
+1. **Release changelog** — every update listed in reverse chronological order with version numbers and dates
+2. Point to the **v2.2 entry (May 5, 2026)** — highlight recent improvements:
+   - Provider countersignature panel working on all signed forms
+   - CCM Consent company name live-updates when switching patients
+   - Custom PaperlessMD branding (logo, favicon, PWA icon)
+   - Mobile sidebar fully interactive (z-index and tap fixes)
+   - Email notification timeout fix (no more stuck "Saving…" spinner)
+3. Each entry has a version badge, date, and plain-language description
+
+> **Say:** "Every time we push an update, it shows up here. Your team can see exactly what changed and when — no release notes buried in an email chain."
 
 ---
 
@@ -568,19 +603,23 @@ Ask: *"What CPT codes apply to wound debridement with a 5 cm wound?"*
 
 **Action:** Open the URL on a phone browser or pass the tablet to the audience.
 
-1. **Top bar** — hamburger menu, global search icon, notification bell — everything reachable in one thumb
-2. **Sidebar** — tap the hamburger; full navigation slides in from the left
-3. **Patient list** — tap a patient name; profile loads instantly
-4. **New Visit Form** — start a form on the phone:
+1. **Top bar** — hamburger menu (≡), global search icon, notification bell — everything reachable with one thumb
+2. **Custom branding** — PaperlessMD logo appears in the top bar and sidebar; the browser tab shows the custom favicon
+3. **Sidebar** — tap the hamburger; full navigation slides in from the left with a smooth animation
+   - All links are fully tappable — tap any item to navigate
+   - Tapping the dark overlay behind the sidebar closes it
+   - **Bottom nav bar** — persistent shortcut bar at the screen bottom: Home, Patients, Schedule, Sign Queue, Messages
+4. **Patient list** — tap a patient name; profile loads instantly
+5. **New Visit Form** — start a form on the phone:
    - Step progress bar reflows to fit the small screen
    - **Sticky bottom bar** — Back / Next buttons are always visible, no scrolling to find them
    - **Vitals numpad** — large tap targets, optimized for thumbs; presets are full-width buttons
    - **Medication rows** become stacked cards on mobile — easier to read and tap
    - **Signature canvas** fills the screen width; sign with a finger
-5. **Wound Photos form** — camera launches natively; photo uploads directly to the patient record
-6. Show the **PWA install prompt** — "Add to Home Screen" — launches like a native app with no browser chrome
+6. **Wound Photos form** — camera launches natively; photo uploads directly to the patient record
+7. Show the **PWA install prompt** — "Add to Home Screen" — launches like a native app with no browser chrome and shows the custom PaperlessMD icon on the home screen
 
-> **Say:** "MAs can run a complete visit — from check-in to signed form — on a $200 Android phone. No special hardware required."
+> **Say:** "MAs can run a complete visit — from check-in to signed form — on a $200 Android phone. No special hardware required. The app installs to the home screen and works like a native app."
 
 ---
 
@@ -633,7 +672,7 @@ Ask: *"What CPT codes apply to wound debridement with a 5 cm wound?"*
 | Question | Answer |
 |---|---|
 | **Is it HIPAA compliant?** | Yes. All data is encrypted in transit (HTTPS/TLS). Every access is audit-logged. No PHI is sent to third parties except the AI, which receives only de-identified clinical text. Role-based access means staff only see what they need to. |
-| **Where is the data stored?** | On your own server — you control the database. There is no shared multi-tenant cloud. Data never leaves your infrastructure. |
+| **Where is the data stored?** | On a dedicated DigitalOcean Droplet (NYC1, Ubuntu 24.04 LTS) — your own virtual server. MySQL database is local to the droplet. No shared multi-tenant cloud. Data is accessible only over HTTPS via `ecpaperlessmd.com`. |
 | **What if the MA loses internet mid-visit?** | The service worker caches the app. Forms save to IndexedDB on-device. Sync fires automatically when connectivity returns. Nothing is lost. |
 | **Can providers sign from their own device?** | Yes — the sign queue works on any device, any browser, no app install required. |
 | **How does billing access work?** | The Billing role sees submitted forms and ICD-10 codes only. Vitals, wound photos, and clinical notes are not visible to billing users — by design, not by configuration. |
@@ -649,5 +688,6 @@ Ask: *"What CPT codes apply to wound debridement with a 5 cm wound?"*
 
 ---
 
-*Demo prepared April 30, 2026 — PaperlessMD v2.1*
+*Demo prepared May 5, 2026 — PaperlessMD v2.2*
 *Practice: Beyond Wound Care Inc.*
+*Live at: https://ecpaperlessmd.com · Server: DigitalOcean NYC1*

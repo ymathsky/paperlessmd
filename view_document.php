@@ -18,6 +18,27 @@ $stmt->execute([$id]);
 $doc = $stmt->fetch();
 if (!$doc) { header('Location: ' . BASE_URL . '/dashboard.php'); exit; }
 
+// Auto-fill countersignature provider name: today's schedule → most recent schedule → assigned_provider → blank
+$_autoProvider = '';
+try {
+    // 1. Today's scheduled provider
+    $__sp = $pdo->prepare("SELECT provider_name FROM `schedule` WHERE patient_id = ? AND visit_date = CURDATE() AND COALESCE(provider_name,'') != '' ORDER BY id DESC LIMIT 1");
+    $__sp->execute([$doc['patient_id']]);
+    $_autoProvider = (string)($__sp->fetchColumn() ?: '');
+    // 2. Most recent schedule entry (any date)
+    if (!$_autoProvider) {
+        $__sp2 = $pdo->prepare("SELECT provider_name FROM `schedule` WHERE patient_id = ? AND COALESCE(provider_name,'') != '' ORDER BY visit_date DESC, id DESC LIMIT 1");
+        $__sp2->execute([$doc['patient_id']]);
+        $_autoProvider = (string)($__sp2->fetchColumn() ?: '');
+    }
+    // 3. Assigned provider from patients table
+    if (!$_autoProvider) {
+        $__pat = $pdo->prepare("SELECT assigned_provider FROM patients WHERE id = ? AND COALESCE(assigned_provider,'') != '' LIMIT 1");
+        $__pat->execute([$doc['patient_id']]);
+        $_autoProvider = (string)($__pat->fetchColumn() ?: '');
+    }
+} catch (PDOException $e) {}
+
 auditLog($pdo, 'form_view', 'form', $id, $doc['form_type'] . ' — ' . $doc['first_name'] . ' ' . $doc['last_name']);
 
 $data = json_decode($doc['form_data'] ?? '{}', true) ?: [];
@@ -133,6 +154,30 @@ include __DIR__ . '/includes/header.php';
   .bwc-form            { font-size: 11px; }
   .bwc-practice-name   { font-size: 18px; }
   .bwc-form-title      { font-size: 14px; }
+
+  /* Force light theme inside the document card regardless of dark mode */
+  html.dark #printDoc { color-scheme: light; background-color: #fff !important; color: #000 !important; border-color: #e2e8f0 !important; }
+  html.dark #printDoc .bg-white   { background-color: #fff !important; }
+  html.dark #printDoc .bg-slate-50, html.dark #printDoc .bg-gray-50 { background-color: #f8fafc !important; }
+  html.dark #printDoc .bg-slate-100, html.dark #printDoc .bg-gray-100 { background-color: #f1f5f9 !important; }
+  html.dark #printDoc .bg-slate-200 { background-color: #e2e8f0 !important; }
+  html.dark #printDoc .text-slate-900, html.dark #printDoc .text-slate-800 { color: #0f172a !important; }
+  html.dark #printDoc .text-slate-700 { color: #334155 !important; }
+  html.dark #printDoc .text-slate-600 { color: #475569 !important; }
+  html.dark #printDoc .text-slate-500 { color: #64748b !important; }
+  html.dark #printDoc .text-slate-400 { color: #94a3b8 !important; }
+  html.dark #printDoc .text-slate-300 { color: #cbd5e1 !important; }
+  html.dark #printDoc .border-slate-100 { border-color: #f1f5f9 !important; }
+  html.dark #printDoc .border-slate-200 { border-color: #e2e8f0 !important; }
+  html.dark #printDoc .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+  html.dark #printDoc .divide-y > :not([hidden]) ~ :not([hidden]) { border-color: #f1f5f9 !important; }
+  html.dark #printDoc table { color: #000 !important; }
+  html.dark #printDoc th  { color: #334155 !important; }
+  html.dark #printDoc td  { color: #000 !important; }
+  html.dark #printDoc tbody tr { border-color: #e2e8f0 !important; }
+  html.dark #printDoc input, html.dark #printDoc textarea, html.dark #printDoc select {
+    background-color: #fff !important; color: #000 !important; border-color: #cbd5e1 !important;
+  }
 </style>
 
 <!-- Breadcrumb -->
@@ -153,6 +198,26 @@ include __DIR__ . '/includes/header.php';
         <i class="bi bi-exclamation-triangle-fill text-amber-500 flex-shrink-0"></i>
         <span>This form was already signed today. Showing the existing signed document.</span>
     </div>
+    <?php endif; ?>
+    <?php if (isAdmin() && in_array($doc['form_type'], ['vital_cs','new_patient_pocket','new_patient_pocket_pc','ccm_consent','abn','informed_consent_wound','rpm_consent'])): ?>
+    <?php
+        $_editMap = [
+            'vital_cs'             => '/forms/vital_cs.php',
+            'new_patient_pocket'   => '/forms/new_patient_pocket.php',
+            'new_patient_pocket_pc'=> '/forms/new_patient_pocket.php',
+            'ccm_consent'          => '/forms/ccm_consent.php',
+            'abn'                  => '/forms/abn.php',
+            'informed_consent_wound' => '/forms/informed_consent_wound.php',
+            'rpm_consent'          => '/forms/rpm_consent.php',
+        ];
+        $_editUrl = BASE_URL . ($_editMap[$doc['form_type']] ?? '') . '?patient_id=' . $doc['patient_id'] . '&edit=1';
+        if ($doc['form_type'] === 'new_patient_pocket_pc') $_editUrl .= '&np_type=primary_care';
+    ?>
+    <a href="<?= $_editUrl ?>"
+       class="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-50 border-2 border-amber-200 text-amber-700
+              hover:bg-amber-100 font-bold rounded-xl transition-all text-sm">
+        <i class="bi bi-pencil-square"></i> Edit Form
+    </a>
     <?php endif; ?>
     <button onclick="window.print()"
             class="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-700 hover:bg-slate-800 text-white
@@ -478,6 +543,7 @@ JS;
         <div class="mb-4">
             <label class="block text-sm font-semibold text-slate-700 mb-1.5">Provider Name</label>
             <input type="text" id="provName" placeholder="Dr. Full Name"
+                   value="<?= htmlspecialchars($_autoProvider, ENT_QUOTES, 'UTF-8') ?>"
                    class="w-full max-w-sm px-4 py-2.5 border border-slate-200 rounded-xl text-sm
                           focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent bg-white">
         </div>
@@ -577,5 +643,52 @@ $extraJs  = <<<JS
 JS;
 ?>
 <?php endif; ?>
+
+<?php
+// Wound photo + Quick Notes floating panels (non-billing only)
+if (!isBilling()) {
+    $patient_id = (int)$doc['patient_id'];
+    include __DIR__ . '/includes/wound_photo_panel.php';
+}
+
+// RX Pad floating button (clinical staff only)
+if (canAccessClinical() && !isBilling()) {
+    $patient_id = (int)$doc['patient_id'];
+    $patient    = ['first_name' => $doc['first_name'], 'last_name' => $doc['last_name'], 'dob' => $doc['dob']];
+    include __DIR__ . '/includes/rx_pad_panel.php';
+}
+?>
+
+<script>
+(function(){
+    var pd = document.getElementById('printDoc');
+    if (!pd || !document.documentElement.classList.contains('dark')) return;
+    /* Force every element inside #printDoc to light-mode colors via
+       inline !important — highest priority in the CSS cascade */
+    function forceLight(el) {
+        el.style.setProperty('background-color', '#ffffff', 'important');
+        el.style.setProperty('color', '#000000', 'important');
+        el.style.setProperty('border-color', '#000000', 'important');
+    }
+    forceLight(pd);
+    pd.querySelectorAll('*').forEach(function(el) {
+        var tag = el.tagName;
+        /* Keep section headers and signature-stripe dark as designed */
+        if (el.classList.contains('bwc-section-hdr')) {
+            el.style.setProperty('background-color', '#333333', 'important');
+            el.style.setProperty('color', '#ffffff', 'important');
+            return;
+        }
+        el.style.setProperty('color', '#000000', 'important');
+        el.style.setProperty('border-color', '#000000', 'important');
+        /* Only reset backgrounds on block/table elements that carry one */
+        if (['DIV','SECTION','TABLE','THEAD','TBODY','TR','TD','TH','SPAN','P','NAV','UL','LI'].includes(tag)) {
+            el.style.setProperty('background-color', 'transparent', 'important');
+        }
+    });
+    /* Give the card itself a white background */
+    pd.style.setProperty('background-color', '#ffffff', 'important');
+})();
+</script>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>

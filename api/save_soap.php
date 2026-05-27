@@ -168,6 +168,11 @@ if ($noteId) {
     ]);
 
     auditLog($pdo, $status === 'final' ? 'soap_finalize' : 'soap_edit', 'patient', $patientId, null, 'note_id=' . $noteId);
+    if ($status === 'final' && ($existing['status'] ?? '') !== 'final') {
+        require_once __DIR__ . '/../includes/mailer.php';
+        require_once __DIR__ . '/../includes/notifications.php';
+        notifyVisitCompleted($pdo, $patientId, (int)$_SESSION['user_id'], $visitId, $noteDate);
+    }
     echo json_encode(['ok' => true, 'id' => $noteId]);
 
 } else {
@@ -186,5 +191,10 @@ if ($noteId) {
     $newId = (int)$pdo->lastInsertId();
 
     auditLog($pdo, $status === 'final' ? 'soap_finalize' : 'soap_create', 'patient', $patientId, null, 'note_id=' . $newId);
+    if ($status === 'final') {
+        require_once __DIR__ . '/../includes/mailer.php';
+        require_once __DIR__ . '/../includes/notifications.php';
+        notifyVisitCompleted($pdo, $patientId, (int)$_SESSION['user_id'], $visitId, $noteDate);
+    }
     echo json_encode(['ok' => true, 'id' => $newId]);
 }

@@ -30,6 +30,7 @@ if (!function_exists('vdArr')) {
 $provider = vd($data, 'provider_name') ?: '_______________________';
 $visitType = vd($data, 'visit_type');
 $fuWeeks  = vd($data, 'fu_weeks');
+$fuUnit   = strtoupper(vd($data, 'fu_unit') ?: 'WEEKS');
 $timeIn   = vd($data, 'time_in');
 $timeOut  = vd($data, 'time_out');
 $homebound = vd($data, 'homebound');   // 'homebound' or 'not_homebound'
@@ -102,7 +103,7 @@ $vtOptions = ['New', 'Follow Up', 'Sick', 'Post Hospital F/U'];
             </span>
         <?php endforeach; ?>
         </strong>
-        &nbsp;&nbsp;F/U IN: <span class="bwc-fill-sm"><?= $fuWeeks ?: '___' ?></span> WEEKS
+        &nbsp;&nbsp;F/U IN: <span class="bwc-fill-sm"><?= $fuWeeks ?: '___' ?></span> <?= $fuUnit ?>
         &nbsp;&nbsp;Time in: <span class="bwc-fill-sm"><?= $timeIn ?: '_______' ?></span>
         &nbsp;&nbsp;Time Out: <span class="bwc-fill-sm"><?= $timeOut ?: '_______' ?></span>
     </div>
@@ -193,6 +194,16 @@ $vtOptions = ['New', 'Follow Up', 'Sick', 'Post Hospital F/U'];
              style="max-width:100%;border:1px solid #e2e8f0;border-radius:4px;background:#fff;">
     </div>
     <?php endif; ?>
+
+    <?php for ($hwi = 2; $hwi <= 5; $hwi++):
+        $hwKey = 'med_handwriting_' . $hwi;
+        if (empty($data[$hwKey])) continue; ?>
+    <div style="margin-top:6pt;">
+        <p style="font-size:8pt;color:#666;margin-bottom:3pt;">Annotated Medication PDF — Page <?= $hwi - 1 ?>:</p>
+        <img src="<?= h($data[$hwKey]) ?>" alt="Annotated PDF page <?= $hwi - 1 ?>"
+             style="max-width:100%;border:1px solid #e2e8f0;border-radius:4px;background:#fff;">
+    </div>
+    <?php endfor; ?>
 
     <!-- Signatures -->
     <div class="bwc-sigs">
