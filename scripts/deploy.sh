@@ -66,6 +66,7 @@ MIGRATION_ORDER=(
     migrate_form_submissions_provider.php
     migrate_patient_extras.php
     migrate_push_subscriptions.php
+    migrate_dark_mode.php
 )
 
 echo "Running migrations..." >> "$LOG"
