@@ -125,8 +125,8 @@ window.openMapPanel = function (address, name, gmUrl, visitData) {
     document.body.style.overflow = 'hidden';
 
     loadLeaflet(function () {
-        // Let panel animate into view, then init
-        setTimeout(function () { initMap(address); }, 80);
+        // Wait for panel slide-in animation (320ms) before init so Leaflet sees the real height
+        setTimeout(function () { initMap(address); }, 340);
     });
 };
 
@@ -264,6 +264,8 @@ function initMap(address) {
             .bindPopup('<strong>Destination</strong><br><span style="font-size:0.8rem;color:#475569;">' + address + '</span>', { maxWidth: 220 })
             .openPopup();
 
+        // Re-invalidate here — panel is fully open by now
+        mapInstance.invalidateSize();
         mapInstance.setView([dLat, dLon], 15);
 
         if (navigator.geolocation) {
@@ -312,8 +314,17 @@ function initMap(address) {
                         setMapStatus('<i class="bi bi-map" style="color:#3b82f6;"></i> Destination shown &mdash; <a href="' + document.getElementById('mapPanelGmBtn').href + '" target="_blank" rel="noopener" style="color:#2563eb;font-weight:600;"><i class="bi bi-google"></i> Get Directions</a>');
                     });
                 },
-                function () {
-                    setMapStatus('<i class="bi bi-map-fill" style="color:#3b82f6;"></i> Destination shown &mdash; <a href="' + document.getElementById('mapPanelGmBtn').href + '" target="_blank" rel="noopener" style="color:#2563eb;font-weight:600;"><i class="bi bi-google"></i> Open in Google Maps</a>');
+                function (err) {
+                    var denied = err && err.code === 1; // PERMISSION_DENIED
+                    if (denied) {
+                        setMapStatus(
+                            '<i class="bi bi-geo-alt-fill" style="color:#ef4444;"></i> Location blocked &mdash; '
+                            + '<span style="color:#64748b;">enable in browser settings then </span>'
+                            + '<a href="#" onclick="event.preventDefault();retryLocation()" style="color:#2563eb;font-weight:700;">tap to retry</a>'
+                        );
+                    } else {
+                        setMapStatus('<i class="bi bi-map-fill" style="color:#3b82f6;"></i> Destination shown &mdash; <a href="' + document.getElementById('mapPanelGmBtn').href + '" target="_blank" rel="noopener" style="color:#2563eb;font-weight:600;"><i class="bi bi-google"></i> Open in Google Maps</a>');
+                    }
                 },
                 { timeout: 8000, enableHighAccuracy: true }
             );
@@ -325,6 +336,34 @@ function initMap(address) {
         showDirectionsBtn(address, null, null);
     });
 }
+
+// Retry geolocation after user enables permission in browser settings
+window.retryLocation = function () {
+    if (!mapInstance || !destMarker) return;
+    setMapStatus('<i class="bi bi-crosshair spin" style="color:#3b82f6;"></i> Getting your location…');
+    var destLL = destMarker.getLatLng();
+    navigator.geolocation.getCurrentPosition(
+        function (pos) {
+            var uLat = pos.coords.latitude;
+            var uLon = pos.coords.longitude;
+            if (userMarker) { mapInstance.removeLayer(userMarker); }
+            if (routeLayer) { mapInstance.removeLayer(routeLayer); }
+            userMarker = L.circleMarker([uLat, uLon], {
+                radius: 9, fillColor: '#3b82f6', color: '#1d4ed8',
+                fillOpacity: 0.9, weight: 2.5
+            }).addTo(mapInstance).bindPopup('<strong>You are here</strong>');
+            mapInstance.fitBounds([[destLL.lat, destLL.lng], [uLat, uLon]], { padding: [50, 50] });
+            var gmUrl = 'https://www.google.com/maps/dir/?api=1&origin=' + uLat + ',' + uLon
+                + '&destination=' + encodeURIComponent(document.getElementById('mapPanelAddr').textContent);
+            document.getElementById('mapPanelGmBtn').href = gmUrl;
+            setMapStatus('<i class="bi bi-map-fill" style="color:#3b82f6;"></i> Location found &mdash; <a href="' + gmUrl + '" target="_blank" rel="noopener" style="color:#2563eb;font-weight:600;"><i class="bi bi-google"></i> Get Directions</a>');
+        },
+        function () {
+            setMapStatus('<i class="bi bi-geo-alt-fill" style="color:#ef4444;"></i> Still blocked — check browser site settings and try again.');
+        },
+        { timeout: 10000, enableHighAccuracy: true }
+    );
+};
 
 })();
 </script>
