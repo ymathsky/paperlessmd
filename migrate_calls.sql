@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS call_signals (id INT AUTO_INCREMENT PRIMARY KEY, from_user_id INT NOT NULL, to_user_id INT NOT NULL, signal_type VARCHAR(20) NOT NULL, payload MEDIUMTEXT NOT NULL, consumed TINYINT DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, INDEX idx_to_consumed (to_user_id, consumed, created_at));

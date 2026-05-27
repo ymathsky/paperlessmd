@@ -1,0 +1,1 @@
+UPDATE wound_measurements SET entry_type = 'manual' WHERE entry_type = 'ai' AND analysis_confidence IS NULL AND granulation_pct IS NULL AND slough_pct IS NULL AND ruler_detected = 0 AND (length_cm > 0 OR width_cm > 0); SELECT entry_type, COUNT(*) as cnt FROM wound_measurements GROUP BY entry_type;

@@ -1,0 +1,399 @@
+<?php
+/**
+ * Notification triggers for PaperlessMD.
+ *
+ * Each function collects the needed recipients from the DB,
+ * builds an email, and delegates to sendMail().
+ *
+ * Requires:
+ *   - $pdo  (global PDO instance from db.php)
+ *   - includes/mailer.php  (already required before calling these)
+ */
+
+// Load WebPush helper (gracefully no-ops if table not yet created)
+if (file_exists(__DIR__ . '/includes/WebPush.php')) {
+    require_once __DIR__ . '/includes/WebPush.php';
+}
+
+/**
+ * Check if a staff member wants push notifications of a given type.
+ * Defaults to true (opt-out model) when no preference is stored.
+ */
+function _staffWantsPush(PDO $pdo, int $staffId, string $notifType): bool
+{
+    static $cache = [];
+    if (!isset($cache[$staffId])) {
+        $s = $pdo->prepare('SELECT push_prefs FROM staff WHERE id = ? LIMIT 1');
+        $s->execute([$staffId]);
+        $cache[$staffId] = json_decode((string)($s->fetchColumn() ?: '{}'), true) ?? [];
+    }
+    return ($cache[$staffId][$notifType] ?? true) !== false;
+}
+
+/**
+ * Send a push notification to all staff matching the given emails.
+ * Maps emails → staff_ids, then calls webpush_notify per staff member.
+ * Pass $notifType to honour per-user opt-out preferences.
+ */
+function _notifPushByEmails(PDO $pdo, array $emails, string $title, string $body, string $url = '/', string $notifType = ''): void
+{
+    if (!function_exists('webpush_notify') || empty($emails)) return;
+    $placeholders = implode(',', array_fill(0, count($emails), '?'));
+    $stmt = $pdo->prepare("SELECT id FROM staff WHERE email IN ($placeholders) AND active = 1");
+    $stmt->execute($emails);
+    $ids = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    foreach ($ids as $id) {
+        if ($notifType !== '' && !_staffWantsPush($pdo, (int)$id, $notifType)) continue;
+        webpush_notify($pdo, (int)$id, $title, $body, $url);
+    }
+}
+
+/**
+ * Send a push notification to a single staff member by user ID.
+ * Pass $notifType to honour per-user opt-out preferences.
+ */
+function _notifPushById(PDO $pdo, int $staffId, string $title, string $body, string $url = '/', string $notifType = ''): void
+{
+    if (!function_exists('webpush_notify')) return;
+    if ($notifType !== '' && !_staffWantsPush($pdo, $staffId, $notifType)) return;
+    webpush_notify($pdo, $staffId, $title, $body, $url);
+}
+
+// ── Helper: load admins + providers email list ────────────────────────────────
+function _notifGetEmails(PDO $pdo, array $roles): array
+{
+    if (empty($roles)) return [];
+    $placeholders = implode(',', array_fill(0, count($roles), '?'));
+    $stmt = $pdo->prepare(
+        "SELECT email FROM staff WHERE role IN ($placeholders) AND active = 1 AND email IS NOT NULL AND email != ''"
+    );
+    $stmt->execute($roles);
+    return $stmt->fetchAll(PDO::FETCH_COLUMN);
+}
+
+// ── Helper: get one staff email ───────────────────────────────────────────────
+function _notifGetEmail(PDO $pdo, int $userId): string
+{
+    $stmt = $pdo->prepare("SELECT email FROM staff WHERE id = ? AND active = 1 LIMIT 1");
+    $stmt->execute([$userId]);
+    return (string)($stmt->fetchColumn() ?: '');
+}
+
+// ── Helper: patient full name ─────────────────────────────────────────────────
+function _notifPatientName(PDO $pdo, int $patientId): string
+{
+    $stmt = $pdo->prepare("SELECT CONCAT(first_name,' ',last_name) FROM patients WHERE id = ? LIMIT 1");
+    $stmt->execute([$patientId]);
+    return (string)($stmt->fetchColumn() ?: 'Unknown patient');
+}
+
+// ── Helper: staff full name ───────────────────────────────────────────────────
+function _notifStaffName(PDO $pdo, int $userId): string
+{
+    $stmt = $pdo->prepare("SELECT full_name FROM staff WHERE id = ? LIMIT 1");
+    $stmt->execute([$userId]);
+    return (string)($stmt->fetchColumn() ?: 'Staff');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 1. Form signed by MA → notify all admins + providers to countersign
+// ─────────────────────────────────────────────────────────────────────────────
+function notifyFormSigned(PDO $pdo, int $submissionId, int $patientId, string $formType, int $maId): void
+{
+    // Find provider assigned to this patient's most recent/today's schedule entry
+    $provStmt = $pdo->prepare("
+        SELECT provider_name FROM `schedule`
+        WHERE patient_id = ? AND COALESCE(provider_name,'') != ''
+        ORDER BY visit_date DESC, id DESC LIMIT 1
+    ");
+    $provStmt->execute([$patientId]);
+    $assignedProvider = (string)($provStmt->fetchColumn() ?: '');
+
+    $recipients = [];
+
+    if ($assignedProvider !== '') {
+        $provEmailStmt = $pdo->prepare(
+            "SELECT email FROM staff WHERE full_name = ? AND role = 'provider' AND active = 1 AND email IS NOT NULL AND email != '' LIMIT 1"
+        );
+        $provEmailStmt->execute([$assignedProvider]);
+        $provEmail = (string)($provEmailStmt->fetchColumn() ?: '');
+        if ($provEmail) $recipients[] = $provEmail;
+    } else {
+        foreach (_notifGetEmails($pdo, ['provider']) as $e) {
+            if (!in_array($e, $recipients, true)) $recipients[] = $e;
+        }
+    }
+
+    foreach (_notifGetEmails($pdo, ['admin']) as $e) {
+        if (!in_array($e, $recipients, true)) $recipients[] = $e;
+    }
+
+    if (empty($recipients)) return;
+
+    $patientName = _notifPatientName($pdo, $patientId);
+    $maName      = _notifStaffName($pdo, $maId);
+    $formLabel   = ucwords(str_replace('_', ' ', $formType));
+    $link        = (defined('BASE_URL') ? BASE_URL : '') . '/view_document.php?id=' . $submissionId;
+    $queueLink   = (defined('BASE_URL') ? BASE_URL : '') . '/esign_queue.php';
+
+    $html = <<<HTML
+<p>A new form has been submitted and is awaiting provider countersignature.</p>
+<dl class="meta">
+  <dt>Patient</dt><dd>{$patientName}</dd>
+  <dt>Form</dt><dd>{$formLabel}</dd>
+  <dt>Submitted by</dt><dd>{$maName}</dd>
+  <dt>Submitted at</dt><dd>{$_ts}</dd>
+</dl>
+<p>
+  <a href="{$link}" class="btn">Review &amp; Sign</a>
+</p>
+<p style="font-size:13px;color:#64748b">
+  Or view the full <a href="{$queueLink}" style="color:#1d4ed8">E-Sign Queue</a>.
+</p>
+HTML;
+
+    // Replace placeholder
+    $ts   = date('F j, Y \a\t g:i a T');
+    $html = str_replace('{$_ts}', $ts, $html);
+
+    sendMail($recipients, "New form awaiting signature — {$patientName}", $html);
+    _notifPushByEmails($pdo, $recipients,
+        "Form awaiting signature",
+        "{$patientName} — {$formLabel} submitted by {$maName}",
+        (defined('BASE_URL') ? BASE_URL : '') . '/esign_queue.php',
+        'form_signed'
+    );
+}
+// ─────────────────────────────────────────────────────────────────────────────
+function notifyProviderSigned(PDO $pdo, int $submissionId, string $providerName): void
+{
+    // Get MA + patient info from the submission
+    $stmt = $pdo->prepare("
+        SELECT fs.ma_id, fs.form_type, fs.patient_id,
+               CONCAT(p.first_name,' ',p.last_name) AS patient_name
+        FROM form_submissions fs
+        LEFT JOIN patients p ON p.id = fs.patient_id
+        WHERE fs.id = ?
+        LIMIT 1
+    ");
+    $stmt->execute([$submissionId]);
+    $row = $stmt->fetch();
+    if (!$row) return;
+
+    // Notify MA + all admins
+    $recipients = [];
+    $maEmail = _notifGetEmail($pdo, (int)$row['ma_id']);
+    if ($maEmail) $recipients[] = $maEmail;
+    foreach (_notifGetEmails($pdo, ['admin']) as $e) {
+        if (!in_array($e, $recipients, true)) $recipients[] = $e;
+    }
+    if (empty($recipients)) return;
+
+    $formLabel   = ucwords(str_replace('_', ' ', $row['form_type']));
+    $patientName = $row['patient_name'];
+    $link        = (defined('BASE_URL') ? BASE_URL : '') . '/view_document.php?id=' . $submissionId;
+    $ts          = date('F j, Y \a\t g:i a T');
+
+    $html = <<<HTML
+<p>A form has been countersigned by the provider and is now complete.</p>
+<dl class="meta">
+  <dt>Patient</dt><dd>{$patientName}</dd>
+  <dt>Form</dt><dd>{$formLabel}</dd>
+  <dt>Signed by</dt><dd>{$providerName}</dd>
+  <dt>Signed at</dt><dd>{$ts}</dd>
+</dl>
+<p><a href="{$link}" class="btn">View Document</a></p>
+HTML;
+
+    sendMail($recipients, "Form countersigned — {$patientName}", $html);
+    _notifPushByEmails($pdo, $recipients,
+        "Form countersigned — {$patientName}",
+        "{$formLabel} signed by {$providerName}",
+        $link,
+        'form_countersigned'
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3. New internal message → notify recipient by email
+// ─────────────────────────────────────────────────────────────────────────────
+function notifyNewMessage(PDO $pdo, int $toUserId, int $fromUserId, string $messageBody): void
+{
+    $recipientEmail = _notifGetEmail($pdo, $toUserId);
+    if (!$recipientEmail) return;
+
+    $fromName    = _notifStaffName($pdo, $fromUserId);
+    $recipName   = _notifStaffName($pdo, $toUserId);
+    $messagesUrl = (defined('BASE_URL') ? BASE_URL : '') . '/messages.php';
+    $preview     = mb_substr(strip_tags($messageBody), 0, 160);
+    if (mb_strlen($messageBody) > 160) $preview .= '…';
+    $ts          = date('F j, Y \a\t g:i a T');
+
+    $html = <<<HTML
+<p>Hi {$recipName},</p>
+<p>You have a new internal message from <strong>{$fromName}</strong>.</p>
+<dl class="meta">
+  <dt>From</dt><dd>{$fromName}</dd>
+  <dt>Received</dt><dd>{$ts}</dd>
+  <dt>Preview</dt><dd style="font-style:italic">&ldquo;{$preview}&rdquo;</dd>
+</dl>
+<p><a href="{$messagesUrl}" class="btn">Open Messages</a></p>
+HTML;
+
+    sendMail($recipientEmail, "New message from {$fromName}", $html);
+    _notifPushById($pdo, $toUserId,
+        "New message from {$fromName}",
+        $preview,
+        $messagesUrl,
+        'new_message'
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4. Broadcast message (to_user_id IS NULL) → notify all active staff except sender
+// ─────────────────────────────────────────────────────────────────────────────
+function notifyBroadcastMessage(PDO $pdo, int $fromUserId, string $messageBody): void
+{
+    $stmt = $pdo->prepare(
+        "SELECT email FROM staff WHERE active = 1 AND id != ? AND email IS NOT NULL AND email != ''"
+    );
+    $stmt->execute([$fromUserId]);
+    $recipients = $stmt->fetchAll(PDO::FETCH_COLUMN);
+    if (empty($recipients)) return;
+
+    $fromName    = _notifStaffName($pdo, $fromUserId);
+    $messagesUrl = (defined('BASE_URL') ? BASE_URL : '') . '/messages.php';
+    $preview     = mb_substr(strip_tags($messageBody), 0, 160);
+    if (mb_strlen($messageBody) > 160) $preview .= '…';
+    $ts          = date('F j, Y \a\t g:i a T');
+
+    $html = <<<HTML
+<p>A broadcast message has been sent to all staff by <strong>{$fromName}</strong>.</p>
+<dl class="meta">
+  <dt>From</dt><dd>{$fromName}</dd>
+  <dt>Sent</dt><dd>{$ts}</dd>
+  <dt>Preview</dt><dd style="font-style:italic">&ldquo;{$preview}&rdquo;</dd>
+</dl>
+<p><a href="{$messagesUrl}" class="btn">Open Messages</a></p>
+HTML;
+
+    sendMail($recipients, "Broadcast message from {$fromName}", $html);
+    _notifPushByEmails($pdo, $recipients,
+        "Broadcast from {$fromName}",
+        $preview,
+        $messagesUrl,
+        'new_message'
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5. Schedule assigned → notify MA, matched provider, and admins
+// ─────────────────────────────────────────────────────────────────────────────
+function notifyScheduleAssigned(
+    PDO $pdo,
+    int $maId,
+    int $patientId,
+    string $visitDate,
+    string $visitType,
+    string $providerName,
+    int $createdBy
+): void {
+    $patientName  = _notifPatientName($pdo, $patientId);
+    $maName       = _notifStaffName($pdo, $maId);
+    $assignedBy   = _notifStaffName($pdo, $createdBy);
+    $scheduleUrl  = (defined('BASE_URL') ? BASE_URL : '') . '/schedule.php';
+    $ts           = date('F j, Y \a\t g:i a T');
+    $visitDate_f  = date('F j, Y', strtotime($visitDate));
+
+    $visitTypeLabels = [
+        'routine'     => 'Routine Visit',
+        'new_patient' => 'New Patient',
+        'wound_care'  => 'Wound Care',
+        'awv'         => 'Annual Wellness Visit',
+        'ccm'         => 'CCM',
+        'il'          => 'IL',
+    ];
+    $visitLabel = isset($visitTypeLabels[$visitType]) ? $visitTypeLabels[$visitType] : ucwords(str_replace('_', ' ', $visitType));
+
+    $providerLine = $providerName ? "<dt>Provider</dt><dd>{$providerName}</dd>" : '';
+
+    $html = <<<HTML
+<p>A new patient visit has been scheduled and assigned to you.</p>
+<dl class="meta">
+  <dt>Patient</dt><dd>{$patientName}</dd>
+  <dt>Visit Date</dt><dd>{$visitDate_f}</dd>
+  <dt>Visit Type</dt><dd>{$visitLabel}</dd>
+  <dt>Assigned MA</dt><dd>{$maName}</dd>
+  {$providerLine}
+  <dt>Scheduled by</dt><dd>{$assignedBy}</dd>
+  <dt>Scheduled at</dt><dd>{$ts}</dd>
+</dl>
+<p><a href="{$scheduleUrl}" class="btn">View Schedule</a></p>
+HTML;
+
+    $recipients = [];
+
+    // Notify the assigned MA
+    $maEmail = _notifGetEmail($pdo, $maId);
+    if ($maEmail) $recipients[] = $maEmail;
+
+    // Notify matching provider staff (lookup by full_name + role=provider)
+    if ($providerName !== '') {
+        $provStmt = $pdo->prepare(
+            "SELECT email FROM staff WHERE full_name = ? AND role = 'provider' AND active = 1 AND email IS NOT NULL AND email != '' LIMIT 1"
+        );
+        $provStmt->execute([$providerName]);
+        $provEmail = (string)($provStmt->fetchColumn() ?: '');
+        if ($provEmail && !in_array($provEmail, $recipients, true)) {
+            $recipients[] = $provEmail;
+        }
+    }
+
+    // Notify all admins
+    foreach (_notifGetEmails($pdo, ['admin']) as $e) {
+        if (!in_array($e, $recipients, true)) $recipients[] = $e;
+    }
+
+    if (empty($recipients)) return;
+
+    $subject = "New visit scheduled — {$patientName} on {$visitDate_f}";
+    sendMail($recipients, $subject, $html);
+    _notifPushByEmails($pdo, $recipients,
+        "Visit scheduled — {$patientName}",
+        "{$visitDate_f} · {$visitLabel}" . ($providerName ? " · {$providerName}" : ''),
+        (defined('BASE_URL') ? BASE_URL : '') . '/schedule.php',
+        'schedule_assigned'
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6. Account locked → notify admins
+// ─────────────────────────────────────────────────────────────────────────────
+function notifyAccountLocked(PDO $pdo, string $lockedName, string $lockedUsername, string $lockedRole, string $lockUntil, string $ip): void
+{
+    $recipients = _notifGetEmails($pdo, ['admin']);
+    if (empty($recipients)) return;
+
+    $ts       = date('F j, Y \a\t g:i a T');
+    $usersUrl = (defined('BASE_URL') ? BASE_URL : '') . '/admin/users.php';
+
+    $html = <<<HTML
+<p>A staff account has been automatically locked after too many consecutive failed login attempts.</p>
+<dl class="meta">
+  <dt>Account</dt><dd>{$lockedName} ({$lockedUsername})</dd>
+  <dt>Role</dt><dd>{$lockedRole}</dd>
+  <dt>Locked at</dt><dd>{$ts}</dd>
+  <dt>Unlocks at</dt><dd>{$lockUntil}</dd>
+  <dt>IP address</dt><dd>{$ip}</dd>
+</dl>
+<p><a href="{$usersUrl}" class="btn">Manage Staff Accounts</a></p>
+HTML;
+
+    sendMail($recipients, "Account locked — {$lockedName}", $html);
+    _notifPushByEmails($pdo, $recipients,
+        "Account locked — {$lockedName}",
+        "Too many failed logins from {$ip}",
+        (defined('BASE_URL') ? BASE_URL : '') . '/admin/users.php',
+        'account_locked'
+    );
+}
