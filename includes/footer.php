@@ -1087,16 +1087,9 @@ $_bnItems = [
 
 <!-- ── Alpine Confirm Dialog ───────────────────────────────────────────────── -->
 <div x-data
-     x-show="$store.pdConfirm.visible"
-     x-transition:enter="transition ease-out duration-150"
-     x-transition:enter-start="opacity-0"
-     x-transition:enter-end="opacity-100"
-     x-transition:leave="transition ease-in duration-100"
-     x-transition:leave-start="opacity-100"
-     x-transition:leave-end="opacity-0"
-     class="fixed no-print"
+     class="no-print"
      :style="$store.pdConfirm.visible
-         ? 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,0.45);'
+         ? 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,0.45);'
          : 'display:none;'"
      @keydown.escape.window="$store.pdConfirm.answer(false)">
     <div x-show="$store.pdConfirm.visible"
