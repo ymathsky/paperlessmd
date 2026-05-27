@@ -296,26 +296,6 @@ $formMeta = [
     'il_disclosure'      => ['label' => 'IL Disclosure Auth.',       'icon' => 'bi-file-earmark-text',   'bg' => 'bg-slate-100',   'text' => 'text-slate-600'],
 ];
 
-// ── FAB context: en_route patient first, then first scheduled, then no-patient
-$_fabPid  = 0;
-$_fabPArr = ['first_name' => '', 'last_name' => '', 'dob' => ''];
-foreach ($mySchedule as $_fSv) {
-    if ($_fSv['status'] === 'en_route') { $_fabPid = (int)$_fSv['patient_id']; break; }
-}
-if (!$_fabPid && !empty($mySchedule)) {
-    $_fabPid = (int)$mySchedule[0]['patient_id'];
-}
-if ($_fabPid) {
-    try {
-        $_fpStmt = $pdo->prepare("SELECT first_name, last_name, dob FROM patients WHERE id = ? LIMIT 1");
-        $_fpStmt->execute([$_fabPid]);
-        $_fpRow = $_fpStmt->fetch(PDO::FETCH_ASSOC);
-        if ($_fpRow) $_fabPArr = $_fpRow;
-    } catch (PDOException $e) { /* non-fatal */ }
-}
-$patient_id = $_fabPid;
-$patient    = $_fabPArr;
-
 include __DIR__ . '/includes/header.php';
 ?>
 
@@ -664,18 +644,6 @@ include __DIR__ . '/includes/header.php';
                     <i class="bi bi-play-fill"></i> Start
                 </button>
                 <?php elseif ($sv['status'] === 'en_route'): ?>
-                <?php
-                    $_dvt  = $sv['visit_type'] ?? 'routine';
-                    $_dvst = $sv['visit_subtype'] ?? '';
-                    $_dfp  = (str_contains(strtolower($_dvt),'new'))
-                        ? '/forms/new_patient_pocket.php'
-                        : '/forms/vital_cs.php';
-                    $_npParam = (str_contains(strtolower($_dvt),'new')) ? '&np_type=' . ($_dvst === 'primary_care' ? 'primary_care' : 'wound_care') : '';
-                ?>
-                <a href="<?= BASE_URL . $_dfp ?>?patient_id=<?= $sv['patient_id'] ?>&visit_id=<?= $sv['id'] ?>&sched_visit_type=<?= urlencode($_dvt) ?><?= $_npParam ?>"
-                   class="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all whitespace-nowrap">
-                    <i class="bi bi-file-earmark-plus-fill"></i> Open Forms
-                </a>
                 <button onclick="dashResetVisit(<?= $sv['id'] ?>, this)"
                         class="flex items-center gap-1 px-2.5 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-xl text-xs font-semibold hover:bg-amber-100 active:scale-95 transition-all whitespace-nowrap">
                     <i class="bi bi-arrow-counterclockwise"></i> Reset
@@ -1850,6 +1818,4 @@ function dashUndoEndVisit(visitId, btn) {
     });
 }
 </script>
-<?php include __DIR__ . '/includes/wound_photo_panel.php'; ?>
-<?php include __DIR__ . '/includes/rx_pad_panel.php'; ?>
 <?php include __DIR__ . '/includes/footer.php'; ?>
