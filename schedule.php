@@ -7,11 +7,27 @@ requireNotBilling();
 // Map visit type to the primary form URL (used by Start Visit and Open Forms buttons)
 function firstFormUrl(string $visitType, int $patientId, int $visitId, string $visitSubtype = ''): string {
     $slug = strtolower(trim($visitType));
+    
+    // Base query params
+    $params = '?patient_id=' . $patientId . '&visit_id=' . $visitId . '&sched_visit_type=' . urlencode($visitType);
+
     if (str_contains($slug, 'new')) {
         $npType = ($visitSubtype === 'primary_care') ? 'primary_care' : 'wound_care';
-        return '/forms/new_patient_pocket.php?patient_id=' . $patientId . '&visit_id=' . $visitId . '&sched_visit_type=' . urlencode($visitType) . '&np_type=' . $npType;
+        return '/forms/new_patient_pocket.php' . $params . '&np_type=' . $npType;
+    } elseif ($slug === 'wound_care') {
+        return '/forms/wound_care.php' . $params;
+    } elseif (in_array($slug, ['awv', 'medicare_awv'])) {
+        return '/forms/medicare_awv.php' . $params;
+    } elseif ($slug === 'ccm') {
+        return '/forms/ccm_consent.php' . $params;
+    } elseif (in_array($slug, ['il', 'il_disclosure'])) {
+        return '/forms/il_disclosure.php' . $params;
+    } elseif ($slug === 'cognitive_wellness') {
+        return '/forms/cognitive_wellness.php' . $params;
     }
-    return '/forms/vital_cs.php?patient_id=' . $patientId . '&visit_id=' . $visitId . '&sched_visit_type=' . urlencode($visitType);
+
+    // Fallback and routine
+    return '/forms/vital_cs.php' . $params;
 }
 
 $pageTitle = 'My Schedule';
@@ -1219,12 +1235,26 @@ async function startVisit(visitId, patientId, visitType, visitSubtype, btn) {
     btn.disabled = true;
     btn.innerHTML = '<i class="bi bi-hourglass-split text-sm animate-spin"></i> Starting…';
 
-    const isNewPatient = visitType.toLowerCase().includes('new');
+    const vType = visitType.toLowerCase();
     const npType = (visitSubtype === 'primary_care') ? 'primary_care' : 'wound_care';
-    const formPath = isNewPatient
-        ? '/forms/new_patient_pocket.php'
-        : '/forms/vital_cs.php';
-    const npParam = isNewPatient ? '&np_type=' + npType : '';
+    
+    let formPath = '/forms/vital_cs.php'; // default fallback for 'routine'
+    let npParam = '';
+
+    if (vType.includes('new')) {
+        formPath = '/forms/new_patient_pocket.php';
+        npParam = '&np_type=' + npType;
+    } else if (vType === 'wound_care') {
+        formPath = '/forms/wound_care.php';
+    } else if (vType === 'awv' || vType === 'medicare_awv') {
+        formPath = '/forms/medicare_awv.php';
+    } else if (vType === 'ccm') {
+        formPath = '/forms/ccm_consent.php';
+    } else if (vType === 'il' || vType === 'il_disclosure') {
+        formPath = '/forms/il_disclosure.php';
+    } else if (vType === 'cognitive_wellness') {
+        formPath = '/forms/cognitive_wellness.php';
+    }
 
     fetch(BASE + '/api/schedule_update.php', {
         method: 'POST',

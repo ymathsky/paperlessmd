@@ -1762,10 +1762,26 @@ async function dashStartVisit(visitId, patientId, visitType, visitSubtype, btn) 
     btn.disabled = true;
     btn.innerHTML = '<i class="bi bi-hourglass-split animate-spin"></i>';
 
-    const isNew   = visitType.toLowerCase().includes('new');
-    const npType  = (visitSubtype === 'primary_care') ? 'primary_care' : 'wound_care';
-    const formPath = isNew ? '/forms/new_patient_pocket.php' : '/forms/vital_cs.php';
-    const npParam  = isNew ? '&np_type=' + npType : '';
+    const vType = visitType.toLowerCase();
+    const npType = (visitSubtype === 'primary_care') ? 'primary_care' : 'wound_care';
+    
+    let formPath = '/forms/vital_cs.php'; // default for routine
+    let npParam  = '';
+
+    if (vType.includes('new')) {
+        formPath = '/forms/new_patient_pocket.php';
+        npParam = '&np_type=' + npType;
+    } else if (vType === 'wound_care') {
+        formPath = '/forms/wound_care.php';
+    } else if (vType === 'awv' || vType === 'medicare_awv') {
+        formPath = '/forms/medicare_awv.php';
+    } else if (vType === 'ccm') {
+        formPath = '/forms/ccm_consent.php';
+    } else if (vType === 'il' || vType === 'il_disclosure') {
+        formPath = '/forms/il_disclosure.php';
+    } else if (vType === 'cognitive_wellness') {
+        formPath = '/forms/cognitive_wellness.php';
+    }
 
     fetch(window._pdBase + '/api/schedule_update.php', {
         method: 'POST',
