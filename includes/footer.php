@@ -1129,19 +1129,14 @@ $_bnItems = [
                     style="flex:1;min-width:0;padding:11px 12px;background:#fff;
                            border:1.5px solid #d1d5db;border-radius:50px;
                            font-size:14px;font-weight:600;color:#374151;cursor:pointer;
-                           overflow:hidden;white-space:nowrap;
+                           overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
                            transition:background 0.12s;"
                     onmouseover="this.style.background='#f9fafb'"
                     onmouseout="this.style.background='#fff'">
                 Cancel
             </button>
             <button @click="$store.pdConfirm.answer(true)"
-                    :style="$store.pdConfirm.confirmStyle || 'background:#2563eb;'"
-                    style="flex:1;min-width:0;padding:11px 12px;border:none;border-radius:50px;
-                           font-size:14px;font-weight:700;cursor:pointer;color:#fff;
-                           overflow:hidden;white-space:nowrap;
-                           box-shadow:0 4px 14px rgba(0,0,0,0.22);
-                           transition:filter 0.12s,transform 0.1s;"
+                    :style="`flex:1;min-width:0;padding:11px 12px;border:none;border-radius:50px;font-size:14px;font-weight:700;cursor:pointer;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,0.22);transition:filter 0.12s,transform 0.1s;` + ($store.pdConfirm.confirmStyle || 'background:#2563eb;')"
                     onmouseover="this.style.filter='brightness(1.1)';this.style.transform='translateY(-1px)'"
                     onmouseout="this.style.filter='';this.style.transform=''">
                 <span x-text="$store.pdConfirm.confirmLabel"></span>
