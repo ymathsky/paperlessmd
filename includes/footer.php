@@ -1089,16 +1089,17 @@ $_bnItems = [
 <div x-data
      class="no-print"
      :style="$store.pdConfirm.visible
-         ? 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,0.45);'
+         ? 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;background:rgba(0,0,0,0.45);'
          : 'display:none;'"
      @keydown.escape.window="$store.pdConfirm.answer(false)">
     <div x-show="$store.pdConfirm.visible"
          x-transition:enter="transition ease-out duration-150"
          x-transition:enter-start="opacity-0 scale-95"
          x-transition:enter-end="opacity-100 scale-100"
-         style="background:#fff;border-radius:16px;max-width:340px;width:100%;
-                box-shadow:0 8px 40px rgba(0,0,0,0.18);position:relative;padding:24px 20px 20px;
-                box-sizing:border-box;">
+         style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                background:#fff;border-radius:16px;width:calc(100vw - 32px);max-width:340px;
+                box-shadow:0 8px 40px rgba(0,0,0,0.18);padding:24px 20px 20px;
+                box-sizing:border-box;z-index:100000;">
 
         <!-- Close × -->
         <button @click="$store.pdConfirm.answer(false)"
