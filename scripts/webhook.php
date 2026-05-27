@@ -20,7 +20,14 @@
  */
 
 // ── Config ────────────────────────────────────────────────────────────────────
-define('WEBHOOK_SECRET', 'REPLACE_WITH_YOUR_GITHUB_WEBHOOK_SECRET');
+// Secret is stored server-side in includes/config.local.php, never in git.
+// On the server, add: define('WEBHOOK_SECRET', 'your-secret-here');
+$_localConfig = __DIR__ . '/../includes/config.local.php';
+if (is_file($_localConfig)) { require_once $_localConfig; }
+if (!defined('WEBHOOK_SECRET') || WEBHOOK_SECRET === '') {
+    http_response_code(500);
+    exit('Webhook secret not configured on server');
+}
 define('DEPLOY_SCRIPT',  '/usr/local/bin/paperlessmd-deploy');
 define('DEPLOY_LOG',     '/var/log/paperlessmd-deploy.log');
 define('ALLOWED_BRANCH', 'refs/heads/main');
@@ -54,7 +61,7 @@ if ($ref !== ALLOWED_BRANCH) {
 // ── Trigger deploy asynchronously ────────────────────────────────────────────
 // Run as www-data (same user Apache runs as, which has write access to app dir)
 $cmd = 'sudo -n /usr/local/bin/paperlessmd-deploy >> ' . escapeshellarg(DEPLOY_LOG) . ' 2>&1 &';
-exec($cmd);
+exec($cmd, $out, $rc);
 
 http_response_code(200);
 echo 'Deploy triggered at ' . date('Y-m-d H:i:s');
