@@ -1754,7 +1754,9 @@ async function dashStartVisit(visitId, patientId, visitType, visitSubtype, btn) 
         subtext:      'You will not be able to navigate to any other page until the visit is ended.',
         confirmLabel: 'Start Visit',
         confirmIcon:  'bi bi-play-fill',
-        confirmStyle: 'background:#2563eb;',
+        confirmStyle: 'background:linear-gradient(135deg,#2563eb,#0ea5e9);',
+        iconBg:       '#eff6ff',
+        iconColor:    '#2563eb',
     });
     if (!ok) return;
     btn.disabled = true;

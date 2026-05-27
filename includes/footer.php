@@ -1094,36 +1094,63 @@ $_bnItems = [
      x-transition:leave="transition ease-in duration-150"
      x-transition:leave-start="opacity-100"
      x-transition:leave-end="opacity-0"
-     class="fixed inset-0 z-[99999] flex items-center justify-center p-4 no-print"
-     style="background:rgba(15,23,42,0.65);backdrop-filter:blur(4px);display:none;z-index:99999;"
+     class="fixed inset-0 flex items-center justify-center p-5 no-print"
+     style="background:rgba(10,18,35,0.72);backdrop-filter:blur(6px);display:none;z-index:99999;"
      @keydown.escape.window="$store.pdConfirm.answer(false)">
     <div x-show="$store.pdConfirm.visible"
-         x-transition:enter="transition ease-out duration-250"
-         x-transition:enter-start="opacity-0 scale-95 translate-y-2"
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0 scale-95 translate-y-3"
          x-transition:enter-end="opacity-100 scale-100 translate-y-0"
-         style="background:#fff;border-radius:20px;padding:28px 24px;max-width:360px;width:100%;
-                box-shadow:0 24px 64px rgba(0,0,0,0.25);text-align:center;">
-        <div style="width:52px;height:52px;background:#fef3c7;border-radius:50%;
-                    display:flex;align-items:center;justify-content:center;margin:0 auto 14px;">
-            <i class="bi bi-question-circle-fill" style="font-size:24px;color:#d97706;"></i>
-        </div>
-        <p x-text="$store.pdConfirm.message"
-           style="font-size:16px;font-weight:700;color:#1e293b;margin:0 0 6px;line-height:1.4;"></p>
-        <p x-text="$store.pdConfirm.subtext"
-           x-show="$store.pdConfirm.subtext"
-           style="font-size:13px;color:#64748b;margin:0 0 22px;"></p>
-        <div style="display:flex;gap:10px;margin-top:22px;">
-            <button @click="$store.pdConfirm.answer(false)"
-                    style="flex:1;padding:12px;background:#f1f5f9;color:#475569;border:none;
-                           border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;">
-                Cancel
-            </button>
+         style="background:#fff;border-radius:28px;max-width:400px;width:100%;
+                box-shadow:0 40px 100px rgba(0,0,0,0.35);overflow:hidden;">
+
+        <!-- Coloured accent stripe (matches confirm button colour) -->
+        <div style="height:5px;" :style="$store.pdConfirm.confirmStyle || 'background:#2563eb;'"></div>
+
+        <div style="padding:32px 28px 28px;text-align:center;">
+
+            <!-- Icon bubble — background is a tint of the action colour -->
+            <div style="width:64px;height:64px;border-radius:50%;display:flex;align-items:center;
+                        justify-content:center;margin:0 auto 20px;"
+                 :style="'background:' + ($store.pdConfirm.iconBg || '#eff6ff') + ';'">
+                <i :class="$store.pdConfirm.confirmIcon || 'bi bi-question-circle-fill'"
+                   style="font-size:28px;"
+                   :style="'color:' + ($store.pdConfirm.iconColor || '#2563eb') + ';'"></i>
+            </div>
+
+            <!-- Title -->
+            <p x-text="$store.pdConfirm.message"
+               style="font-size:18px;font-weight:800;color:#0f172a;margin:0 0 8px;line-height:1.35;"></p>
+
+            <!-- Subtext -->
+            <p x-text="$store.pdConfirm.subtext"
+               x-show="$store.pdConfirm.subtext"
+               style="font-size:13.5px;color:#64748b;margin:0 0 4px;line-height:1.55;"></p>
+
+            <!-- Confirm button (full width, prominent) -->
             <button @click="$store.pdConfirm.answer(true)"
-                    :style="$store.pdConfirm.confirmStyle"
-                    style="flex:1;padding:12px;border:none;border-radius:12px;
-                           font-size:14px;font-weight:700;cursor:pointer;color:#fff;">
+                    :style="$store.pdConfirm.confirmStyle || 'background:#2563eb;'"
+                    style="display:flex;align-items:center;justify-content:center;gap:8px;
+                           width:100%;margin-top:24px;padding:15px 20px;border:none;
+                           border-radius:50px;font-size:15px;font-weight:800;
+                           cursor:pointer;color:#fff;
+                           box-shadow:0 4px 18px rgba(0,0,0,0.18);
+                           transition:filter 0.15s;"
+                    onmouseover="this.style.filter='brightness(1.1)'"
+                    onmouseout="this.style.filter=''">
                 <i :class="$store.pdConfirm.confirmIcon"></i>
                 <span x-text="$store.pdConfirm.confirmLabel"></span>
+            </button>
+
+            <!-- Cancel (ghost, below) -->
+            <button @click="$store.pdConfirm.answer(false)"
+                    style="display:block;width:100%;margin-top:10px;padding:13px 20px;
+                           background:transparent;border:1.5px solid #e2e8f0;border-radius:50px;
+                           font-size:14px;font-weight:600;color:#64748b;cursor:pointer;
+                           transition:background 0.12s,color 0.12s;"
+                    onmouseover="this.style.background='#f1f5f9';this.style.color='#334155'"
+                    onmouseout="this.style.background='transparent';this.style.color='#64748b'">
+                Cancel
             </button>
         </div>
     </div>
@@ -1163,6 +1190,8 @@ document.addEventListener('alpine:init', () => {
         confirmLabel: 'Confirm',
         confirmIcon:  'bi bi-check-lg',
         confirmStyle: 'background:#2563eb;',
+        iconBg:       '#eff6ff',
+        iconColor:    '#2563eb',
         _resolve:     null,
         show(opts) {
             if (typeof opts === 'string') opts = { message: opts };
@@ -1171,6 +1200,8 @@ document.addEventListener('alpine:init', () => {
             this.confirmLabel = opts.confirmLabel  || 'Confirm';
             this.confirmIcon  = opts.confirmIcon   || 'bi bi-check-lg';
             this.confirmStyle = opts.confirmStyle  || 'background:#2563eb;';
+            this.iconBg       = opts.iconBg        || '#eff6ff';
+            this.iconColor    = opts.iconColor     || '#2563eb';
             this.visible      = true;
             return new Promise(resolve => { this._resolve = resolve; });
         },

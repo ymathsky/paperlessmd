@@ -1211,7 +1211,9 @@ async function startVisit(visitId, patientId, visitType, visitSubtype, btn) {
         subtext:      'You will not be able to navigate to any other page until the visit is ended.',
         confirmLabel: 'Start Visit',
         confirmIcon:  'bi bi-play-fill',
-        confirmStyle: 'background:#2563eb;',
+        confirmStyle: 'background:linear-gradient(135deg,#2563eb,#0ea5e9);',
+        iconBg:       '#eff6ff',
+        iconColor:    '#2563eb',
     });
     if (!ok) return;
     btn.disabled = true;
@@ -1253,7 +1255,9 @@ async function endVisit(visitId, btn) {
         message: 'Mark this visit as completed?',
         confirmLabel: 'Complete Visit',
         confirmIcon:  'bi bi-check-circle-fill',
-        confirmStyle: 'background:#059669;',
+        confirmStyle: 'background:linear-gradient(135deg,#059669,#10b981);',
+        iconBg:       '#f0fdf4',
+        iconColor:    '#059669',
     });
     if (!ok) return;
     btn.disabled = true;
