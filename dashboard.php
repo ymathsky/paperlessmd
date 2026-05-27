@@ -1748,7 +1748,15 @@ endif;
 ?>
 <script>
 // ── Dashboard: one-tap Start Visit ───────────────────────────────────────────
-function dashStartVisit(visitId, patientId, visitType, visitSubtype, btn) {
+async function dashStartVisit(visitId, patientId, visitType, visitSubtype, btn) {
+    const ok = await pdConfirm({
+        message:      'Start this visit?',
+        subtext:      'You will not be able to navigate to any other page until the visit is ended.',
+        confirmLabel: 'Start Visit',
+        confirmIcon:  'bi bi-play-fill',
+        confirmStyle: 'background:#2563eb;',
+    });
+    if (!ok) return;
     btn.disabled = true;
     btn.innerHTML = '<i class="bi bi-hourglass-split animate-spin"></i>';
 

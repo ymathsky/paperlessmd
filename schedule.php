@@ -1205,7 +1205,15 @@ function closeRouteMapModal() {
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeRouteMapModal(); });
 
 // ── One-tap Start Visit ───────────────────────────────────────────────────────
-function startVisit(visitId, patientId, visitType, visitSubtype, btn) {
+async function startVisit(visitId, patientId, visitType, visitSubtype, btn) {
+    const ok = await pdConfirm({
+        message:      'Start this visit?',
+        subtext:      'You will not be able to navigate to any other page until the visit is ended.',
+        confirmLabel: 'Start Visit',
+        confirmIcon:  'bi bi-play-fill',
+        confirmStyle: 'background:#2563eb;',
+    });
+    if (!ok) return;
     btn.disabled = true;
     btn.innerHTML = '<i class="bi bi-hourglass-split text-sm animate-spin"></i> Starting…';
 
