@@ -930,10 +930,10 @@ document.addEventListener('DOMContentLoaded',function(){
 
     var pad=null;
     if(canvas&&typeof SignaturePad!=='undefined'){
-        function resizeCanvas(){var ratio=Math.max(window.devicePixelRatio||1,1),w=wrapper.getBoundingClientRect().width||wrapper.offsetWidth;if(!w)return;canvas.width=w*ratio;canvas.height=140*ratio;canvas.style.width=w+'px';canvas.style.height='140px';canvas.getContext('2d').scale(ratio,ratio);pad.clear();}
+        function resizeCanvas(){var ratio=Math.max(window.devicePixelRatio||1,1),rect=canvas.getBoundingClientRect();if(!rect.width)return;canvas.width=Math.round(rect.width*ratio);canvas.height=Math.round(rect.height*ratio);canvas.getContext('2d').scale(ratio,ratio);pad.clear();}
         pad=new SignaturePad(canvas,{penColor:'rgb(15,23,42)',minWidth:1.5,maxWidth:3});
         pad.addEventListener('beginStroke',function(){placeholder.style.display='none';});
-        (function tryInit(n){var w=wrapper.getBoundingClientRect().width||wrapper.offsetWidth;if(!w&&n<30){requestAnimationFrame(function(){tryInit(n+1);});return;}resizeCanvas();})(0);
+        (function tryInit(n){var r=canvas.getBoundingClientRect();if(!r.width&&n<30){requestAnimationFrame(function(){tryInit(n+1);});return;}resizeCanvas();})(0);
         window.addEventListener('resize',function(){resizeCanvas();});
     }
     clearBtn&&clearBtn.addEventListener('click',function(){if(pad)pad.clear();if(placeholder)placeholder.style.display='';});
@@ -1009,16 +1009,15 @@ document.addEventListener('DOMContentLoaded', function () {
     if (pCanvas && typeof SignaturePad !== 'undefined') {
         function pResize() {
             var ratio = Math.max(window.devicePixelRatio || 1, 1),
-                w = pWrapper.getBoundingClientRect().width || pWrapper.offsetWidth;
-            if (!w) return;
-            pCanvas.width = w * ratio; pCanvas.height = 140 * ratio;
-            pCanvas.style.width = w + 'px'; pCanvas.style.height = '140px';
+                rect = pCanvas.getBoundingClientRect();
+            if (!rect.width) return;
+            pCanvas.width = Math.round(rect.width * ratio); pCanvas.height = Math.round(rect.height * ratio);
             pCanvas.getContext('2d').scale(ratio, ratio);
             pPad.clear();
         }
         pPad = new SignaturePad(pCanvas, { penColor: 'rgb(15,23,42)', minWidth: 1.5, maxWidth: 3 });
         pPad.addEventListener('beginStroke', function () { if (pPHolder) pPHolder.style.display = 'none'; });
-        (function tryInit(n) { var w = pWrapper.getBoundingClientRect().width || pWrapper.offsetWidth; if (!w && n < 30) { requestAnimationFrame(function () { tryInit(n + 1); }); return; } pResize(); })(0);
+        (function tryInit(n) { var r = pCanvas.getBoundingClientRect(); if (!r.width && n < 30) { requestAnimationFrame(function () { tryInit(n + 1); }); return; } pResize(); })(0);
         window.addEventListener('resize', pResize);
     }
     pClearBtn && pClearBtn.addEventListener('click', function () { if (pPad) pPad.clear(); if (pPHolder) pPHolder.style.display = ''; });
