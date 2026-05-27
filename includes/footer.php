@@ -1088,83 +1088,68 @@ $_bnItems = [
 <!-- ── Alpine Confirm Dialog ───────────────────────────────────────────────── -->
 <div x-data
      x-show="$store.pdConfirm.visible"
-     x-transition:enter="transition ease-out duration-200"
+     x-transition:enter="transition ease-out duration-150"
      x-transition:enter-start="opacity-0"
      x-transition:enter-end="opacity-100"
-     x-transition:leave="transition ease-in duration-150"
+     x-transition:leave="transition ease-in duration-100"
      x-transition:leave-start="opacity-100"
      x-transition:leave-end="opacity-0"
-     class="fixed inset-0 flex items-center justify-center p-5 no-print"
-     style="background:rgba(8,15,30,0.78);backdrop-filter:blur(8px);display:none;z-index:99999;"
+     class="fixed inset-0 flex items-center justify-center p-6 no-print"
+     style="background:rgba(0,0,0,0.45);display:none;z-index:99999;"
      @keydown.escape.window="$store.pdConfirm.answer(false)">
     <div x-show="$store.pdConfirm.visible"
-         x-transition:enter="transition ease-out duration-220"
-         x-transition:enter-start="opacity-0 scale-90 translate-y-6"
-         x-transition:enter-end="opacity-100 scale-100 translate-y-0"
-         style="background:#fff;border-radius:32px;max-width:380px;width:100%;
-                box-shadow:0 48px 120px rgba(0,0,0,0.45);overflow:hidden;">
+         x-transition:enter="transition ease-out duration-150"
+         x-transition:enter-start="opacity-0 scale-95"
+         x-transition:enter-end="opacity-100 scale-100"
+         style="background:#fff;border-radius:16px;max-width:360px;width:100%;
+                box-shadow:0 8px 40px rgba(0,0,0,0.18);position:relative;padding:28px 24px 22px;">
 
-        <!-- ── Hero header: tinted panel + large icon ── -->
-        <div style="padding:44px 32px 32px;text-align:center;position:relative;"
-             :style="'background:' + ($store.pdConfirm.iconBg || '#f0f4ff') + ';'">
-            <!-- soft radial glow behind icon -->
-            <div style="position:absolute;top:0;left:50%;transform:translateX(-50%);
-                        width:240px;height:140px;border-radius:50%;
-                        filter:blur(40px);opacity:0.35;pointer-events:none;"
-                 :style="$store.pdConfirm.confirmStyle || 'background:#2563eb;'"></div>
+        <!-- Close × -->
+        <button @click="$store.pdConfirm.answer(false)"
+                style="position:absolute;top:14px;right:16px;width:28px;height:28px;
+                       background:none;border:none;cursor:pointer;font-size:18px;
+                       color:#9ca3af;line-height:1;display:flex;align-items:center;justify-content:center;
+                       border-radius:6px;transition:color 0.12s,background 0.12s;"
+                onmouseover="this.style.color='#374151';this.style.background='#f3f4f6'"
+                onmouseout="this.style.color='#9ca3af';this.style.background='none'"
+                aria-label="Close">
+            &times;
+        </button>
 
-            <!-- Icon circle (filled with confirm colour) -->
-            <div style="position:relative;width:80px;height:80px;border-radius:50%;
-                        display:flex;align-items:center;justify-content:center;
-                        margin:0 auto 22px;"
-                 :style="($store.pdConfirm.confirmStyle || 'background:#2563eb;') + 'box-shadow:0 10px 32px rgba(0,0,0,0.22);'">
-                <i :class="$store.pdConfirm.confirmIcon || 'bi bi-check-lg'"
-                   style="font-size:34px;color:#fff;"></i>
-            </div>
+        <!-- Title -->
+        <p x-text="$store.pdConfirm.message"
+           style="font-size:17px;font-weight:700;color:#111827;margin:0 24px 8px 0;
+                  line-height:1.35;text-align:center;"></p>
 
-            <!-- Title -->
-            <p x-text="$store.pdConfirm.message"
-               style="font-size:20px;font-weight:800;color:#0f172a;margin:0 0 10px;
-                      line-height:1.3;letter-spacing:-0.01em;"></p>
+        <!-- Subtext -->
+        <p x-text="$store.pdConfirm.subtext"
+           x-show="$store.pdConfirm.subtext"
+           style="font-size:13px;color:#6b7280;margin:0 0 20px;line-height:1.55;text-align:center;"></p>
 
-            <!-- Subtext -->
-            <p x-text="$store.pdConfirm.subtext"
-               x-show="$store.pdConfirm.subtext"
-               style="font-size:13.5px;color:#64748b;margin:0;line-height:1.6;
-                      max-width:290px;display:block;margin-left:auto;margin-right:auto;"></p>
-        </div>
-
-        <!-- ── Action area ── -->
-        <div style="padding:22px 24px 26px;background:#fff;display:flex;flex-direction:column;gap:10px;">
-
-            <!-- Confirm (primary, full-width) -->
+        <!-- Buttons -->
+        <div style="display:flex;gap:10px;margin-top:20px;">
+            <button @click="$store.pdConfirm.answer(false)"
+                    style="flex:1;padding:11px 16px;background:#fff;
+                           border:1.5px solid #d1d5db;border-radius:8px;
+                           font-size:14px;font-weight:600;color:#374151;cursor:pointer;
+                           transition:background 0.12s;"
+                    onmouseover="this.style.background='#f9fafb'"
+                    onmouseout="this.style.background='#fff'">
+                Cancel
+            </button>
             <button @click="$store.pdConfirm.answer(true)"
                     :style="$store.pdConfirm.confirmStyle || 'background:#2563eb;'"
-                    style="display:flex;align-items:center;justify-content:center;gap:9px;
-                           width:100%;padding:16px 24px;border:none;border-radius:18px;
-                           font-size:15.5px;font-weight:800;cursor:pointer;color:#fff;
-                           letter-spacing:0.01em;
-                           box-shadow:0 6px 22px rgba(0,0,0,0.20);
-                           transition:filter 0.15s,transform 0.12s;"
-                    onmouseover="this.style.filter='brightness(1.1)';this.style.transform='translateY(-1px)'"
-                    onmouseout="this.style.filter='';this.style.transform=''">
-                <i :class="$store.pdConfirm.confirmIcon" style="font-size:16px;"></i>
+                    style="flex:1;padding:11px 16px;border:none;border-radius:8px;
+                           font-size:14px;font-weight:700;cursor:pointer;color:#fff;
+                           transition:filter 0.12s;"
+                    onmouseover="this.style.filter='brightness(1.1)'"
+                    onmouseout="this.style.filter=''">
                 <span x-text="$store.pdConfirm.confirmLabel"></span>
-            </button>
-
-            <!-- Cancel (subtle) -->
-            <button @click="$store.pdConfirm.answer(false)"
-                    style="display:block;width:100%;padding:14px 24px;
-                           background:#f8fafc;border:none;border-radius:18px;
-                           font-size:14.5px;font-weight:600;color:#64748b;cursor:pointer;
-                           transition:background 0.12s,color 0.12s;"
-                    onmouseover="this.style.background='#f1f5f9';this.style.color='#334155'"
-                    onmouseout="this.style.background='#f8fafc';this.style.color='#64748b'">
-                Cancel
             </button>
         </div>
     </div>
 </div>
+
 
 <script>
 /* ── Alpine Stores: Toasts + Confirm Dialog ─────────────────────────────── */
