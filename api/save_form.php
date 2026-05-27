@@ -15,12 +15,15 @@ if (!verifyCsrf($_POST['csrf_token'] ?? '')) {
 
 $patientId  = (int)($_POST['patient_id'] ?? 0);
 $formType   = $_POST['form_type'] ?? '';
+$visitId    = (int)($_POST['visit_id'] ?? 0);
 $signature  = $_POST['patient_signature'] ?? '';
 $maSig      = $_POST['ma_signature'] ?? '';
 $poaName    = trim($_POST['poa_name'] ?? '');
 $poaRel     = trim($_POST['poa_relationship'] ?? '');
+$_editOverride = (isAdmin() || isMa()) && ($_POST['edit_override'] ?? '') === '1';
+$forceDraft = ($formType === 'vital_cs');
 
-$allowed = ['vital_cs', 'new_patient', 'abn', 'pf_signup', 'ccm_consent', 'cognitive_wellness', 'medicare_awv', 'il_disclosure', 'wound_care_consent', 'informed_consent_wound', 'rpm_consent', 'new_patient_pocket'];
+$allowed = ['vital_cs', 'new_patient', 'abn', 'pf_signup', 'ccm_consent', 'cognitive_wellness', 'medicare_awv', 'il_disclosure', 'wound_care_consent', 'informed_consent_wound', 'rpm_consent', 'new_patient_pocket', 'new_patient_pocket_pc'];
 if (!$patientId || !in_array($formType, $allowed, true)) {
     die('Invalid form submission.');
 }
@@ -34,7 +37,7 @@ if (!$chk->fetch()) {
 
 // Non-admin: require a scheduled visit today for this patient
 // (exempt intake forms — new patients won't have a visit on schedule yet)
-$intakeForms = ['new_patient', 'new_patient_pocket', 'pf_signup'];
+$intakeForms = ['new_patient', 'new_patient_pocket', 'new_patient_pocket_pc', 'pf_signup'];
 if (!isAdmin() && !in_array($formType, $intakeForms, true)) {
     $schedChk = $pdo->prepare("
         SELECT id FROM `schedule`
@@ -49,7 +52,7 @@ if (!isAdmin() && !in_array($formType, $intakeForms, true)) {
 }
 
 // Collect form fields (exclude meta)
-$excludeKeys = ['csrf_token', 'patient_id', 'form_type', 'patient_signature', 'ma_signature', 'poa_name', 'poa_relationship', 'med_count'];
+$excludeKeys = ['csrf_token', 'patient_id', 'form_type', 'patient_signature', 'ma_signature', 'poa_name', 'poa_relationship', 'med_count', 'draft_submission_id'];
 $formData    = [];
 foreach ($_POST as $key => $value) {
     if (!in_array($key, $excludeKeys, true)) {
@@ -65,6 +68,31 @@ if ($maSig && !preg_match('/^data:image\/png;base64,[A-Za-z0-9+\/=]+$/', $maSig)
 // Validate patient_signature format if provided
 if ($signature && !preg_match('/^data:image\/png;base64,[A-Za-z0-9+\/=]+$/', $signature)) {
     $signature = '';
+}
+
+$_isNewPatientPocket = ($formType === 'new_patient_pocket' || $formType === 'new_patient_pocket_pc');
+$_prevSigned = null;
+if ($_editOverride && (
+        !$signature ||
+    !$maSig
+    )) {
+    $prevSigStmt = $pdo->prepare("SELECT patient_signature, ma_signature, provider_signature, provider_name
+                                  FROM form_submissions
+                                  WHERE patient_id = ? AND form_type = ? AND status IN ('signed','uploaded')
+                                  ORDER BY created_at DESC
+                                  LIMIT 1");
+    $prevSigStmt->execute([$patientId, $formType]);
+    $_prevSigned = $prevSigStmt->fetch(PDO::FETCH_ASSOC) ?: null;
+
+    if ($_prevSigned) {
+        // New Patient Packet must capture a fresh patient signature on submit.
+        if (!$signature && !$_isNewPatientPocket && !empty($_prevSigned['patient_signature'])) {
+            $signature = (string)$_prevSigned['patient_signature'];
+        }
+        if (!$maSig && !empty($_prevSigned['ma_signature'])) {
+            $maSig = (string)$_prevSigned['ma_signature'];
+        }
+    }
 }
 
 // Validate med_handwriting if provided (strip if invalid)
@@ -91,36 +119,35 @@ if (!empty($formData['med_pdf'])) {
     }
 }
 
-// Validate and require provider_signature for new_patient_pocket
+// Provider signature is optional for New Patient Packet; keep if valid.
 $providerSig       = null;
 $providerPrintName = null;
-if ($formType === 'new_patient_pocket') {
+if ($_isNewPatientPocket) {
     $providerSig = $formData['provider_signature'] ?? '';
     if ($providerSig && !preg_match('/^data:image\/png;base64,[A-Za-z0-9+\/=]+$/', $providerSig)) {
         unset($formData['provider_signature']);
         $providerSig = '';
     }
-    if (!$providerSig) {
-        http_response_code(400);
-        die('Provider signature is required.');
-    }
     $providerPrintName = trim($formData['provider_print_name'] ?? '') ?: null;
 }
 
 // Require both signatures
-if (!$signature) {
-    http_response_code(400);
-    die('Patient signature is required.');
-}
-if (!$maSig) {
-    http_response_code(400);
-    die('MA signature is required.');
+if (!$forceDraft) {
+    if (!$signature) {
+        http_response_code(400);
+        die('Patient signature is required.');
+    }
+    if (!$maSig) {
+        http_response_code(400);
+        die('MA signature is required.');
+    }
 }
 
-$status = 'signed';
+$status = $forceDraft ? 'draft' : 'signed';
 
 // One-signature rule: if submitting with a signature and one already exists today, redirect
-if ($signature) {
+// Admin with edit_override=1 bypasses this check to allow re-signing
+if (!$forceDraft && $signature && !$_editOverride) {
     $dupChk = $pdo->prepare("
         SELECT id FROM form_submissions
         WHERE patient_id = ? AND form_type = ? AND status IN ('signed','uploaded')
@@ -137,7 +164,7 @@ if ($signature) {
 $stmt   = $pdo->prepare("
     INSERT INTO form_submissions
         (patient_id, form_type, form_data, patient_signature, ma_signature, poa_name, poa_relationship, ma_id, status, signed_at, provider_signature, provider_name)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ");
 $stmt->execute([
     $patientId,
@@ -149,11 +176,32 @@ $stmt->execute([
     $poaRel    ?: null,
     $_SESSION['user_id'],
     $status,
+    $status === 'signed' ? date('Y-m-d H:i:s') : null,
     $providerSig       ?: null,
     $providerPrintName ?: null,
 ]);
 
 $newId = $pdo->lastInsertId();
+
+if (in_array($formType, ['vital_cs', 'new_patient_pocket', 'new_patient_pocket_pc'], true)) {
+    try {
+        if (array_key_exists('pharmacy_name', $formData) || array_key_exists('pharmacy_phone', $formData) || array_key_exists('pharmacy_address', $formData)) {
+            $pdo->prepare("UPDATE patients
+                           SET pharmacy_name = COALESCE(NULLIF(?, ''), pharmacy_name),
+                               pharmacy_phone = COALESCE(NULLIF(?, ''), pharmacy_phone),
+                               pharmacy_address = COALESCE(NULLIF(?, ''), pharmacy_address)
+                           WHERE id = ?")
+                ->execute([
+                    trim((string)($formData['pharmacy_name'] ?? '')),
+                    trim((string)($formData['pharmacy_phone'] ?? '')),
+                    trim((string)($formData['pharmacy_address'] ?? '')),
+                    $patientId,
+                ]);
+        }
+    } catch (PDOException $e) {
+        // Skip pharmacy sync if patient extras columns are unavailable.
+    }
+}
 
 require_once __DIR__ . '/../includes/audit.php';
 auditLog($pdo, 'form_create', 'form', (int)$newId, $formType, 'patient_id=' . $patientId);
@@ -161,10 +209,12 @@ auditLog($pdo, 'form_create', 'form', (int)$newId, $formType, 'patient_id=' . $p
 // Email notification — new form awaiting provider countersignature
 require_once __DIR__ . '/../includes/mailer.php';
 require_once __DIR__ . '/../includes/notifications.php';
-notifyFormSigned($pdo, (int)$newId, $patientId, $formType, (int)$_SESSION['user_id']);
+if ($status === 'signed') {
+    notifyFormSigned($pdo, (int)$newId, $patientId, $formType, (int)$_SESSION['user_id']);
+}
 
 // ── Medication reconciliation for Visit Consent forms ─────────────────────
-if ($formType === 'vital_cs' || $formType === 'new_patient_pocket') {
+if (in_array($formType, ['vital_cs', 'new_patient_pocket', 'new_patient_pocket_pc'], true) && $status === 'signed') {
     $staffId  = (int)$_SESSION['user_id'];
     // Use submitted med_count (dynamic rows), read from $_POST since it's excluded from $formData; cap at 30
     $medCount = min(30, max(6, (int)($_POST['med_count'] ?? 6)));
@@ -225,6 +275,19 @@ if ($formType === 'vital_cs' || $formType === 'new_patient_pocket') {
     } catch (PDOException $e) {
         // Table not yet migrated — skip reconciliation silently
     }
+}
+
+if ($formType === 'vital_cs' && $status === 'draft') {
+    $q = [
+        'patient_id'   => $patientId,
+        'edit'         => 1,
+        'draft_saved'  => 1,
+    ];
+    if ($visitId > 0) {
+        $q['visit_id'] = $visitId;
+    }
+    header('Location: ' . BASE_URL . '/forms/vital_cs.php?' . http_build_query($q));
+    exit;
 }
 
 header('Location: ' . BASE_URL . '/view_document.php?id=' . $newId);
