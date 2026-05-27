@@ -10,9 +10,26 @@ include __DIR__ . '/includes/header.php';
 
 $releases = [
     [
+        'version' => 'v3.4',
+        'date'    => 'May 28, 2026',
+        'label'   => 'Latest',
+        'color'   => 'emerald',
+        'items'   => [
+            ['icon' => 'bi-bell-fill',             'tag' => 'New',     'tag_color' => 'blue',  'title' => 'Push Notifications',                           'desc' => 'Staff now receive real-time push notifications on their device for new messages, visit assignments, and morning route reminders — even when the app is in the background.'],
+            ['icon' => 'bi-capsule-pill',          'tag' => 'New',     'tag_color' => 'blue',  'title' => 'Drug Search & Rx Pad',                         'desc' => 'Providers can now search medications by name or NDC and add them to the patient Rx pad directly inside the visit workflow, with dosage, frequency, and refill fields.'],
+            ['icon' => 'bi-camera-video-fill',     'tag' => 'New',     'tag_color' => 'blue',  'title' => 'Video Call Integration',                       'desc' => 'Telehealth video calls can now be launched directly from the patient chart, enabling remote visits without leaving PaperlessMD.'],
+            ['icon' => 'bi-pen-fill',              'tag' => 'New',     'tag_color' => 'blue',  'title' => 'Provider Signature Panel',                     'desc' => 'Providers can now apply their saved digital signature to forms from within the visit workflow, eliminating the need to sign outside the app.'],
+            ['icon' => 'bi-cloud-check-fill',      'tag' => 'New',     'tag_color' => 'blue',  'title' => 'Server-Side Autosave Every 45 Seconds',        'desc' => 'Visit forms now silently sync a draft to the server every 45 seconds. If staff lose connectivity or close the tab unexpectedly, their work is preserved and recoverable from any device.'],
+            ['icon' => 'bi-stop-circle-fill',      'tag' => 'Improve', 'tag_color' => 'teal',  'title' => 'End Visit Available on All Visit Forms',       'desc' => 'The End Visit button now appears on every visit form — ABN, New Patient, CCM Consent, Medicare AWV, Cognitive Wellness, IL Disclosure, PF Signup, and Wound Care Consent — making it easy to close the visit from whichever form is completed last.'],
+            ['icon' => 'bi-person-badge-fill',     'tag' => 'New',     'tag_color' => 'blue',  'title' => 'Avatar / Profile Photo Upload',                'desc' => 'Staff can now upload a profile photo from their My Profile page. The avatar appears in the sidebar and session header across the app.'],
+            ['icon' => 'bi-sticky-fill',           'tag' => 'New',     'tag_color' => 'blue',  'title' => 'Quick Notes',                                  'desc' => 'A quick-notes panel is now available for fast free-text notes tied to the current session without opening a full visit form.'],
+            ['icon' => 'bi-unlock-fill',           'tag' => 'New',     'tag_color' => 'blue',  'title' => 'Forgot & Reset Password',                      'desc' => 'Staff can now reset their password via a secure email link from the login screen, removing the need for admin intervention for forgotten passwords.'],
+        ],
+    ],
+    [
         'version' => 'v3.3',
         'date'    => 'May 27, 2026',
-        'label'   => 'Latest',
+        'label'   => null,
         'color'   => 'emerald',
         'items'   => [
             ['icon' => 'bi-save2-fill',            'tag' => 'Improve', 'tag_color' => 'teal',  'title' => 'Save Draft Keeps In-Progress Visits Safe', 'desc' => 'The form footer now clearly supports Save Draft as the safe pause point during a visit. Staff can preserve incomplete work, leave the chart, and return later without losing the current visit state.'],
