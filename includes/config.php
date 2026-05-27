@@ -38,14 +38,14 @@ if (!defined('DB_HOST') && getenv('MYSQL_HOST') !== false) {
 }
 
 // ── Shared constants (same on all environments) ──────────────────────────────
-define('APP_NAME',          'PaperlessMD');
+if (!defined('APP_NAME')) define('APP_NAME', 'PaperlessMD');
 define('PRACTICE_NAME',     'Beyond Wound Care Inc.');
 define('PRACTICE_ADDRESS',  '1340 Remington RD, STE P, Schaumburg, IL 60173');
 define('PRACTICE_PHONE',    '847-873-8693');
 define('PRACTICE_FAX',      '847-873-8486');
 define('PRACTICE_EMAIL',    'Support@beyondwoundcare.com');
 define('UPLOAD_DIR', dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . 'photos' . DIRECTORY_SEPARATOR);
-define('SESSION_TIMEOUT', 7200); // 2 hours
+if (!defined('SESSION_TIMEOUT')) define('SESSION_TIMEOUT', 7200); // 2 hours
 define('GEMINI_API_KEY',  ''); // legacy fallback
 
 // Load API keys from gitignored file (create this file on each server, never commit it)
