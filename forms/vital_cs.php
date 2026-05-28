@@ -650,13 +650,13 @@ include __DIR__ . '/../includes/header.php';
             </div><!-- /wiz-section Medication Attachments -->
 
             <!-- ── Add / Edit Medication Modal ───────────────────────── -->
-            <div id="medModal" class="hidden fixed inset-0 z-[200] flex items-end sm:items-center justify-center no-print"
-                 style="padding-bottom:env(safe-area-inset-bottom)">
+            <div id="medModal" class="hidden fixed inset-0 z-[200] flex items-end sm:items-center justify-center no-print">
                 <div id="medModalBackdrop" class="absolute inset-0 bg-black/50 backdrop-blur-sm"
                      onclick="medModalClose()"></div>
                 <div class="relative bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md
                             shadow-2xl border border-slate-100 p-5 space-y-4
                             translate-y-full transition-transform duration-300"
+                     style="padding-bottom:calc(4.5rem + env(safe-area-inset-bottom))"
                      id="medModalCard">
                     <div class="flex items-center justify-between mb-1">
                         <h3 id="medModalTitle" class="font-bold text-slate-800 text-base">Add Medication</h3>
