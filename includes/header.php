@@ -78,9 +78,7 @@ if (!empty($_SESSION['user_id'])) {
               bg-gradient-to-b from-blue-950 via-blue-900 to-blue-800
               shadow-2xl transition-transform duration-300
               w-[240px] -translate-x-full md:translate-x-0">
-    <?php if (!empty($_GET['visit_id'])): ?>
-    <div class="absolute inset-0 z-[9999] cursor-not-allowed" title="End the visit to navigate"></div>
-    <?php endif; ?>
+
 
     <!-- Brand -->
     <a href="<?= BASE_URL ?>/dashboard.php"
@@ -237,7 +235,7 @@ if (!empty($_SESSION['user_id'])) {
         </a>
         <button id="sidebarDarkToggle"
                 onclick="sidebarToggleDark()"
-                class="relative z-[10000] flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-blue-200 hover:bg-white/10 hover:text-white transition-all duration-150 w-full text-left">
+                class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-blue-200 hover:bg-white/10 hover:text-white transition-all duration-150 w-full text-left">
             <i id="sidebarDarkIcon" class="bi <?= $_darkMode ? 'bi-sun-fill' : 'bi-moon-fill' ?> text-base w-5 shrink-0 text-center"></i>
             <span id="sidebarDarkLabel"><?= $_darkMode ? 'Light Mode' : 'Dark Mode' ?></span>
         </button>
@@ -254,6 +252,14 @@ if (!empty($_SESSION['user_id'])) {
         </button>
     </div>
 </aside>
+<?php if (!empty($_GET['visit_id'])): ?>
+<script>
+document.addEventListener('click', function(e) {
+    var link = e.target.closest('#sidebar a');
+    if (link) { e.preventDefault(); e.stopImmediatePropagation(); }
+}, true);
+</script>
+<?php endif; ?>
 
 <!-- Mobile top bar (hamburger + brand) — visible only on small screens -->
 <header class="md:hidden no-print fixed inset-x-0 top-0 z-40 h-14

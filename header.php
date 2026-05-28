@@ -59,9 +59,7 @@ if (!isBilling()) {
               bg-gradient-to-b from-blue-950 via-blue-900 to-blue-800
               shadow-2xl transition-transform duration-300
               w-[240px] -translate-x-full md:translate-x-0">
-    <?php if (!empty($_GET['visit_id'])): ?>
-    <div class="absolute inset-0 z-[9999] cursor-not-allowed" title="End the visit to navigate"></div>
-    <?php endif; ?>
+
 
     <!-- Brand -->
     <a href="<?= BASE_URL ?>/dashboard.php"
@@ -230,6 +228,14 @@ if (!isBilling()) {
         </button>
     </div>
 </aside>
+<?php if (!empty($_GET['visit_id'])): ?>
+<script>
+document.addEventListener('click', function(e) {
+    var link = e.target.closest('#sidebar a');
+    if (link) { e.preventDefault(); e.stopImmediatePropagation(); }
+}, true);
+</script>
+<?php endif; ?>
 
 <!-- Mobile top bar (hamburger + brand) — visible only on small screens -->
 <header class="md:hidden no-print fixed inset-x-0 top-0 z-40 h-14
