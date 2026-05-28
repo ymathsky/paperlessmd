@@ -364,11 +364,16 @@ include __DIR__ . '/../includes/header.php';
                            class="w-full bg-transparent text-sm font-semibold text-slate-800 border-0 border-b border-slate-300 pb-1
                                   focus:outline-none focus:border-red-400 transition"
                            placeholder="<?= $v['placeholder'] ?>">
-                    <label class="flex items-center gap-1.5 mt-2.5 cursor-pointer select-none group">
-                        <input type="checkbox" name="<?= $v['name'] ?>_per_patient" value="1"
-                               class="w-3.5 h-3.5 rounded accent-red-500 cursor-pointer">
-                        <span class="text-xs text-slate-400 group-hover:text-slate-500 transition-colors">Per patient</span>
-                    </label>
+                    <div class="flex gap-1.5 mt-2.5">
+                        <label class="vital-src flex-1 flex items-center justify-center gap-1 py-1 px-1.5 border-2 border-slate-200 rounded-lg cursor-pointer text-xs font-semibold transition-all">
+                            <input type="radio" name="<?= $v['name'] ?>_source" value="checked" checked class="sr-only">
+                            <i class="bi bi-check2"></i> Checked
+                        </label>
+                        <label class="vital-src vital-pp flex-1 flex items-center justify-center gap-1 py-1 px-1.5 border-2 border-slate-200 rounded-lg cursor-pointer text-xs font-semibold transition-all">
+                            <input type="radio" name="<?= $v['name'] ?>_source" value="per_patient" class="sr-only">
+                            <i class="bi bi-person"></i> Per patient
+                        </label>
+                    </div>
                 </div>
                 <?php endforeach; ?>
             </div>
