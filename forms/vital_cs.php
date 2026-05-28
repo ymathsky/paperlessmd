@@ -58,11 +58,13 @@ try {
 // Auto-fill provider name — prefer the specific visit's provider_name, fall back to any today's visit
 $_schedProvider = '';
 $_schedDate     = date('Y-m-d');
-$_schedTime     = date('H:i');
+// time_in: prefer URL param (set at moment MA confirms Start Visit), then schedule visit_time, then now
+$_getTimeIn = preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $_GET['time_in'] ?? '') ? $_GET['time_in'] : null;
+$_schedTime = $_getTimeIn ?? date('H:i');
 if (!empty($_visitRow['provider_name'])) {
     $_schedProvider = (string)$_visitRow['provider_name'];
     $_schedDate     = (string)($_visitRow['visit_date'] ?: date('Y-m-d'));
-    $_schedTime     = (string)($_visitRow['visit_time'] ?: date('H:i'));
+    if (!$_getTimeIn) $_schedTime = (string)($_visitRow['visit_time'] ?: date('H:i'));
 } else {
     try {
         $__sp = $pdo->prepare("SELECT provider_name, visit_date, visit_time FROM `schedule` WHERE patient_id = ? AND COALESCE(provider_name,'') != '' ORDER BY visit_date DESC, id DESC LIMIT 1");
@@ -71,7 +73,7 @@ if (!empty($_visitRow['provider_name'])) {
         if ($__sr) {
             $_schedProvider = (string)($__sr['provider_name'] ?: '');
             $_schedDate     = (string)($__sr['visit_date'] ?: date('Y-m-d'));
-            $_schedTime     = (string)($__sr['visit_time'] ?: date('H:i'));
+            if (!$_getTimeIn) $_schedTime = (string)($__sr['visit_time'] ?: date('H:i'));
         }
     } catch (PDOException $e) {}
 }
@@ -427,7 +429,7 @@ include __DIR__ . '/../includes/header.php';
                     Missed Visit &mdash; vital signs are optional. Fill what you know or skip this step.
                 </div>
 
-                <div class="vitals-quick-grid grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+                <div class="vitals-quick-grid grid grid-cols-2 gap-3 pt-1">
                     <?php
                     $vitals = [
                         ['name'=>'bp',      'label'=>'BP',       'placeholder'=>'120/80',      'req'=>true],

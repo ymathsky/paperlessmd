@@ -43,7 +43,9 @@ try {
 // Auto-fill provider name, date and time from today's schedule
 $_schedProvider = '';
 $_schedDate     = date('Y-m-d');
-$_schedTime     = date('H:i');
+// time_in: prefer URL param (set at moment MA confirms Start Visit), then schedule visit_time, then now
+$_getTimeIn = preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $_GET['time_in'] ?? '') ? $_GET['time_in'] : null;
+$_schedTime = $_getTimeIn ?? date('H:i');
 try {
     $__sp = $pdo->prepare("SELECT provider_name, visit_date, visit_time FROM `schedule` WHERE patient_id = ? AND visit_date = CURDATE() AND COALESCE(provider_name,'') != '' ORDER BY id DESC LIMIT 1");
     $__sp->execute([$patient_id]);
@@ -51,7 +53,7 @@ try {
     if ($__sr) {
         $_schedProvider = (string)($__sr['provider_name'] ?: '');
         $_schedDate     = (string)($__sr['visit_date'] ?: date('Y-m-d'));
-        $_schedTime     = (string)($__sr['visit_time'] ?: date('H:i'));
+        if (!$_getTimeIn) $_schedTime = (string)($__sr['visit_time'] ?: date('H:i'));
     }
 } catch (PDOException $e) {}
 
