@@ -43,7 +43,7 @@ try {
 // Auto-fill provider name, date and time from today's schedule
 $_schedProvider = '';
 $_schedDate     = date('Y-m-d');
-$_schedTime     = '';
+$_schedTime     = date('H:i');
 try {
     $__sp = $pdo->prepare("SELECT provider_name, visit_date, visit_time FROM `schedule` WHERE patient_id = ? AND visit_date = CURDATE() AND COALESCE(provider_name,'') != '' ORDER BY id DESC LIMIT 1");
     $__sp->execute([$patient_id]);
@@ -51,7 +51,7 @@ try {
     if ($__sr) {
         $_schedProvider = (string)($__sr['provider_name'] ?: '');
         $_schedDate     = (string)($__sr['visit_date'] ?: date('Y-m-d'));
-        $_schedTime     = (string)($__sr['visit_time'] ?: '');
+        $_schedTime     = (string)($__sr['visit_time'] ?: date('H:i'));
     }
 } catch (PDOException $e) {}
 
