@@ -253,11 +253,43 @@ if (!empty($_SESSION['user_id'])) {
     </div>
 </aside>
 <?php if (!empty($_GET['visit_id'])): ?>
+<!-- Visit-lock toast -->
+<div id="visitLockToast"
+     class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999]
+            bg-amber-500 text-white px-5 py-3 rounded-xl shadow-2xl
+            flex items-center gap-3 text-sm font-semibold pointer-events-none">
+    <i class="bi bi-shield-lock-fill text-base shrink-0"></i>
+    <span>Active visit in progress &mdash; end the visit before navigating.</span>
+</div>
 <script>
-document.addEventListener('click', function(e) {
-    var link = e.target.closest('#sidebar a');
-    if (link) { e.preventDefault(); e.stopImmediatePropagation(); }
-}, true);
+(function () {
+    function showLockToast() {
+        var t = document.getElementById('visitLockToast');
+        if (!t) return;
+        t.classList.remove('hidden');
+        clearTimeout(t._hide);
+        t._hide = setTimeout(function () { t.classList.add('hidden'); }, 3000);
+    }
+
+    // Block sidebar link clicks + show toast
+    document.addEventListener('click', function (e) {
+        var link = e.target.closest('#sidebar a');
+        if (link) { e.preventDefault(); e.stopImmediatePropagation(); showLockToast(); }
+    }, true);
+
+    // Trap back / forward buttons
+    history.pushState(null, '', location.href);
+    window.addEventListener('popstate', function () {
+        history.pushState(null, '', location.href);
+        showLockToast();
+    });
+
+    // Warn on tab close, refresh, or manual URL change
+    window.addEventListener('beforeunload', function (e) {
+        e.preventDefault();
+        e.returnValue = '';
+    });
+})();
 </script>
 <?php endif; ?>
 
