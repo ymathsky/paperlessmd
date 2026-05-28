@@ -306,7 +306,7 @@ document.addEventListener('keydown', function (e) {
 
 <script src="<?= BASE_URL ?>/assets/js/signature_pad.min.js"></script>
 <script src="<?= BASE_URL ?>/assets/js/app.js?v=3"></script>
-<script src="<?= BASE_URL ?>/assets/js/form-wizard.js"></script>
+<script src="<?= BASE_URL ?>/assets/js/form-wizard.js?v=2"></script>
 <script src="<?= BASE_URL ?>/assets/js/handwriting.js?v=2"></script>
 <script src="<?= BASE_URL ?>/assets/js/form-helpers.js?v=8"></script>
 <script>
