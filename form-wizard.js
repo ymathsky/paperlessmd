@@ -267,7 +267,7 @@
                 } else if (els[0].tagName === 'SELECT') {
                     els[0].value = vals[0] || '';
                 } else {
-                    if (els.length === 1) els[0].value = vals[0] || '';
+                    if (els.length === 1 && !els[0].readOnly) els[0].value = vals[0] || '';
                 }
             });
         }
