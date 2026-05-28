@@ -29,6 +29,7 @@ if (!$patient) { header('Location: ' . BASE_URL . '/patients.php'); exit; }
 $_npType = $_GET['np_type'] ?? 'wound_care'; // 'wound_care' | 'primary_care'
 $_isPrimarycare = ($_npType === 'primary_care');
 
+$_coName = ($patient['company'] ?? '') === 'Visiting Medical Physician Inc.' ? 'Visiting Medical Physician Inc.' : PRACTICE_NAME;
 $_coUC   = strtoupper($_coName);
 $_coAbb  = ($_coName === 'Visiting Medical Physician Inc.') ? 'VMP' : 'BWC';
 
