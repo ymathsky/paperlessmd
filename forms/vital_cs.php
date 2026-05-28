@@ -112,15 +112,31 @@ $_fcs_company = $patient['company'] ?? 'Beyond Wound Care Inc.';
 include __DIR__ . '/../includes/header.php';
 ?>
 
-<nav class="flex items-center gap-2 text-sm text-slate-400 mb-6 flex-wrap">
-    <a href="<?= BASE_URL ?>/patients.php" class="hover:text-blue-600 font-medium">Patients</a>
-    <i class="bi bi-chevron-right text-xs"></i>
-    <a href="<?= BASE_URL ?>/patient_view.php?id=<?= $patient_id ?>" class="hover:text-blue-600 font-medium">
+<!-- Breadcrumb -->
+<nav class="flex items-center gap-2 text-sm text-slate-400 mb-4 flex-wrap">
+    <a href="<?= BASE_URL ?>/patients.php" class="hover:text-blue-500 transition-colors">Patients</a>
+    <i class="bi bi-chevron-right text-xs text-slate-300"></i>
+    <a href="<?= BASE_URL ?>/patient_view.php?id=<?= $patient_id ?>" class="hover:text-blue-500 transition-colors">
         <?= h($patient['first_name'] . ' ' . $patient['last_name']) ?>
     </a>
-    <i class="bi bi-chevron-right text-xs"></i>
-    <span class="text-slate-700 font-semibold">Visit Consent Form</span>
+    <i class="bi bi-chevron-right text-xs text-slate-300"></i>
+    <span class="text-slate-600 font-semibold">Visit Consent Form</span>
 </nav>
+
+<!-- Patient context bar -->
+<div class="flex items-center gap-3 bg-white border border-slate-100 rounded-2xl px-4 py-3 mb-5 shadow-sm">
+    <div class="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-red-500 to-red-700 flex items-center justify-center text-white font-bold text-sm shadow-sm">
+        <?= mb_strtoupper(mb_substr($patient['first_name'], 0, 1) . mb_substr($patient['last_name'], 0, 1)) ?>
+    </div>
+    <div class="min-w-0">
+        <p class="font-bold text-slate-800 text-sm leading-tight truncate"><?= h($patient['first_name'] . ' ' . $patient['last_name']) ?></p>
+        <p class="text-xs text-slate-400 truncate"><?= h($patient['company'] ?? '') ?></p>
+    </div>
+    <div class="ml-auto flex items-center gap-2 text-xs text-slate-400 shrink-0">
+        <i class="bi bi-calendar3 text-red-400"></i>
+        <span><?= date('M j, Y') ?></span>
+    </div>
+</div>
 
 <div class="max-w-3xl mx-auto">
 
@@ -161,18 +177,28 @@ include __DIR__ . '/../includes/header.php';
 <!-- Card -->
 <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
     <!-- Card Header -->
-    <div class="bg-gradient-to-r from-red-700 to-red-600 px-6 py-4 flex items-center gap-3">
-        <div class="bg-white/20 p-2 rounded-xl">
-            <i class="bi bi-file-medical-fill text-white text-xl"></i>
-        </div>
-        <div>
-            <h2 class="text-white font-bold text-lg"><span class="co-name-display"><?= h($_fcs_company) ?></span> &mdash; Consent Form</h2>
-            <p class="text-red-100 text-sm"><?= h($patient['first_name'] . ' ' . $patient['last_name']) ?></p>
+    <div class="bg-gradient-to-r from-red-700 via-red-600 to-rose-600 px-6 py-5">
+        <div class="flex items-center justify-between gap-4">
+            <div class="flex items-center gap-3 min-w-0">
+                <div class="bg-white/20 backdrop-blur-sm p-2.5 rounded-xl shrink-0">
+                    <i class="bi bi-file-medical-fill text-white text-xl leading-none"></i>
+                </div>
+                <div class="min-w-0">
+                    <h2 class="text-white font-extrabold text-base leading-tight truncate">
+                        <span class="co-name-display"><?= h($_fcs_company) ?></span>
+                    </h2>
+                    <p class="text-red-200 text-sm mt-0.5">Visit Consent Form</p>
+                </div>
+            </div>
+            <span class="shrink-0 inline-flex items-center gap-1.5 bg-white/20 text-white text-xs font-bold px-3 py-1.5 rounded-full">
+                <i class="bi bi-calendar-check text-sm"></i>
+                <?= date('M j, Y') ?>
+            </span>
         </div>
     </div>
 
-    <!-- Wizard progress header -->
-    <div id="wiz-header" class="px-6 pt-5 pb-2"></div>
+    <!-- Wizard progress header (built by form-wizard.js) -->
+    <div id="wiz-header"></div>
 
     <form id="mainForm" method="POST" action="<?= BASE_URL ?>/api/save_form.php" novalidate>
         <input type="hidden" name="csrf_token"  value="<?= csrfToken() ?>">
@@ -187,96 +213,115 @@ include __DIR__ . '/../includes/header.php';
         <div class="px-6 pb-2">
         <?php include __DIR__ . '/../includes/form_company_selector.php'; ?>
 
-        <!-- â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•— -->
-        <!-- â•‘  STEP 1 &mdash; Visit Info             â•‘ -->
-        <!-- â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-        <div class="wiz-step space-y-6 py-4"
+        <!-- Step 1 - Visit Info -->
+        <div class="wiz-step space-y-4 py-4"
              data-step="0"
              data-title="Visit Info"
              data-icon="bi-calendar-check">
 
-            <p class="form-section-title"><i class="bi bi-calendar-check text-red-500"></i> Visit Information</p>
-
-            <!-- Provider / Date -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Provider</label>
-                    <input type="text" name="provider_name"
-                           required data-label="Provider Name"
-                           list="providerNameList"
-                           value="<?= h($_schedProvider ?: pv($prev, 'provider_name')) ?>"
-                           class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
-                                  focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition focus:bg-white"
-                           placeholder="Attending provider name">
-                    <datalist id="providerNameList">
-                        <?php foreach ($_providerNames as $_pn): ?>
-                        <option value="<?= h($_pn) ?>">
-                        <?php endforeach; ?>
-                    </datalist>
+            <!-- Section: Provider & Date -->
+            <div class="wiz-section">
+                <div class="wiz-section-hd">
+                    <i class="bi bi-person-badge"></i> Provider &amp; Date
                 </div>
-                <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Date of Visit</label>
-                    <input type="date" name="form_date" value="<?= date('Y-m-d') ?>"
-                           required data-label="Date of Visit"
-                           class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
-                                  focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition focus:bg-white">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Provider</label>
+                        <input type="text" name="provider_name"
+                               required data-label="Provider Name"
+                               list="providerNameList"
+                               value="<?= h($_schedProvider ?: pv($prev, 'provider_name')) ?>"
+                               class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white
+                                      focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition"
+                               placeholder="Attending provider name">
+                        <datalist id="providerNameList">
+                            <?php foreach ($_providerNames as $_pn): ?>
+                            <option value="<?= h($_pn) ?>">
+                            <?php endforeach; ?>
+                        </datalist>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Date of Visit</label>
+                        <input type="date" name="form_date" value="<?= date('Y-m-d') ?>"
+                               required data-label="Date of Visit"
+                               class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white
+                                      focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition">
+                    </div>
                 </div>
             </div>
 
-            <!-- Visit Type -->
-            <div>
-                <label class="block text-sm font-bold text-slate-700 mb-3">Visit Type</label>
+            <!-- Section: Visit Type & Time -->
+            <div class="wiz-section">
+                <div class="wiz-section-hd">
+                    <i class="bi bi-clipboard2-pulse"></i> Visit Type &amp; Time
+                </div>
+                <?php
+                $_vtIcons = ['New'=>'bi-star','Follow Up'=>'bi-arrow-repeat','Sick'=>'bi-thermometer-half','Post Hospital F/U'=>'bi-hospital'];
+                ?>
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
                     <?php foreach (['New','Follow Up','Sick','Post Hospital F/U'] as $vt): ?>
-                    <label class="flex items-center gap-2.5 p-3 border border-slate-200 rounded-xl cursor-pointer
-                                  hover:border-red-300 hover:bg-red-50/50 transition-colors has-[:checked]:border-red-400 has-[:checked]:bg-red-50">
+                    <label class="flex flex-col items-center gap-1.5 py-3 px-2 border-2 border-slate-200 rounded-xl cursor-pointer text-center
+                                  transition-all hover:border-red-300 hover:bg-red-50/40
+                                  has-[:checked]:border-red-500 has-[:checked]:bg-red-50 has-[:checked]:shadow-sm">
                         <input type="radio" name="visit_type" value="<?= $vt ?>"
                                required data-label="Visit Type"
                                <?= $_preselVt === $vt ? 'checked' : '' ?>
-                               class="w-4 h-4 text-red-600 border-slate-300 focus:ring-red-400 flex-shrink-0">
-                        <span class="text-sm font-medium text-slate-700"><?= $vt ?></span>
+                               class="sr-only">
+                        <i class="bi <?= $_vtIcons[$vt] ?> text-xl transition-colors" style="color:<?= $_preselVt === $vt ? '#ef4444' : '#94a3b8' ?>"></i>
+                        <span class="text-xs font-semibold text-slate-600 leading-tight"><?= $vt ?></span>
                     </label>
                     <?php endforeach; ?>
                 </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">Time In</label>
+                <div class="max-w-xs">
+                    <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
+                        <i class="bi bi-clock text-red-400 mr-1"></i>Time In
+                    </label>
                     <input type="time" name="time_in"
                            required data-label="Time In"
-                           class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
-                                  focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition focus:bg-white">
+                           class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white
+                                  focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition">
                 </div>
             </div>
 
-            <!-- Homebound Status -->
-            <div>
-                <label class="block text-sm font-bold text-slate-700 mb-3">Homebound Status</label>
+            <!-- Section: Homebound Status -->
+            <div class="wiz-section">
+                <div class="wiz-section-hd">
+                    <i class="bi bi-house-heart"></i> Homebound Status
+                </div>
                 <div class="grid grid-cols-2 gap-3">
-                    <label class="flex flex-col items-center gap-2 p-4 border-2 border-slate-200 rounded-xl cursor-pointer text-center
-                                  transition-colors has-[:checked]:border-red-500 has-[:checked]:bg-red-50">
+                    <label class="flex flex-col items-center gap-2.5 py-5 px-3 border-2 border-slate-200 rounded-2xl cursor-pointer text-center
+                                  transition-all hover:border-green-400 hover:bg-green-50/40
+                                  has-[:checked]:border-green-500 has-[:checked]:bg-green-50 has-[:checked]:shadow-sm">
                         <input type="radio" name="homebound" value="homebound"
                                required data-label="Homebound Status"
                                class="sr-only">
-                        <i class="bi bi-check-circle-fill" style="font-size:2rem;color:#22c55e"></i>
-                        <span class="font-semibold text-slate-700 text-sm leading-snug">Patient IS Homebound</span>
+                        <span class="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
+                            <i class="bi bi-house-check-fill text-green-500 text-2xl leading-none"></i>
+                        </span>
+                        <span class="font-bold text-slate-700 text-sm leading-snug">Patient IS<br>Homebound</span>
                     </label>
-                    <label class="flex flex-col items-center gap-2 p-4 border-2 border-slate-200 rounded-xl cursor-pointer text-center
-                                  transition-colors has-[:checked]:border-slate-500 has-[:checked]:bg-slate-100">
+                    <label class="flex flex-col items-center gap-2.5 py-5 px-3 border-2 border-slate-200 rounded-2xl cursor-pointer text-center
+                                  transition-all hover:border-slate-400 hover:bg-slate-50
+                                  has-[:checked]:border-slate-500 has-[:checked]:bg-slate-100 has-[:checked]:shadow-sm">
                         <input type="radio" name="homebound" value="not_homebound"
                                class="sr-only">
-                        <i class="bi bi-x-circle-fill" style="font-size:2rem;color:#94a3b8"></i>
-                        <span class="font-semibold text-slate-700 text-sm leading-snug">Patient IS NOT Homebound</span>
+                        <span class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
+                            <i class="bi bi-house-x-fill text-slate-400 text-2xl leading-none"></i>
+                        </span>
+                        <span class="font-bold text-slate-700 text-sm leading-snug">Patient IS NOT<br>Homebound</span>
                     </label>
                 </div>
             </div>
 
-            <!-- Missed Visit -->
-            <div>
-                <label class="block text-sm font-semibold text-slate-700 mb-1.5">
-                    Missed Visit Reason <span class="text-slate-400 font-normal">(if applicable)</span>
-                </label>
+            <!-- Section: Missed Visit -->
+            <div class="wiz-section">
+                <div class="wiz-section-hd">
+                    <i class="bi bi-exclamation-circle"></i> Missed Visit
+                    <span class="ml-auto text-xs font-normal normal-case tracking-normal text-slate-400">optional</span>
+                </div>
                 <input type="text" name="missed_visit_reason"
-                       class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
-                              focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition focus:bg-white"
+                       class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white
+                              focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition"
                        placeholder="Leave blank if not a missed visit">
             </div>
 

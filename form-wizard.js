@@ -117,6 +117,10 @@
             const pct = steps.length > 1 ? (current / (steps.length - 1)) * 100 : 100;
             const bar = document.getElementById('wiz-progress-bar');
             if (bar) bar.style.width = Math.max(pct, 4) + '%';
+
+            // Step counter text
+            const counter = document.getElementById('wiz-step-counter');
+            if (counter) counter.textContent = 'Step ' + (current + 1) + ' of ' + steps.length;
         }
 
         function updateNavButtons() {
@@ -277,25 +281,27 @@
         // ── Build header HTML ──────────────────────────────────────────
         function buildHeader(steps) {
             let html = '';
-            // Progress bar track
-            html += '<div class="relative mb-6">';
-            html += '<div class="absolute inset-0 flex items-center" aria-hidden="true">';
-            html += '  <div class="w-full bg-slate-200 rounded-full h-1.5">';
-            html += '    <div id="wiz-progress-bar" class="bg-blue-500 h-1.5 rounded-full transition-all duration-500" style="width:4%"></div>';
+            html += '<div class="wiz-header-wrap">';
+            // Step counter
+            html += '<div class="wiz-step-counter" id="wiz-step-counter">Step 1 of ' + steps.length + '</div>';
+            // Progress track
+            html += '<div class="wiz-track-wrap" aria-hidden="true">';
+            html += '  <div class="wiz-track-bg">';
+            html += '    <div id="wiz-progress-bar" class="wiz-track-fill" style="width:0%"></div>';
             html += '  </div>';
             html += '</div>';
             // Pills
-            html += '<ol class="relative flex justify-between">';
+            html += '<ol class="wiz-pills-row">';
             steps.forEach(function (s, i) {
                 const title = s.dataset.title || ('Step ' + (i + 1));
                 const icon  = s.dataset.icon  || 'bi-circle';
-                html += '<li class="flex flex-col items-center flex-1 ' + (i === 0 ? '' : '') + '">';
-                html += '  <button type="button" class="wiz-pill flex flex-col items-center gap-1 focus:outline-none group" data-step="' + i + '">';
-                html += '    <span class="relative flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-200 bg-white shadow-sm">';
-                html += '      <span class="wiz-num text-sm font-bold">' + (i + 1) + '</span>';
-                html += '      <i class="wiz-check bi bi-check-lg text-sm font-bold hidden"></i>';
+                html += '<li class="wiz-pill-item">';
+                html += '  <button type="button" class="wiz-pill" data-step="' + i + '" aria-label="Step ' + (i+1) + ': ' + title + '">';
+                html += '    <span class="wiz-pill-circle">';
+                html += '      <i class="wiz-pill-icon bi ' + icon + '"></i>';
+                html += '      <i class="wiz-check bi bi-check-lg hidden"></i>';
                 html += '    </span>';
-                html += '    <span class="hidden sm:block text-xs font-semibold mt-0.5 text-center leading-tight max-w-[72px]">' + title + '</span>';
+                html += '    <span class="wiz-pill-label">' + title + '</span>';
                 html += '  </button>';
                 html += '</li>';
             });
