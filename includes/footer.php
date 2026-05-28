@@ -1221,5 +1221,46 @@ window.pdConfirm = (opts) => Alpine.store('pdConfirm').show(opts);
 <!-- Flowbite JS (component interactions) -->
 <script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js"></script>
 
+<!-- ■ Mobile Bottom Navigation Bar ■ -->
+<nav class="md:hidden no-print fixed bottom-0 inset-x-0 z-50
+            bg-gradient-to-r from-blue-950 to-blue-900
+            border-t border-white/10 shadow-[0_-4px_20px_rgba(0,0,0,.35)]
+            flex items-stretch"
+     style="padding-bottom:env(safe-area-inset-bottom)">
+    <?php
+    $_bnItems = [
+        ['href'=>'/dashboard.php',  'key'=>'dashboard', 'icon'=>'bi-speedometer2',    'label'=>'Home'],
+        ['href'=>'/patients.php',   'key'=>'patients',  'icon'=>'bi-people-fill',     'label'=>'Patients'],
+        ['href'=>'/schedule.php',   'key'=>'schedule',  'icon'=>'bi-calendar3',       'label'=>'Schedule', 'billingHide'=>true],
+        ['href'=>'/esign_queue.php','key'=>'esign',     'icon'=>'bi-pen-fill',        'label'=>'Sign',     'billingHide'=>true, 'maHide'=>true,
+         'badge'=>($_esignCount??0), 'badgeCls'=>'bg-violet-500'],
+        ['href'=>'/messages.php',   'key'=>'messages',  'icon'=>'bi-chat-dots-fill',  'label'=>'Messages',
+         'badge'=>($_unreadMessages??0), 'badgeCls'=>'bg-emerald-500'],
+    ];
+    foreach ($_bnItems as $_bn):
+        if (!empty($_bn['billingHide']) && isBilling()) continue;
+        if (!empty($_bn['maHide']) && isMa()) continue;
+        $_bnActive = ($activeNav ?? '') === $_bn['key'];
+    ?>
+    <a href="<?= BASE_URL . $_bn['href'] ?>"
+       class="flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 relative
+              transition-colors <?= $_bnActive ? 'text-white' : 'text-blue-300/70 active:text-white' ?>">
+        <?php if ($_bnActive): ?>
+        <span class="absolute top-0 left-2 right-2 h-0.5 bg-indigo-400 rounded-b-full"></span>
+        <?php endif; ?>
+        <div class="relative">
+            <i class="bi <?= $_bn['icon'] ?> text-[22px] leading-none"></i>
+            <?php if (!empty($_bn['badge']) && $_bn['badge'] > 0): ?>
+            <span class="absolute -top-1.5 -right-2.5 <?= $_bn['badgeCls'] ?> text-white
+                         text-[9px] font-bold px-1 py-px rounded-full leading-none min-w-[16px] text-center">
+                <?= min((int)$_bn['badge'], 99) ?>
+            </span>
+            <?php endif; ?>
+        </div>
+        <span class="text-[10px] font-semibold leading-none"><?= $_bn['label'] ?></span>
+    </a>
+    <?php endforeach; ?>
+</nav>
+
 </body>
 </html>
