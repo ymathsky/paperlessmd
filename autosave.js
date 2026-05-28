@@ -119,9 +119,11 @@
                         matches[k].checked = vals.indexOf(matches[k].value) !== -1;
                     }
                 } else {
-                    first.value = val;
-                    /* Fire change so dependent UI (e.g. POA toggle) reacts */
-                    first.dispatchEvent(new Event('change', { bubbles: true }));
+                    if (!first.readOnly) {
+                        first.value = val;
+                        /* Fire change so dependent UI (e.g. POA toggle) reacts */
+                        first.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
                 }
             }
         }

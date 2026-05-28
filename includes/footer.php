@@ -317,7 +317,7 @@ window._pdTimezone = '<?= htmlspecialchars(APP_TIMEZONE, ENT_QUOTES, 'UTF-8') ?>
 window._pdCsrf = '<?= htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8') ?>';
 <?php endif; ?>
 </script>
-<script src="<?= BASE_URL ?>/assets/js/autosave.js" defer></script>
+<script src="<?= BASE_URL ?>/assets/js/autosave.js?v=2" defer></script>
 <script src="<?= BASE_URL ?>/assets/js/voice.js" defer></script>
 <script src="<?= BASE_URL ?>/assets/js/offline.js" defer></script>
 <script src="<?= BASE_URL ?>/assets/js/ai-assistant.js" defer></script>
