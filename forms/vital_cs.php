@@ -222,10 +222,10 @@ include __DIR__ . '/../includes/header.php';
             <!-- Section: Provider & Date -->
             <div class="wiz-section">
                 <div class="wiz-section-hd">
-                    <i class="bi bi-person-badge"></i> Provider &amp; Date
+                    <i class="bi bi-person-badge"></i> Provider, Date &amp; Time
                 </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="sm:col-span-1">
                         <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Provider</label>
                         <input type="text" name="provider_name"
                                required data-label="Provider Name"
@@ -247,13 +247,22 @@ include __DIR__ . '/../includes/header.php';
                                class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white
                                       focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition">
                     </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
+                            <i class="bi bi-clock text-red-400 mr-1"></i>Time In
+                        </label>
+                        <input type="time" name="time_in"
+                               required data-label="Time In"
+                               class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white
+                                      focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition">
+                    </div>
                 </div>
             </div>
 
-            <!-- Section: Visit Type & Time -->
+            <!-- Section: Visit Type -->
             <div class="wiz-section">
                 <div class="wiz-section-hd">
-                    <i class="bi bi-clipboard2-pulse"></i> Visit Type &amp; Time
+                    <i class="bi bi-clipboard2-pulse"></i> Visit Type
                 </div>
                 <?php
                 $_vtIcons = ['New'=>'bi-star','Follow Up'=>'bi-arrow-repeat','Sick'=>'bi-thermometer-half','Post Hospital F/U'=>'bi-hospital'];
@@ -270,15 +279,6 @@ include __DIR__ . '/../includes/header.php';
                         <span class="text-xs font-semibold text-slate-600 leading-tight"><?= $vt ?></span>
                     </label>
                     <?php endforeach; ?>
-                </div>
-                <div class="max-w-xs">
-                    <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
-                        <i class="bi bi-clock text-red-400 mr-1"></i>Time In
-                    </label>
-                    <input type="time" name="time_in"
-                           required data-label="Time In"
-                           class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white
-                                  focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition">
                 </div>
             </div>
 
