@@ -260,14 +260,13 @@ include __DIR__ . '/../includes/header.php';
                 ?>
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
                     <?php foreach (['New','Follow Up','Sick','Post Hospital F/U'] as $vt): ?>
-                    <label class="flex flex-col items-center gap-1.5 py-3 px-2 border-2 border-slate-200 rounded-xl cursor-pointer text-center
-                                  transition-all hover:border-red-300 hover:bg-red-50/40
+                    <label class="radio-card flex flex-col items-center gap-1.5 py-3 px-2 border-2 border-slate-200 rounded-xl cursor-pointer text-center
                                   has-[:checked]:border-red-500 has-[:checked]:bg-red-50 has-[:checked]:shadow-sm">
                         <input type="radio" name="visit_type" value="<?= $vt ?>"
                                required data-label="Visit Type"
                                <?= $_preselVt === $vt ? 'checked' : '' ?>
                                class="sr-only">
-                        <i class="bi <?= $_vtIcons[$vt] ?> text-xl transition-colors" style="color:<?= $_preselVt === $vt ? '#ef4444' : '#94a3b8' ?>"></i>
+                        <i class="bi <?= $_vtIcons[$vt] ?> vt-icon text-xl"></i>
                         <span class="text-xs font-semibold text-slate-600 leading-tight"><?= $vt ?></span>
                     </label>
                     <?php endforeach; ?>
@@ -289,8 +288,7 @@ include __DIR__ . '/../includes/header.php';
                     <i class="bi bi-house-heart"></i> Homebound Status
                 </div>
                 <div class="grid grid-cols-2 gap-3">
-                    <label class="flex flex-col items-center gap-2.5 py-5 px-3 border-2 border-slate-200 rounded-2xl cursor-pointer text-center
-                                  transition-all hover:border-green-400 hover:bg-green-50/40
+                    <label class="radio-card radio-hb-yes flex flex-col items-center gap-2.5 py-5 px-3 border-2 border-slate-200 rounded-2xl cursor-pointer text-center
                                   has-[:checked]:border-green-500 has-[:checked]:bg-green-50 has-[:checked]:shadow-sm">
                         <input type="radio" name="homebound" value="homebound"
                                required data-label="Homebound Status"
@@ -300,8 +298,7 @@ include __DIR__ . '/../includes/header.php';
                         </span>
                         <span class="font-bold text-slate-700 text-sm leading-snug">Patient IS<br>Homebound</span>
                     </label>
-                    <label class="flex flex-col items-center gap-2.5 py-5 px-3 border-2 border-slate-200 rounded-2xl cursor-pointer text-center
-                                  transition-all hover:border-slate-400 hover:bg-slate-50
+                    <label class="radio-card radio-hb-no flex flex-col items-center gap-2.5 py-5 px-3 border-2 border-slate-200 rounded-2xl cursor-pointer text-center
                                   has-[:checked]:border-slate-500 has-[:checked]:bg-slate-100 has-[:checked]:shadow-sm">
                         <input type="radio" name="homebound" value="not_homebound"
                                class="sr-only">
