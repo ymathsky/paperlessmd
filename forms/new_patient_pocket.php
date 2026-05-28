@@ -40,12 +40,19 @@ try {
     $_providerNames = $_pnStmt->fetchAll(PDO::FETCH_COLUMN);
 } catch (PDOException $e) {}
 
-// Auto-fill provider name from today's schedule
+// Auto-fill provider name, date and time from today's schedule
 $_schedProvider = '';
+$_schedDate     = date('Y-m-d');
+$_schedTime     = '';
 try {
-    $__sp = $pdo->prepare("SELECT provider_name FROM `schedule` WHERE patient_id = ? AND visit_date = CURDATE() AND COALESCE(provider_name,'') != '' ORDER BY id DESC LIMIT 1");
+    $__sp = $pdo->prepare("SELECT provider_name, visit_date, visit_time FROM `schedule` WHERE patient_id = ? AND visit_date = CURDATE() AND COALESCE(provider_name,'') != '' ORDER BY id DESC LIMIT 1");
     $__sp->execute([$patient_id]);
-    $_schedProvider = (string)($__sp->fetchColumn() ?: '');
+    $__sr = $__sp->fetch(PDO::FETCH_ASSOC);
+    if ($__sr) {
+        $_schedProvider = (string)($__sr['provider_name'] ?: '');
+        $_schedDate     = (string)($__sr['visit_date'] ?: date('Y-m-d'));
+        $_schedTime     = (string)($__sr['visit_time'] ?: '');
+    }
 } catch (PDOException $e) {}
 
 // Fetch provider's saved signature for auto-fill.
@@ -206,38 +213,40 @@ include __DIR__ . '/../includes/header.php';
                 <div class="wiz-section-hd">
                     <i class="bi bi-person-badge"></i> Provider, Date &amp; Time
                 </div>
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Provider</label>
-                        <input type="text" name="provider_name"
-                               list="providerNameList"
-                               value="<?= h($_schedProvider ?: pv($prev, 'provider_name')) ?>"
-                               class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white
-                                      focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition"
-                               placeholder="Attending provider name">
-                        <datalist id="providerNameList">
-                            <?php foreach ($_providerNames as $_pn): ?>
-                            <option value="<?= h($_pn) ?>">
-                            <?php endforeach; ?>
-                        </datalist>
-                    </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Date of Visit</label>
-                            <input type="date" name="form_date" value="<?= date('Y-m-d') ?>"
-                                   class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white
-                                          focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
-                                <i class="bi bi-clock text-indigo-400 mr-1"></i>Time In
-                            </label>
-                            <input type="time" name="time_in"
-                                   class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white
-                                          focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition">
+                <?php
+                    $_dispProvider = h($_schedProvider ?: pv($prev, 'provider_name') ?: '—');
+                    $_dispDate     = $_schedDate ? date('M j, Y', strtotime($_schedDate)) : date('M j, Y');
+                    $_dispTime     = $_schedTime ? date('g:i A', strtotime($_schedTime)) : '—';
+                ?>
+                <input type="hidden" name="provider_name" value="<?= h($_schedProvider ?: pv($prev, 'provider_name')) ?>">
+                <input type="hidden" name="form_date"     value="<?= h($_schedDate) ?>">
+                <input type="hidden" name="time_in"       value="<?= h($_schedTime) ?>">
+                <div class="divide-y divide-slate-100 rounded-xl border border-slate-100 overflow-hidden">
+                    <div class="flex items-center gap-3 px-4 py-3 bg-slate-50">
+                        <i class="bi bi-person-badge-fill text-indigo-400 text-base shrink-0"></i>
+                        <div class="min-w-0">
+                            <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wide leading-none mb-0.5">Provider</p>
+                            <p class="text-sm font-bold text-slate-800 truncate"><?= $_dispProvider ?></p>
                         </div>
                     </div>
-                    <div>
+                    <div class="grid grid-cols-2 divide-x divide-slate-100">
+                        <div class="flex items-center gap-3 px-4 py-3 bg-slate-50">
+                            <i class="bi bi-calendar3 text-indigo-400 text-base shrink-0"></i>
+                            <div>
+                                <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wide leading-none mb-0.5">Date of Visit</p>
+                                <p class="text-sm font-bold text-slate-800"><?= $_dispDate ?></p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3 px-4 py-3 bg-slate-50">
+                            <i class="bi bi-clock-fill text-indigo-400 text-base shrink-0"></i>
+                            <div>
+                                <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wide leading-none mb-0.5">Time In</p>
+                                <p class="text-sm font-bold text-slate-800"><?= $_dispTime ?></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-4">
                         <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">F/U In</label>
                         <div class="flex gap-2">
                             <input type="number" name="fu_weeks" min="1"
@@ -251,7 +260,6 @@ include __DIR__ . '/../includes/header.php';
                                 <option value="days">Days</option>
                             </select>
                         </div>
-                    </div>
                 </div>
             </div>
 
