@@ -59,10 +59,13 @@ if (!isBilling()) {
               bg-gradient-to-b from-blue-950 via-blue-900 to-blue-800
               shadow-2xl transition-transform duration-300
               w-[240px] -translate-x-full md:translate-x-0">
+    <?php if (!empty($_GET['visit_id'])): ?>
+    <div class="absolute inset-0 z-[9999] cursor-not-allowed" title="End the visit to navigate"></div>
+    <?php endif; ?>
 
     <!-- Brand -->
     <a href="<?= BASE_URL ?>/dashboard.php"
-       class="flex items-center gap-3 px-5 py-5 border-b border-white/10 shrink-0 group <?= !empty($_GET['visit_id']) ? 'pointer-events-none' : '' ?>">
+       class="flex items-center gap-3 px-5 py-5 border-b border-white/10 shrink-0 group">
         <div class="w-9 h-9 rounded-xl overflow-hidden shrink-0">
             <img src="<?= BASE_URL ?>/assets/img/pwa-icon-192.png" alt="PaperlessMD" class="w-full h-full object-cover">
         </div>
@@ -73,7 +76,7 @@ if (!isBilling()) {
     </a>
 
     <!-- Nav links -->
-<nav class="flex-1 overflow-y-auto px-3 py-4 space-y-0.5 <?= !empty($_GET['visit_id']) ? 'pointer-events-none opacity-50 select-none' : '' ?>">
+<nav class="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
         <?php
         // Unread messages count (try/catch: safe before migration runs)
         $_unreadMessages = 0;
@@ -192,7 +195,7 @@ if (!isBilling()) {
     </nav>
 
     <!-- User section (bottom) -->
-    <div class="shrink-0 border-t border-white/10 px-3 py-3 md:pb-3 pb-20 <?= !empty($_GET['visit_id']) ? 'pointer-events-none opacity-50 select-none' : '' ?>">
+    <div class="shrink-0 border-t border-white/10 px-3 py-3 md:pb-3 pb-20">
         <div class="flex items-center gap-3 px-3 py-2.5 rounded-xl mb-0.5">
             <div class="relative shrink-0">
                 <div class="w-8 h-8 bg-blue-600 rounded-lg grid place-items-center text-xs font-bold text-white">
@@ -232,7 +235,7 @@ if (!isBilling()) {
 <header class="md:hidden no-print fixed inset-x-0 top-0 z-40 h-14
                bg-gradient-to-r from-blue-950 to-blue-800 shadow-lg
                flex items-center justify-between px-4">
-    <a href="<?= BASE_URL ?>/dashboard.php" class="flex items-center gap-2.5 <?= !empty($_GET['visit_id']) ? 'pointer-events-none' : '' ?>">
+    <a href="<?= BASE_URL ?>/dashboard.php" class="flex items-center gap-2.5">
         <div class="w-8 h-8 rounded-xl overflow-hidden">
             <img src="<?= BASE_URL ?>/assets/img/pwa-icon-192.png" alt="PaperlessMD" class="w-full h-full object-cover">
         </div>
