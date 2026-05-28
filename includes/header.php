@@ -237,7 +237,7 @@ if (!empty($_SESSION['user_id'])) {
         </a>
         <button id="sidebarDarkToggle"
                 onclick="sidebarToggleDark()"
-                class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-blue-200 hover:bg-white/10 hover:text-white transition-all duration-150 w-full text-left">
+                class="relative z-[10000] flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-blue-200 hover:bg-white/10 hover:text-white transition-all duration-150 w-full text-left">
             <i id="sidebarDarkIcon" class="bi <?= $_darkMode ? 'bi-sun-fill' : 'bi-moon-fill' ?> text-base w-5 shrink-0 text-center"></i>
             <span id="sidebarDarkLabel"><?= $_darkMode ? 'Light Mode' : 'Dark Mode' ?></span>
         </button>
