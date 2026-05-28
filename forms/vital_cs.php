@@ -224,8 +224,8 @@ include __DIR__ . '/../includes/header.php';
                 <div class="wiz-section-hd">
                     <i class="bi bi-person-badge"></i> Provider, Date &amp; Time
                 </div>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <div class="sm:col-span-1">
+                <div class="space-y-4">
+                    <div>
                         <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Provider</label>
                         <input type="text" name="provider_name"
                                required data-label="Provider Name"
@@ -240,21 +240,23 @@ include __DIR__ . '/../includes/header.php';
                             <?php endforeach; ?>
                         </datalist>
                     </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Date of Visit</label>
-                        <input type="date" name="form_date" value="<?= date('Y-m-d') ?>"
-                               required data-label="Date of Visit"
-                               class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white
-                                      focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
-                            <i class="bi bi-clock text-red-400 mr-1"></i>Time In
-                        </label>
-                        <input type="time" name="time_in"
-                               required data-label="Time In"
-                               class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white
-                                      focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Date of Visit</label>
+                            <input type="date" name="form_date" value="<?= date('Y-m-d') ?>"
+                                   required data-label="Date of Visit"
+                                   class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white
+                                          focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
+                                <i class="bi bi-clock text-red-400 mr-1"></i>Time In
+                            </label>
+                            <input type="time" name="time_in"
+                                   required data-label="Time In"
+                                   class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white
+                                          focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition">
+                        </div>
                     </div>
                 </div>
             </div>
