@@ -14,7 +14,7 @@ $_visitId   = (int)($_GET['visit_id'] ?? 0);
 $_visitRow  = null;
 if ($_visitId) {
     $_vStmt = $pdo->prepare(
-        "SELECT id, ma_id FROM `schedule` WHERE id = ? AND patient_id = ? LIMIT 1"
+        "SELECT id, ma_id, provider_name FROM `schedule` WHERE id = ? AND patient_id = ? LIMIT 1"
     );
     $_vStmt->execute([$_visitId, $patient_id]);
     $_visitRow = $_vStmt->fetch();
@@ -55,13 +55,17 @@ try {
     $_providerNames = $_pnStmt->fetchAll(PDO::FETCH_COLUMN);
 } catch (PDOException $e) {}
 
-// Auto-fill provider name from today's schedule
+// Auto-fill provider name — prefer the specific visit's provider_name, fall back to any today's visit
 $_schedProvider = '';
-try {
-    $__sp = $pdo->prepare("SELECT provider_name FROM `schedule` WHERE patient_id = ? AND visit_date = CURDATE() AND COALESCE(provider_name,'') != '' ORDER BY id DESC LIMIT 1");
-    $__sp->execute([$patient_id]);
-    $_schedProvider = (string)($__sp->fetchColumn() ?: '');
-} catch (PDOException $e) {}
+if (!empty($_visitRow['provider_name'])) {
+    $_schedProvider = (string)$_visitRow['provider_name'];
+} else {
+    try {
+        $__sp = $pdo->prepare("SELECT provider_name FROM `schedule` WHERE patient_id = ? AND visit_date = CURDATE() AND COALESCE(provider_name,'') != '' ORDER BY id DESC LIMIT 1");
+        $__sp->execute([$patient_id]);
+        $_schedProvider = (string)($__sp->fetchColumn() ?: '');
+    } catch (PDOException $e) {}
+}
 
 // Edit mode: allow re-opening a signed CS form without the one-signature redirect
 $_csEditMode = !empty($_GET['edit']);
@@ -252,18 +256,24 @@ include __DIR__ . '/../includes/header.php';
                 <div class="space-y-4">
                     <div>
                         <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Provider</label>
+                        <?php $_providerValue = h($_schedProvider ?: pv($prev, 'provider_name')); $_providerLocked = $_schedProvider !== ''; ?>
                         <input type="text" name="provider_name"
                                required data-label="Provider Name"
-                               list="providerNameList"
-                               value="<?= h($_schedProvider ?: pv($prev, 'provider_name')) ?>"
-                               class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white
-                                      focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition"
+                               <?= !$_providerLocked ? 'list="providerNameList"' : '' ?>
+                               value="<?= $_providerValue ?>"
+                               <?= $_providerLocked ? 'readonly' : '' ?>
+                               class="w-full px-4 py-3 border rounded-xl text-sm transition
+                                      <?= $_providerLocked
+                                            ? 'border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed'
+                                            : 'border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent' ?>"
                                placeholder="Attending provider name">
+                        <?php if (!$_providerLocked): ?>
                         <datalist id="providerNameList">
                             <?php foreach ($_providerNames as $_pn): ?>
                             <option value="<?= h($_pn) ?>">
                             <?php endforeach; ?>
                         </datalist>
+                        <?php endif; ?>
                     </div>
                     <div class="grid grid-cols-2 gap-4">
                         <div>
