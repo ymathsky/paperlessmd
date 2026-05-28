@@ -627,10 +627,19 @@ include __DIR__ . '/../includes/header.php';
                 <div id="pdfAnnotPanel" class="hidden mt-3 border-2 border-red-200 rounded-2xl overflow-hidden no-print">
                     <!-- Toolbar -->
                     <div class="flex flex-wrap items-center gap-3 px-4 py-3 bg-red-50 border-b border-red-200">
+                        <!-- Page nav always visible at top -->
+                        <button type="button" id="pdfPrevBtn"
+                                class="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                            <i class="bi bi-chevron-left text-sm"></i>
+                        </button>
                         <span class="text-sm font-semibold text-red-700">
                             <i class="bi bi-file-earmark-pdf mr-1"></i>
                             Page <span id="pdfCurPage">1</span> / <span id="pdfTotPages">?</span>
                         </span>
+                        <button type="button" id="pdfNextBtn"
+                                class="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                            <i class="bi bi-chevron-right text-sm"></i>
+                        </button>
                         <div class="flex items-center gap-2 ml-auto flex-wrap">
                             <button type="button" class="pdf-pen-btn w-5 h-5 rounded-full bg-slate-800 border-2 border-red-500" data-min="0.8" data-max="1.5" title="Fine pen"></button>
                             <button type="button" class="pdf-pen-btn w-6 h-6 rounded-full bg-slate-800 border-2 border-transparent hover:border-red-400" data-min="1.5" data-max="3" title="Medium pen"></button>
@@ -652,16 +661,8 @@ include __DIR__ . '/../includes/header.php';
                             <canvas id="pdfDrawCanvas" style="position:absolute;top:0;left:0;touch-action:none;"></canvas>
                         </div>
                     </div>
-                    <!-- Nav + Save -->
+                    <!-- Save bar -->
                     <div class="flex flex-wrap items-center gap-3 px-4 py-3 bg-slate-50 border-t border-slate-200">
-                        <button type="button" id="pdfPrevBtn"
-                                class="px-3.5 py-2 bg-white border border-slate-200 text-sm font-semibold text-slate-600 rounded-xl hover:bg-slate-50 transition-colors">
-                            <i class="bi bi-chevron-left"></i> Prev
-                        </button>
-                        <button type="button" id="pdfNextBtn"
-                                class="px-3.5 py-2 bg-white border border-slate-200 text-sm font-semibold text-slate-600 rounded-xl hover:bg-slate-50 transition-colors">
-                            Next <i class="bi bi-chevron-right"></i>
-                        </button>
                         <span id="pdfPageLimitMsg" class="hidden text-xs text-amber-600"><i class="bi bi-info-circle"></i> Only first 4 pages will be saved</span>
                         <button type="button" id="pdfAnnotSave"
                                 class="ml-auto px-5 py-2.5 bg-red-600 hover:bg-red-700 active:scale-95 text-white font-bold text-sm rounded-xl shadow-sm transition-all">
