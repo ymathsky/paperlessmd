@@ -914,18 +914,6 @@ include __DIR__ . '/../includes/header.php';
                 </div>
             </div>
 
-            <!-- AI SOAP Note -->
-            <div class="flex items-center gap-3 p-3 bg-violet-50 border border-violet-200 rounded-xl no-print">
-                <i class="bi bi-stars text-violet-600 text-lg shrink-0"></i>
-                <div class="flex-1 min-w-0">
-                    <p class="text-sm font-semibold text-violet-800">AI SOAP Note</p>
-                    <p class="text-xs text-violet-600">Draft a SOAP note from today's visit data.</p>
-                </div>
-                <button type="button" id="aiSoapBtn" class="ai-btn shrink-0">
-                    <i class="bi bi-file-medical"></i> Draft
-                </button>
-            </div>
-
             <!-- F/U in (weeks/days) -->
             <div>
                 <label class="block text-xs font-semibold text-slate-600 mb-1.5">F/U In</label>
