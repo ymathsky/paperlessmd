@@ -294,6 +294,7 @@ include __DIR__ . '/../includes/header.php';
                                   has-[:checked]:border-green-500 has-[:checked]:bg-green-50 has-[:checked]:shadow-sm">
                         <input type="radio" name="homebound" value="homebound"
                                required data-label="Homebound Status"
+                               checked
                                class="sr-only">
                         <span class="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
                             <i class="bi bi-house-check-fill text-green-500 text-2xl leading-none"></i>
