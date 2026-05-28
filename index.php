@@ -74,6 +74,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Redirect to intended URL if available, otherwise dashboard
                 $redirect = $_SESSION['intended_url'] ?? '';
                 unset($_SESSION['intended_url']);
+
+                // Active-visit resume: if this user has an in-progress visit today,
+                // always send them back to the form — highest priority redirect.
+                if (in_array($user['role'], ['ma', 'admin'])) {
+                    try {
+                        $__avQ = $pdo->prepare("
+                            SELECT id, patient_id, visit_type
+                            FROM schedule
+                            WHERE ma_id = ?
+                              AND visit_started_at IS NOT NULL
+                              AND visit_ended_at   IS NULL
+                              AND status NOT IN ('completed','missed')
+                              AND visit_date = CURDATE()
+                            LIMIT 1
+                        ");
+                        $__avQ->execute([(int)$user['id']]);
+                        $__av = $__avQ->fetch(PDO::FETCH_ASSOC);
+                        if ($__av) {
+                            $redirect = BASE_URL . '/forms/vital_cs.php'
+                                      . '?patient_id=' . (int)$__av['patient_id']
+                                      . '&visit_id='   . (int)$__av['id']
+                                      . '&sched_visit_type=' . urlencode($__av['visit_type'] ?? 'routine');
+                        }
+                    } catch (PDOException $e) { /* schedule table unavailable */ }
+                }
+
                 // Only redirect to same-site, non-API page URLs
                 if ($redirect && strpos($redirect, BASE_URL . '/') === 0
                     && strpos($redirect, BASE_URL . '/index.php') !== 0
