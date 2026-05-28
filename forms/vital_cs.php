@@ -364,7 +364,11 @@ include __DIR__ . '/../includes/header.php';
                            class="w-full bg-transparent text-sm font-semibold text-slate-800 border-0 border-b border-slate-300 pb-1
                                   focus:outline-none focus:border-red-400 transition"
                            placeholder="<?= $v['placeholder'] ?>">
-                    <p class="text-xs text-slate-400 mt-2">Checked or Per patient</p>
+                    <label class="flex items-center gap-1.5 mt-2.5 cursor-pointer select-none group">
+                        <input type="checkbox" name="<?= $v['name'] ?>_per_patient" value="1"
+                               class="w-3.5 h-3.5 rounded accent-red-500 cursor-pointer">
+                        <span class="text-xs text-slate-400 group-hover:text-slate-500 transition-colors">Per patient</span>
+                    </label>
                 </div>
                 <?php endforeach; ?>
             </div>
