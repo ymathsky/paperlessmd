@@ -271,10 +271,11 @@ if (!empty($_SESSION['user_id'])) {
         t._hide = setTimeout(function () { t.classList.add('hidden'); }, 3000);
     }
 
-    // Block sidebar link clicks + show toast
-    document.addEventListener('click', function (e) {
-        var link = e.target.closest('#sidebar a');
-        if (link) { e.preventDefault(); e.stopImmediatePropagation(); showLockToast(); }
+// Block sidebar link clicks + notifications + show toast
+        document.addEventListener('click', function (e) {
+            var link  = e.target.closest('#sidebar a');
+            var notif = e.target.closest('[data-notif-trigger]');
+            if (link || notif) { e.preventDefault(); e.stopImmediatePropagation(); showLockToast(); }
     }, true);
 
     // Trap back / forward buttons
