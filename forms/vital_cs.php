@@ -1196,4 +1196,5 @@ function toggleAllergySeverity(inputId, selectId) {
 <?php include __DIR__ . '/../includes/wound_photo_panel.php'; ?>
 <?php include __DIR__ . '/../includes/drug_autocomplete.php'; ?>
 <?php include __DIR__ . '/../includes/rx_pad_panel.php'; ?>
+<?php $navLocked = true; ?>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

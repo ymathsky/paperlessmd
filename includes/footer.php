@@ -985,7 +985,9 @@ window._pdCsrf = '<?= htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8') ?>';
 // ── Mobile Bottom Tab Bar ─────────────────────────────────────────────────
 // Visible only on small screens (md:hidden). Mirrors the sidebar nav links.
 // $activeNav is set by the page before including header/footer.
-$_bnActive = $activeNav ?? '';
+// $navLocked = true prevents navigation (e.g. while a visit form is open).
+$_bnActive  = $activeNav ?? '';
+$_navLocked = $navLocked ?? false;
 $_bnItems = [
     ['href' => '/dashboard.php', 'key' => 'dashboard', 'icon' => 'bi-speedometer2',   'label' => 'Home'],
     ['href' => '/schedule.php',  'key' => 'schedule',  'icon' => 'bi-calendar3',      'label' => 'Schedule',  'billingHide' => true],
@@ -1002,13 +1004,12 @@ $_bnItems = [
         if (!empty($_item['billingHide']) && isBilling()) continue;
         $_isActive = $_bnActive === $_item['key'];
     ?>
-    <a href="<?= BASE_URL . $_item['href'] ?>"
+    <a href="<?= $_navLocked ? 'javascript:void(0)' : BASE_URL . $_item['href'] ?>"
        style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
               text-decoration:none;transition:background 0.15s;position:relative;
-              <?= $_isActive ? 'background:rgba(255,255,255,0.10);' : '' ?>"
-       onmouseover="this.style.background='rgba(255,255,255,0.07)'"
-       onmouseout="this.style.background='<?= $_isActive ? 'rgba(255,255,255,0.10)' : 'transparent' ?>'">
-        <?php if (!empty($_item['badge']) && $_item['badge'] > 0): ?>
+              <?= $_navLocked ? 'opacity:0.35;cursor:not-allowed;pointer-events:none;' : ($_isActive ? 'background:rgba(255,255,255,0.10);' : '') ?>"
+       <?= $_navLocked ? '' : 'onmouseover="this.style.background=\'rgba(255,255,255,0.07)\'" onmouseout="this.style.background=\'' . ($_isActive ? 'rgba(255,255,255,0.10)' : 'transparent') . '\'"' ?>>
+        <?php if (!empty($_item['badge']) && $_item['badge'] > 0 && !$_navLocked): ?>
         <span style="position:absolute;top:8px;right:calc(50% - 16px);
                      background:#ef4444;color:#fff;font-size:9px;font-weight:800;
                      min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;
@@ -1017,13 +1018,13 @@ $_bnItems = [
         </span>
         <?php endif; ?>
         <i class="bi <?= $_item['icon'] ?>"
-           style="font-size:20px;line-height:1;color:<?= $_isActive ? '#fff' : '#64748b' ?>;
-                  transition:color 0.15s;<?= $_isActive ? 'filter:drop-shadow(0 0 6px rgba(99,102,241,0.6));' : '' ?>"></i>
-        <span style="font-size:10px;font-weight:<?= $_isActive ? '700' : '500' ?>;
-                     color:<?= $_isActive ? '#e2e8f0' : '#475569' ?>;letter-spacing:0.02em;line-height:1;">
+           style="font-size:20px;line-height:1;color:<?= $_isActive && !$_navLocked ? '#fff' : '#64748b' ?>;
+                  transition:color 0.15s;<?= $_isActive && !$_navLocked ? 'filter:drop-shadow(0 0 6px rgba(99,102,241,0.6));' : '' ?>"></i>
+        <span style="font-size:10px;font-weight:<?= $_isActive && !$_navLocked ? '700' : '500' ?>;
+                     color:<?= $_isActive && !$_navLocked ? '#e2e8f0' : '#475569' ?>;letter-spacing:0.02em;line-height:1;">
             <?= $_item['label'] ?>
         </span>
-        <?php if ($_isActive): ?>
+        <?php if ($_isActive && !$_navLocked): ?>
         <span style="position:absolute;top:0;left:50%;transform:translateX(-50%);
                      width:32px;height:2px;background:#6366f1;border-radius:0 0 3px 3px;"></span>
         <?php endif; ?>
@@ -1031,12 +1032,12 @@ $_bnItems = [
     <?php endforeach; ?>
 
     <!-- "More" tab — opens sidebar -->
-    <button onclick="document.getElementById('sidebar').classList.toggle('-translate-x-full');document.getElementById('sidebarBackdrop').classList.toggle('hidden');"
+    <button <?= $_navLocked ? 'disabled' : 'onclick="document.getElementById(\'sidebar\').classList.toggle(\'-translate-x-full\');document.getElementById(\'sidebarBackdrop\').classList.toggle(\'hidden\');"' ?>
             style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
-                   background:transparent;border:none;cursor:pointer;transition:background 0.15s;position:relative;"
-            onmouseover="this.style.background='rgba(255,255,255,0.07)'"
-            onmouseout="this.style.background='transparent'">
-        <?php if (!empty($_totalNotifCount) && $_totalNotifCount > 0): ?>
+                   background:transparent;border:none;transition:background 0.15s;position:relative;
+                   <?= $_navLocked ? 'opacity:0.35;cursor:not-allowed;pointer-events:none;' : 'cursor:pointer;' ?>"
+            <?= $_navLocked ? '' : 'onmouseover="this.style.background=\'rgba(255,255,255,0.07)\'" onmouseout="this.style.background=\'transparent\'"' ?>>
+        <?php if (!empty($_totalNotifCount) && $_totalNotifCount > 0 && !$_navLocked): ?>
         <span style="position:absolute;top:8px;right:calc(50% - 16px);
                      background:#ef4444;color:#fff;font-size:9px;font-weight:800;
                      min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;
@@ -1220,47 +1221,6 @@ window.pdConfirm = (opts) => Alpine.store('pdConfirm').show(opts);
 
 <!-- Flowbite JS (component interactions) -->
 <script src="https://cdn.jsdelivr.net/npm/flowbite@2.5.2/dist/flowbite.min.js"></script>
-
-<!-- ■ Mobile Bottom Navigation Bar ■ -->
-<nav class="md:hidden no-print fixed bottom-0 inset-x-0 z-50
-            bg-gradient-to-r from-blue-950 to-blue-900
-            border-t border-white/10 shadow-[0_-4px_20px_rgba(0,0,0,.35)]
-            flex items-stretch"
-     style="padding-bottom:env(safe-area-inset-bottom)">
-    <?php
-    $_bnItems = [
-        ['href'=>'/dashboard.php',  'key'=>'dashboard', 'icon'=>'bi-speedometer2',    'label'=>'Home'],
-        ['href'=>'/patients.php',   'key'=>'patients',  'icon'=>'bi-people-fill',     'label'=>'Patients'],
-        ['href'=>'/schedule.php',   'key'=>'schedule',  'icon'=>'bi-calendar3',       'label'=>'Schedule', 'billingHide'=>true],
-        ['href'=>'/esign_queue.php','key'=>'esign',     'icon'=>'bi-pen-fill',        'label'=>'Sign',     'billingHide'=>true, 'maHide'=>true,
-         'badge'=>($_esignCount??0), 'badgeCls'=>'bg-violet-500'],
-        ['href'=>'/messages.php',   'key'=>'messages',  'icon'=>'bi-chat-dots-fill',  'label'=>'Messages',
-         'badge'=>($_unreadMessages??0), 'badgeCls'=>'bg-emerald-500'],
-    ];
-    foreach ($_bnItems as $_bn):
-        if (!empty($_bn['billingHide']) && isBilling()) continue;
-        if (!empty($_bn['maHide']) && isMa()) continue;
-        $_bnActive = ($activeNav ?? '') === $_bn['key'];
-    ?>
-    <a href="<?= BASE_URL . $_bn['href'] ?>"
-       class="flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 relative
-              transition-colors <?= $_bnActive ? 'text-white' : 'text-blue-300/70 active:text-white' ?>">
-        <?php if ($_bnActive): ?>
-        <span class="absolute top-0 left-2 right-2 h-0.5 bg-indigo-400 rounded-b-full"></span>
-        <?php endif; ?>
-        <div class="relative">
-            <i class="bi <?= $_bn['icon'] ?> text-[22px] leading-none"></i>
-            <?php if (!empty($_bn['badge']) && $_bn['badge'] > 0): ?>
-            <span class="absolute -top-1.5 -right-2.5 <?= $_bn['badgeCls'] ?> text-white
-                         text-[9px] font-bold px-1 py-px rounded-full leading-none min-w-[16px] text-center">
-                <?= min((int)$_bn['badge'], 99) ?>
-            </span>
-            <?php endif; ?>
-        </div>
-        <span class="text-[10px] font-semibold leading-none"><?= $_bn['label'] ?></span>
-    </a>
-    <?php endforeach; ?>
-</nav>
 
 </body>
 </html>
