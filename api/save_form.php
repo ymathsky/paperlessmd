@@ -206,6 +206,14 @@ if (in_array($formType, ['vital_cs', 'new_patient_pocket', 'new_patient_pocket_p
 require_once __DIR__ . '/../includes/audit.php';
 auditLog($pdo, 'form_create', 'form', (int)$newId, $formType, 'patient_id=' . $patientId);
 
+// ── Mark scheduled visit as completed ─────────────────────────────────────
+if ($status === 'signed' && $visitId > 0) {
+    $pdo->prepare(
+        "UPDATE `schedule` SET status = 'completed', visit_ended_at = NOW()
+         WHERE id = ? AND patient_id = ? AND status != 'completed'"
+    )->execute([$visitId, $patientId]);
+}
+
 // Email notification — new form awaiting provider countersignature
 require_once __DIR__ . '/../includes/mailer.php';
 require_once __DIR__ . '/../includes/notifications.php';
