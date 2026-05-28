@@ -71,7 +71,7 @@
                 'z-index:10',
             ].join(';');
             wrapper.appendChild(btn);
-            el.style.paddingRight = '2.75rem';
+            el.style.paddingRight = '2rem';
         }
 
         btn.addEventListener('click', function () {
