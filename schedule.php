@@ -442,7 +442,7 @@ $renderVisitCard = function(array $v, int $idx, bool $showMaName) use ($statusDe
         <!-- ── BODY: dark slate ── -->
         <div style="background:#0f172a;padding:16px 16px 4px;">
 
-            <!-- visit type + status badges -->
+            <!-- visit type + subtype badges -->
             <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:12px;">
                 <span style="background:rgba(99,102,241,0.25);color:#a5b4fc;border:1px solid rgba(99,102,241,0.4);
                              display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;
@@ -458,12 +458,6 @@ $renderVisitCard = function(array $v, int $idx, bool $showMaName) use ($statusDe
                     <?= h($subtypeLabel) ?>
                 </span>
                 <?php endif; ?>
-                <span style="background:rgba(255,255,255,0.08);color:#cbd5e1;border:1px solid rgba(255,255,255,0.12);"
-                             display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;
-                             font-size:12px;font-weight:700;">
-                    <i class="bi <?= $sd['icon'] ?>" style="font-size:11px;"></i>
-                    <?= $sd['label'] ?>
-                </span>
             </div>
 
             <!-- Patient name — main title -->
@@ -952,7 +946,7 @@ document.querySelectorAll('.ma-pill[id^="pill-"]:not(#pill-all)').forEach(btn =>
                 </p>
                 <input type="hidden" id="editVtHidden" value="routine">
                 <input type="hidden" id="editSubtypeHidden" value="wound_care">
-                <div class="grid grid-cols-3 gap-2" id="editVtPills">
+                <div class="grid grid-cols-2 gap-2" id="editVtPills">
                     <button type="button" onclick="editSetVt('routine',this)" data-val="routine"
                             class="vt-pill-edit inline-flex flex-col items-center gap-1 px-2 py-3 rounded-xl text-xs font-semibold border transition-all
                                    bg-white text-slate-600 border-slate-200 hover:border-indigo-300 hover:text-indigo-600">
@@ -962,26 +956,6 @@ document.querySelectorAll('.ma-pill[id^="pill-"]:not(#pill-all)').forEach(btn =>
                             class="vt-pill-edit inline-flex flex-col items-center gap-1 px-2 py-3 rounded-xl text-xs font-semibold border transition-all
                                    bg-white text-slate-600 border-slate-200 hover:border-emerald-300 hover:text-emerald-600">
                         <i class="bi bi-person-plus-fill text-sm"></i> New Patient
-                    </button>
-                    <button type="button" onclick="editSetVt('wound_care',this)" data-val="wound_care"
-                            class="vt-pill-edit inline-flex flex-col items-center gap-1 px-2 py-3 rounded-xl text-xs font-semibold border transition-all
-                                   bg-white text-slate-600 border-slate-200 hover:border-rose-300 hover:text-rose-600">
-                        <i class="bi bi-bandaid-fill text-sm"></i> Wound Care
-                    </button>
-                    <button type="button" onclick="editSetVt('awv',this)" data-val="awv"
-                            class="vt-pill-edit inline-flex flex-col items-center gap-1 px-2 py-3 rounded-xl text-xs font-semibold border transition-all
-                                   bg-white text-slate-600 border-slate-200 hover:border-violet-300 hover:text-violet-600">
-                        <i class="bi bi-heart-pulse-fill text-sm"></i> AWV
-                    </button>
-                    <button type="button" onclick="editSetVt('ccm',this)" data-val="ccm"
-                            class="vt-pill-edit inline-flex flex-col items-center gap-1 px-2 py-3 rounded-xl text-xs font-semibold border transition-all
-                                   bg-white text-slate-600 border-slate-200 hover:border-blue-300 hover:text-blue-600">
-                        <i class="bi bi-capsule text-sm"></i> CCM
-                    </button>
-                    <button type="button" onclick="editSetVt('il',this)" data-val="il"
-                            class="vt-pill-edit inline-flex flex-col items-center gap-1 px-2 py-3 rounded-xl text-xs font-semibold border transition-all
-                                   bg-white text-slate-600 border-slate-200 hover:border-amber-300 hover:text-amber-600">
-                        <i class="bi bi-file-earmark-text-fill text-sm"></i> IL Disc.
                     </button>
                 </div>
                 <!-- New Patient subtype -->
@@ -1617,7 +1591,7 @@ function editSetSubtype(val, btn) {
     document.getElementById('editSubtypeHidden').value = val;
     document.querySelectorAll('#editSubtypeRow .np-subtype-edit').forEach(p => {
         if (p.dataset.val === val) {
-            p.className = p.className.replace(/bg-emerald-600 text-white border-emerald-600 shadow-sm/g, '').trim();
+            p.className = p.className.replace(/bg-\S+ text-\S+ border-\S+( shadow-sm)?/g, '').trim();
             p.classList.add('bg-emerald-600', 'text-white', 'border-emerald-600', 'shadow-sm');
         } else {
             p.className = p.className.replace(/bg-emerald-600 text-white border-emerald-600 shadow-sm/g, '').trim();
