@@ -401,10 +401,6 @@ include __DIR__ . '/../includes/header.php';
                         $vtPills = [
                             ['val'=>'routine',     'label'=>'Routine',      'icon'=>'bi-activity',          'color'=>'indigo'],
                             ['val'=>'new_patient', 'label'=>'New Patient',  'icon'=>'bi-person-plus-fill',  'color'=>'emerald'],
-                            ['val'=>'wound_care',  'label'=>'Wound Care',   'icon'=>'bi-bandaid-fill',      'color'=>'rose'],
-                            ['val'=>'awv',         'label'=>'AWV',          'icon'=>'bi-heart-pulse-fill',  'color'=>'violet'],
-                            ['val'=>'ccm',         'label'=>'CCM',          'icon'=>'bi-clipboard2-heart',  'color'=>'blue'],
-                            ['val'=>'il',          'label'=>'IL Disclosure','icon'=>'bi-file-earmark-text', 'color'=>'amber'],
                         ];
                         $selVt = $_POST['visit_type'] ?? 'routine';
                         foreach ($vtPills as $vp):
