@@ -331,51 +331,55 @@ include __DIR__ . '/../includes/header.php';
         <!-- â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•— -->
         <!-- â•‘  STEP 2 &mdash; Vitals & Clinical      â•‘ -->
         <!-- â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-        <div class="wiz-step hidden space-y-6 py-4"
+        <div class="wiz-step hidden space-y-4 py-4"
              data-step="1"
              data-title="Vitals"
              data-icon="bi-heart-pulse">
 
-            <p class="form-section-title"><i class="bi bi-heart-pulse text-red-500"></i> Vital Signs</p>
-
-            <div class="vitals-quick-grid grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <?php
-                $vitals = [
-                    ['name'=>'bp',      'label'=>'BP',       'placeholder'=>'120/80',      'req'=>true],
-                    ['name'=>'pulse',   'label'=>'Pulse',    'placeholder'=>'72 bpm',      'req'=>true],
-                    ['name'=>'temp',    'label'=>'Temp',     'placeholder'=>'98.6°F',      'req'=>false],
-                    ['name'=>'o2sat',   'label'=>'O2Sat',    'placeholder'=>'98%',         'req'=>true],
-                    ['name'=>'glucose', 'label'=>'Glucose',  'placeholder'=>'mg/dL',       'req'=>false],
-                    ['name'=>'height',  'label'=>'Height',   'placeholder'=>'in / cm',     'req'=>false],
-                    ['name'=>'weight',  'label'=>'Weight',   'placeholder'=>'lbs / kg',    'req'=>false],
-                    ['name'=>'resp',    'label'=>'Resp',     'placeholder'=>'breaths/min', 'req'=>false],
-                ];
-                foreach ($vitals as $v):
-                    $prefilled = pv($prev, $v['name']);
-                ?>
-                <div class="bg-slate-50 border <?= $prefilled ? 'border-amber-300' : 'border-slate-200' ?> rounded-xl p-3">
-                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">
-                        <?= $v['label'] ?><?= $v['req'] ? ' <span class="text-red-400">*</span>' : '' ?>
-                        <?php if ($prefilled): ?><span class="ml-1 text-amber-400" title="Pre-filled"><i class="bi bi-arrow-counterclockwise"></i></span><?php endif; ?>
-                    </label>
-                    <input type="text" name="<?= $v['name'] ?>" value="<?= $prefilled ?>"
-                           <?= $v['req'] ? 'required data-label="' . $v['label'] . '"' : '' ?>
-                           data-voice-numbers-only="1"
-                           class="w-full bg-transparent text-sm font-semibold text-slate-800 border-0 border-b border-slate-300 pb-1
-                                  focus:outline-none focus:border-red-400 transition"
-                           placeholder="<?= $v['placeholder'] ?>">
-                    <div class="flex gap-1.5 mt-2.5">
-                        <label class="vital-src flex-1 flex items-center justify-center gap-1 py-1 px-1.5 border-2 border-slate-200 rounded-lg cursor-pointer text-xs font-semibold transition-all">
-                            <input type="radio" name="<?= $v['name'] ?>_source" value="checked" checked class="sr-only">
-                            <i class="bi bi-check2"></i> Checked
-                        </label>
-                        <label class="vital-src vital-pp flex-1 flex items-center justify-center gap-1 py-1 px-1.5 border-2 border-slate-200 rounded-lg cursor-pointer text-xs font-semibold transition-all">
-                            <input type="radio" name="<?= $v['name'] ?>_source" value="per_patient" class="sr-only">
-                            <i class="bi bi-person"></i> Per patient
-                        </label>
-                    </div>
+            <div class="wiz-section">
+                <div class="wiz-section-hd">
+                    <i class="bi bi-heart-pulse text-red-400"></i> Vital Signs
                 </div>
-                <?php endforeach; ?>
+
+                <div class="vitals-quick-grid grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+                    <?php
+                    $vitals = [
+                        ['name'=>'bp',      'label'=>'BP',       'placeholder'=>'120/80',      'req'=>true],
+                        ['name'=>'pulse',   'label'=>'Pulse',    'placeholder'=>'72 bpm',      'req'=>true],
+                        ['name'=>'temp',    'label'=>'Temp',     'placeholder'=>'98.6°F',      'req'=>false],
+                        ['name'=>'o2sat',   'label'=>'O2Sat',    'placeholder'=>'98%',         'req'=>true],
+                        ['name'=>'glucose', 'label'=>'Glucose',  'placeholder'=>'mg/dL',       'req'=>false],
+                        ['name'=>'height',  'label'=>'Height',   'placeholder'=>'in / cm',     'req'=>false],
+                        ['name'=>'weight',  'label'=>'Weight',   'placeholder'=>'lbs / kg',    'req'=>false],
+                        ['name'=>'resp',    'label'=>'Resp',     'placeholder'=>'breaths/min', 'req'=>false],
+                    ];
+                    foreach ($vitals as $v):
+                        $prefilled = pv($prev, $v['name']);
+                    ?>
+                    <div class="vital-card border <?= $prefilled ? 'border-amber-300' : 'border-slate-200' ?> rounded-xl p-3">
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">
+                            <?= $v['label'] ?><?= $v['req'] ? ' <span class="text-red-400">*</span>' : '' ?>
+                            <?php if ($prefilled): ?><span class="ml-1 text-amber-400" title="Pre-filled"><i class="bi bi-arrow-counterclockwise"></i></span><?php endif; ?>
+                        </label>
+                        <input type="text" name="<?= $v['name'] ?>" value="<?= $prefilled ?>"
+                               <?= $v['req'] ? 'required data-label="' . $v['label'] . '"' : '' ?>
+                               data-voice-numbers-only="1"
+                               class="w-full bg-transparent text-sm font-semibold text-slate-800 border-0 border-b border-slate-300 pb-1
+                                      focus:outline-none focus:border-red-400 transition"
+                               placeholder="<?= $v['placeholder'] ?>">
+                        <div class="flex flex-col gap-1 mt-2.5">
+                            <label class="vital-src flex items-center justify-center gap-1 py-1 px-2 border-2 border-slate-200 rounded-lg cursor-pointer text-xs font-semibold transition-all">
+                                <input type="radio" name="<?= $v['name'] ?>_source" value="checked" checked class="sr-only">
+                                <i class="bi bi-check2"></i> Checked
+                            </label>
+                            <label class="vital-src vital-pp flex items-center justify-center gap-1 py-1 px-2 border-2 border-slate-200 rounded-lg cursor-pointer text-xs font-semibold transition-all">
+                                <input type="radio" name="<?= $v['name'] ?>_source" value="per_patient" class="sr-only">
+                                <i class="bi bi-person"></i> Per patient
+                            </label>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
             </div>
 
         </div><!-- /step 2 -->
