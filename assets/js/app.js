@@ -363,7 +363,50 @@ document.addEventListener('DOMContentLoaded', function () {
         // Clear session cache — form is being submitted
         if (_pdSigKey) { try { sessionStorage.removeItem(_pdSigKey); } catch(e) {} }
         window._pdSubmitting = true;
-        mainForm.submit();
+
+        // ── Upload progress overlay ───────────────────────────────────
+        var _ovr = document.createElement('div');
+        _ovr.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.65);display:flex;align-items:center;justify-content:center;';
+        _ovr.innerHTML =
+            '<div style="background:#1e293b;border-radius:1.25rem;padding:2rem 2.5rem;width:90%;max-width:340px;text-align:center;box-shadow:0 25px 60px rgba(0,0,0,0.5);">' +
+                '<div style="width:52px;height:52px;background:rgba(239,68,68,0.15);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;">' +
+                    '<i class="bi bi-cloud-arrow-up" style="font-size:1.6rem;color:#ef4444;"></i>' +
+                '</div>' +
+                '<p style="color:#f1f5f9;font-weight:700;font-size:1.05rem;margin:0 0 0.35rem;">Saving Visit…</p>' +
+                '<p id="_uplPct" style="color:#94a3b8;font-size:0.82rem;margin:0 0 1.1rem;">Preparing…</p>' +
+                '<div style="background:#334155;border-radius:999px;height:8px;overflow:hidden;">' +
+                    '<div id="_uplBar" style="height:100%;background:linear-gradient(90deg,#ef4444,#f97316);border-radius:999px;width:0%;transition:width 0.25s ease;"></div>' +
+                '</div>' +
+            '</div>';
+        document.body.appendChild(_ovr);
+
+        var _xhr = new XMLHttpRequest();
+        _xhr.open('POST', mainForm.action);
+        _xhr.upload.addEventListener('progress', function (e) {
+            if (!e.lengthComputable) return;
+            var pct = Math.round((e.loaded / e.total) * 100);
+            var bar = document.getElementById('_uplBar');
+            var lbl = document.getElementById('_uplPct');
+            if (bar) bar.style.width = pct + '%';
+            if (lbl) lbl.textContent = pct + '% uploaded';
+        });
+        _xhr.onload = function () {
+            var bar = document.getElementById('_uplBar');
+            var lbl = document.getElementById('_uplPct');
+            if (bar) bar.style.width = '100%';
+            if (lbl) lbl.textContent = 'Done! Redirecting…';
+            window.location.href = _xhr.responseURL || mainForm.action;
+        };
+        _xhr.onerror = function () {
+            if (_ovr && _ovr.parentNode) _ovr.parentNode.removeChild(_ovr);
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="bi bi-stop-circle-fill text-xl"></i> End Visit';
+            }
+            window._pdSubmitting = false;
+            alert('Upload failed. Please check your connection and try again.');
+        };
+        _xhr.send(new FormData(mainForm));
     }
 
     // submitBtn is type="button" — wire click directly
