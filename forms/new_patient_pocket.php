@@ -169,8 +169,15 @@ include __DIR__ . '/../includes/header.php';
         <div class="bg-white/20 p-2 rounded-xl">
             <i class="bi bi-folder2-open text-white text-xl"></i>
         </div>
-        <div>
-            <h2 class="text-white font-bold text-lg"><?= h(PRACTICE_NAME) ?> &mdash; New Patient Pocket</h2>
+        <div class="flex-1">
+            <div class="flex items-center gap-2 flex-wrap">
+                <h2 class="text-white font-bold text-lg"><?= h($_coName ?: PRACTICE_NAME) ?> &mdash; New Patient Pocket</h2>
+                <span class="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-0.5 rounded-full
+                             <?= $_isPrimarycare ? 'bg-teal-400/30 text-teal-100' : 'bg-rose-400/30 text-rose-100' ?>">
+                    <i class="bi <?= $_isPrimarycare ? 'bi-person-heart' : 'bi-bandaid-fill' ?>"></i>
+                    <?= $_isPrimarycare ? 'Primary Care' : 'Wound Care' ?>
+                </span>
+            </div>
             <p class="text-indigo-100 text-sm"><?= $patientFullName ?> &mdash; CS &bull; CCM &bull; ABN <?php if (!$_isPrimarycare): ?>&bull; Wound Care Consent <?php endif; ?>&bull; PHI &bull; Patient Fusion</p>
         </div>
     </div>
@@ -181,6 +188,7 @@ include __DIR__ . '/../includes/header.php';
         <input type="hidden" name="csrf_token"  value="<?= csrfToken() ?>">
         <input type="hidden" name="patient_id"  value="<?= $patient_id ?>">
         <input type="hidden" name="form_type"   value="<?= $_isPrimarycare ? 'new_patient_pocket_pc' : 'new_patient_pocket' ?>">
+        <input type="hidden" name="visit_id"     value="<?= $visit_id ?>">
         <input type="hidden" name="med_count"   value="<?= count($medRows) ?>">
         <input type="hidden" id="wiz-form-key"  value="new_patient_pocket_<?= $patient_id ?>">
 
@@ -190,101 +198,149 @@ include __DIR__ . '/../includes/header.php';
         <!-- ═══════════════════════════════════════════════════════ -->
         <!-- STEP 0 — Visit Info (CS)                               -->
         <!-- ═══════════════════════════════════════════════════════ -->
-        <div class="wiz-step space-y-6 py-4"
+        <div class="wiz-step space-y-4 py-4"
              data-step="0" data-title="Visit Info" data-icon="bi-calendar-check">
 
-            <p class="form-section-title">
-                <i class="bi bi-calendar-check text-indigo-500"></i>
-                Section 1 of 9 &mdash; Visit Information <span class="text-slate-400 font-normal text-xs">(Visit Consent / CS)</span>
-            </p>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Provider</label>
-                    <input type="text" name="provider_name"
-                           list="providerNameList"
-                           value="<?= h($_schedProvider ?: pv($prev, 'provider_name')) ?>"
-                           class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
-                                  focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition focus:bg-white"
-                           placeholder="Attending provider name">
-                    <datalist id="providerNameList">
-                        <?php foreach ($_providerNames as $_pn): ?>
-                        <option value="<?= h($_pn) ?>">
-                        <?php endforeach; ?>
-                    </datalist>
+            <!-- Section: Provider, Date & Time -->
+            <div class="wiz-section">
+                <div class="wiz-section-hd">
+                    <i class="bi bi-person-badge"></i> Provider, Date &amp; Time
                 </div>
-                <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Date of Visit</label>
-                    <input type="date" name="form_date" value="<?= date('Y-m-d') ?>"
-                           class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
-                                  focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition focus:bg-white">
-                </div>
-            </div>
-
-            <div>
-                <label class="block text-sm font-bold text-slate-700 mb-3">Visit Type</label>
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
-                    <?php foreach (['New','Follow Up','Sick','Post Hospital F/U'] as $vt): ?>
-                    <label class="flex items-center gap-2.5 p-3 border border-slate-200 rounded-xl cursor-pointer
-                                  hover:border-indigo-300 hover:bg-indigo-50/50 transition-colors has-[:checked]:border-indigo-400 has-[:checked]:bg-indigo-50">
-                        <input type="radio" name="visit_type" value="<?= $vt ?>"
-                               class="w-4 h-4 text-indigo-600 border-slate-300 focus:ring-indigo-400 flex-shrink-0"
-                               <?= $vt === $_preselVt ? 'checked' : '' ?>>
-                        <span class="text-sm font-medium text-slate-700"><?= $vt ?></span>
-                    </label>
-                    <?php endforeach; ?>
-                </div>
-                <div class="grid grid-cols-2 gap-4">
+                <div class="space-y-4">
                     <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">F/U In</label>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Provider</label>
+                        <input type="text" name="provider_name"
+                               list="providerNameList"
+                               value="<?= h($_schedProvider ?: pv($prev, 'provider_name')) ?>"
+                               class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white
+                                      focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition"
+                               placeholder="Attending provider name">
+                        <datalist id="providerNameList">
+                            <?php foreach ($_providerNames as $_pn): ?>
+                            <option value="<?= h($_pn) ?>">
+                            <?php endforeach; ?>
+                        </datalist>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Date of Visit</label>
+                            <input type="date" name="form_date" value="<?= date('Y-m-d') ?>"
+                                   class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white
+                                          focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
+                                <i class="bi bi-clock text-indigo-400 mr-1"></i>Time In
+                            </label>
+                            <input type="time" name="time_in"
+                                   class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white
+                                          focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">F/U In</label>
                         <div class="flex gap-2">
                             <input type="number" name="fu_weeks" min="1"
-                                   class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
-                                          focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition focus:bg-white"
+                                   class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white
+                                          focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition"
                                    placeholder="e.g. 2">
                             <select name="fu_unit"
-                                    class="px-3 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
-                                           focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition focus:bg-white">
+                                    class="px-3 py-3 border border-slate-200 rounded-xl text-sm bg-white
+                                           focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition">
                                 <option value="weeks">Weeks</option>
                                 <option value="days">Days</option>
                             </select>
                         </div>
                     </div>
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">Time In</label>
-                        <input type="time" name="time_in"
-                               class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
-                                      focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition focus:bg-white">
-                    </div>
                 </div>
             </div>
 
-            <div>
-                <label class="block text-sm font-bold text-slate-700 mb-3">Homebound Status</label>
+            <!-- Section: Visit Type -->
+            <div class="wiz-section">
+                <div class="wiz-section-hd">
+                    <i class="bi bi-clipboard2-pulse"></i> Visit Type
+                </div>
+                <?php
+                $_vtIcons = [
+                    'New'               => 'bi-person-plus-fill',
+                    'Follow Up'         => 'bi-arrow-repeat',
+                    'Sick'              => 'bi-thermometer-half',
+                    'Post Hospital F/U' => 'bi-hospital-fill',
+                ];
+                ?>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <?php foreach ($_vtIcons as $vt => $icon): ?>
+                    <label class="radio-card flex flex-col items-center gap-1.5 py-3 px-2 border-2 border-slate-200 rounded-xl cursor-pointer text-center
+                                  has-[:checked]:border-red-500 has-[:checked]:bg-red-50 has-[:checked]:shadow-sm">
+                        <input type="radio" name="visit_type" value="<?= $vt ?>"
+                               <?= $vt === $_preselVt ? 'checked' : '' ?>
+                               class="sr-only">
+                        <i class="bi <?= $icon ?> vt-icon text-xl"></i>
+                        <span class="text-xs font-semibold text-slate-600 leading-tight"><?= $vt ?></span>
+                    </label>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+
+            <!-- Section: Homebound Status -->
+            <div class="wiz-section">
+                <div class="wiz-section-hd">
+                    <i class="bi bi-house-heart"></i> Homebound Status
+                </div>
                 <div class="grid grid-cols-2 gap-3">
-                    <label class="flex items-center gap-3 p-4 border-2 border-slate-200 rounded-xl cursor-pointer
-                                  hover:border-indigo-300 hover:bg-indigo-50/50 transition-colors has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50">
-                        <input type="radio" name="homebound" value="homebound"
-                               class="w-4 h-4 text-indigo-600 border-slate-300 focus:ring-indigo-400">
-                        <span class="font-semibold text-slate-700 underline decoration-2">Patient IS Homebound</span>
+                    <label class="radio-card flex flex-col items-center gap-2.5 py-5 px-3 border-2 border-slate-200 rounded-2xl cursor-pointer text-center
+                                  has-[:checked]:border-emerald-400 has-[:checked]:bg-emerald-50 has-[:checked]:shadow-sm">
+                        <input type="radio" name="homebound" value="homebound" checked class="sr-only">
+                        <span class="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center">
+                            <i class="bi bi-house-check-fill text-emerald-500 text-2xl leading-none"></i>
+                        </span>
+                        <span class="font-bold text-slate-700 text-sm leading-snug">Patient IS<br>Homebound</span>
                     </label>
-                    <label class="flex items-center gap-3 p-4 border-2 border-slate-200 rounded-xl cursor-pointer
-                                  hover:border-slate-400 hover:bg-slate-50 transition-colors has-[:checked]:border-slate-500 has-[:checked]:bg-slate-50">
-                        <input type="radio" name="homebound" value="not_homebound"
-                               class="w-4 h-4 text-slate-600 border-slate-300 focus:ring-slate-400">
-                        <span class="font-semibold text-slate-700 underline decoration-2">Patient IS NOT Homebound</span>
+                    <label class="radio-card flex flex-col items-center gap-2.5 py-5 px-3 border-2 border-slate-200 rounded-2xl cursor-pointer text-center
+                                  has-[:checked]:border-slate-500 has-[:checked]:bg-slate-100 has-[:checked]:shadow-sm">
+                        <input type="radio" name="homebound" value="not_homebound" class="sr-only">
+                        <span class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
+                            <i class="bi bi-house-x-fill text-slate-400 text-2xl leading-none"></i>
+                        </span>
+                        <span class="font-bold text-slate-700 text-sm leading-snug">Patient IS NOT<br>Homebound</span>
                     </label>
                 </div>
             </div>
 
-            <div>
-                <label class="block text-sm font-semibold text-slate-700 mb-1.5">
-                    Missed Visit Reason <span class="text-slate-400 font-normal">(if applicable)</span>
-                </label>
-                <input type="text" name="missed_visit_reason"
-                       class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
-                              focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition focus:bg-white"
-                       placeholder="Leave blank if not a missed visit">
+            <!-- Section: Missed Visit -->
+            <div class="wiz-section" id="missedVisitSection">
+                <div class="wiz-section-hd">
+                    <i class="bi bi-exclamation-circle"></i> Missed Visit
+                </div>
+                <div id="mvRegularState">
+                    <button type="button" id="mvToggleBtn"
+                            class="w-full flex items-center gap-3 px-4 py-3.5 border-2 border-dashed border-slate-300
+                                   rounded-xl text-sm font-medium text-slate-500
+                                   hover:border-amber-400 hover:text-amber-700 hover:bg-amber-50 transition-all">
+                        <i class="bi bi-calendar-x text-lg flex-shrink-0"></i>
+                        <span>Mark as Missed Visit</span>
+                        <span class="ml-auto text-xs font-normal text-slate-400">tap to log a missed visit</span>
+                    </button>
+                </div>
+                <div id="mvActiveState" class="hidden space-y-3">
+                    <div class="flex items-center gap-2.5 px-4 py-3 bg-amber-50 border border-amber-300
+                                text-amber-800 rounded-xl text-sm font-semibold">
+                        <i class="bi bi-calendar-x-fill text-amber-500 text-base flex-shrink-0"></i>
+                        <span>Missed Visit &mdash; vitals &amp; signatures will be skipped</span>
+                        <button type="button" id="mvCancelBtn"
+                                class="ml-auto text-amber-600 hover:text-amber-800 text-xs font-normal underline flex-shrink-0">
+                            Cancel
+                        </button>
+                    </div>
+                    <label class="block text-sm font-semibold text-slate-700">
+                        Reason for missed visit <span class="text-red-400">*</span>
+                    </label>
+                    <textarea name="missed_visit_reason" id="mvReasonText" rows="2"
+                              class="w-full px-4 py-3 border border-amber-300 rounded-xl text-sm bg-white
+                                     focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent
+                                     transition resize-none"
+                              placeholder="e.g. Patient not home, Patient cancelled appointment&hellip;"><?= h(pv($prev, 'missed_visit_reason')) ?></textarea>
+                </div>
             </div>
         </div><!-- /step 0 -->
 
@@ -979,21 +1035,13 @@ If secondary insurance is available will bill 20% to secondary insurance.</texta
 
             <p class="form-section-title"><i class="bi bi-person-badge text-indigo-500"></i> Staff Information</p>
 
-            <div class="grid grid-cols-2 gap-4 max-w-xs">
-                <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Medical Assistant</label>
-                    <input type="text" name="ma_name" value="<?= h($_SESSION['full_name'] ?? '') ?>"
-                           class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
-                                  focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition focus:bg-white">
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Time Out</label>
-                    <input type="time" name="time_out"
-                           required data-label="Time Out"
-                           class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
-                                  focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition focus:bg-white">
-                </div>
+            <div class="max-w-xs">
+                <label class="block text-sm font-semibold text-slate-700 mb-1.5">Medical Assistant</label>
+                <input type="text" name="ma_name" value="<?= h($_SESSION['full_name'] ?? '') ?>"
+                       class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
+                              focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition focus:bg-white">
             </div>
+            <input type="hidden" name="time_out">
 
             <!-- Patient + MA signatures via standard sig_block -->
             <?php include __DIR__ . '/../includes/sig_block.php'; ?>
@@ -1076,6 +1124,35 @@ $icdApiBaseJson = json_encode(BASE_URL);
 
 $extraJs = <<<JSBLOCK
 <script>
+/* ── Missed Visit Mode ──────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', function () {
+    var mvToggleBtn = document.getElementById('mvToggleBtn');
+    var mvCancelBtn = document.getElementById('mvCancelBtn');
+    var mvRegular   = document.getElementById('mvRegularState');
+    var mvActive    = document.getElementById('mvActiveState');
+    var mvReason    = document.getElementById('mvReasonText');
+
+    function enterMissedMode() {
+        window._pdMissedVisit = true;
+        if (mvRegular) mvRegular.classList.add('hidden');
+        if (mvActive)  mvActive.classList.remove('hidden');
+        if (mvReason)  mvReason.setAttribute('required', '');
+    }
+
+    function exitMissedMode() {
+        window._pdMissedVisit = false;
+        if (mvActive)  mvActive.classList.add('hidden');
+        if (mvRegular) mvRegular.classList.remove('hidden');
+        if (mvReason)  { mvReason.value = ''; mvReason.removeAttribute('required'); }
+    }
+
+    if (mvToggleBtn) mvToggleBtn.addEventListener('click', enterMissedMode);
+    if (mvCancelBtn) mvCancelBtn.addEventListener('click', exitMissedMode);
+
+    // Auto-enter if draft had a reason
+    if (mvReason && mvReason.value.trim()) enterMissedMode();
+});
+
 /* ── ICD-10 Search ───────────────────────────────────────────── */
 (function () {
     var BASE     = {$icdApiBaseJson};
@@ -1279,14 +1356,16 @@ $extraJs = <<<JSBLOCK
         });
     }
 
-    // Validate provider sig via app.js hook (mainForm.submit() doesn't fire submit events)
+    // Validate provider sig via app.js hook (mainForm.submit() doesn't fire submit events).
+    // Chain with wiz_nav's End Visit gate if it was set (runs after provider sig passes).
+    var _wizNavGate = typeof window._pdEndVisitGate === 'function' ? window._pdEndVisitGate : null;
     window._pdValidateExtra = function () {
         if (!hidden.value) {
             var alertEl = document.getElementById('providerSigAlert');
             if (alertEl) { alertEl.classList.remove('hidden'); alertEl.scrollIntoView({behavior:'smooth', block:'center'}); }
             return false;
         }
-        return true;
+        return _wizNavGate ? _wizNavGate() : true;
     };
 })();
 

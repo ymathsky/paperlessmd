@@ -112,6 +112,7 @@ function sectionHeader($num, $title, $icon='bi-circle-fill', $color='sky') {
         <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
         <input type="hidden" name="patient_id" value="<?= $patient_id ?>">
         <input type="hidden" name="form_type"  value="medicare_awv">
+        <input type="hidden" name="visit_id"    value="<?= $visit_id ?>">
         <input type="hidden" name="gds_score"  id="gds_total" value="0">
         <input type="hidden" id="wiz-form-key" value="medicare_awv_<?= $patient_id ?>">
 

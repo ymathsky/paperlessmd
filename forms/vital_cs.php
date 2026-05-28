@@ -367,15 +367,41 @@ include __DIR__ . '/../includes/header.php';
             </div>
 
             <!-- Section: Missed Visit -->
-            <div class="wiz-section">
+            <div class="wiz-section" id="missedVisitSection">
                 <div class="wiz-section-hd">
                     <i class="bi bi-exclamation-circle"></i> Missed Visit
-                    <span class="ml-auto text-xs font-normal normal-case tracking-normal text-slate-400">optional</span>
                 </div>
-                <input type="text" name="missed_visit_reason"
-                       class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white
-                              focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition"
-                       placeholder="Leave blank if not a missed visit">
+                <!-- Toggle button — regular state -->
+                <div id="mvRegularState">
+                    <button type="button" id="mvToggleBtn"
+                            class="w-full flex items-center gap-3 px-4 py-3.5 border-2 border-dashed border-slate-300
+                                   rounded-xl text-sm font-medium text-slate-500
+                                   hover:border-amber-400 hover:text-amber-700 hover:bg-amber-50 transition-all">
+                        <i class="bi bi-calendar-x text-lg flex-shrink-0"></i>
+                        <span>Mark as Missed Visit</span>
+                        <span class="ml-auto text-xs font-normal text-slate-400">tap to log a missed visit</span>
+                    </button>
+                </div>
+                <!-- Expanded area — missed visit active -->
+                <div id="mvActiveState" class="hidden space-y-3">
+                    <div class="flex items-center gap-2.5 px-4 py-3 bg-amber-50 border border-amber-300
+                                text-amber-800 rounded-xl text-sm font-semibold">
+                        <i class="bi bi-calendar-x-fill text-amber-500 text-base flex-shrink-0"></i>
+                        <span>Missed Visit — vitals &amp; signatures will be skipped</span>
+                        <button type="button" id="mvCancelBtn"
+                                class="ml-auto text-amber-600 hover:text-amber-800 text-xs font-normal underline flex-shrink-0">
+                            Cancel
+                        </button>
+                    </div>
+                    <label class="block text-sm font-semibold text-slate-700">
+                        Reason for missed visit <span class="text-red-400">*</span>
+                    </label>
+                    <textarea name="missed_visit_reason" id="mvReasonText" rows="2"
+                              class="w-full px-4 py-3 border border-amber-300 rounded-xl text-sm bg-white
+                                     focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent
+                                     transition resize-none"
+                              placeholder="e.g. Patient not home, Patient cancelled appointment…"><?= h(pv($prev, 'missed_visit_reason')) ?></textarea>
+                </div>
             </div>
 
         </div><!-- /step 1 -->
@@ -392,6 +418,14 @@ include __DIR__ . '/../includes/header.php';
             <div class="wiz-section">
                 <div class="wiz-section-hd">
                     <i class="bi bi-heart-pulse text-red-400"></i> Vital Signs
+                </div>
+
+                <!-- Missed visit banner -->
+                <div id="mvVitalsBanner" style="display:none"
+                     class="flex items-center gap-2.5 px-4 py-3 bg-amber-50 border border-amber-200
+                            text-amber-800 rounded-xl text-sm font-medium mb-2">
+                    <i class="bi bi-calendar-x-fill text-amber-500 text-base flex-shrink-0"></i>
+                    Missed Visit &mdash; vital signs are optional. Fill what you know or skip this step.
                 </div>
 
                 <div class="vitals-quick-grid grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
@@ -651,13 +685,11 @@ include __DIR__ . '/../includes/header.php';
             </div><!-- /wiz-section Medication Attachments -->
 
             <!-- ── Add / Edit Medication Modal ───────────────────────── -->
-            <div id="medModal" class="hidden fixed inset-0 z-[200] flex items-end sm:items-center justify-center no-print">
-                <div id="medModalBackdrop" class="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            <div id="medModal" class="hidden fixed inset-0 z-[9999] flex items-center justify-center no-print">
+                <div id="medModalBackdrop" class="absolute inset-0 bg-black/60 backdrop-blur-sm"
                      onclick="medModalClose()"></div>
-                <div class="relative bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md
-                            shadow-2xl border border-slate-100 p-5 space-y-4
-                            translate-y-full transition-transform duration-300"
-                     style="padding-bottom:calc(4.5rem + env(safe-area-inset-bottom))"
+                <div class="relative bg-white rounded-2xl w-full shadow-2xl border border-slate-100 p-5 space-y-4 transition-transform duration-300"
+                     style="max-width:26rem"
                      id="medModalCard">
                     <div class="flex items-center justify-between mb-1">
                         <h3 id="medModalTitle" class="font-bold text-slate-800 text-base">Add Medication</h3>
@@ -897,23 +929,23 @@ include __DIR__ . '/../includes/header.php';
              data-title="Sign"
              data-icon="bi-pen">
 
+            <!-- Missed visit banner -->
+            <div id="mvSignBanner" style="display:none"
+                 class="flex items-center gap-2.5 px-4 py-3 bg-amber-50 border border-amber-200
+                        text-amber-800 rounded-xl text-sm font-medium">
+                <i class="bi bi-calendar-x-fill text-amber-500 text-base flex-shrink-0"></i>
+                Missed Visit &mdash; patient and MA signatures are not required.
+            </div>
+
             <p class="form-section-title"><i class="bi bi-person-badge text-red-500"></i> Medical Assistant</p>
 
-            <div class="grid grid-cols-2 gap-4 max-w-xs">
-                <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Medical Assistant</label>
-                    <input type="text" name="ma_name" value="<?= h($_SESSION['full_name'] ?? '') ?>"
-                           class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
-                                  focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition focus:bg-white">
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Time Out</label>
-                    <input type="time" name="time_out"
-                           required data-label="Time Out"
-                           class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
-                                  focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition focus:bg-white">
-                </div>
+            <div class="max-w-xs">
+                <label class="block text-sm font-semibold text-slate-700 mb-1.5">Medical Assistant</label>
+                <input type="text" name="ma_name" value="<?= h($_SESSION['full_name'] ?? '') ?>"
+                       class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
+                              focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition focus:bg-white">
             </div>
+            <input type="hidden" name="time_out">
 
             <!-- Hidden F/U inputs — populated by End Visit modal -->
             <input type="hidden" name="fu_weeks" id="fuWeeksHidden" value="<?= pv($prev,'fu_weeks') ?>">
@@ -933,147 +965,6 @@ include __DIR__ . '/../includes/header.php';
         </div><!-- /px-6 -->
     </form>
 </div><!-- /card -->
-
-<!-- ── End Visit Confirmation Modal ─────────────────────────────────────── -->
-<div id="endVisitModal" class="hidden fixed inset-0 z-[300] flex items-end sm:items-center justify-center no-print">
-    <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="endVisitModalClose()"></div>
-    <div id="endVisitModalCard"
-         class="relative bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-sm shadow-2xl p-6 space-y-5
-                translate-y-full transition-transform duration-300"
-         style="padding-bottom:calc(4.5rem + env(safe-area-inset-bottom))">
-
-        <!-- Header -->
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center shrink-0">
-                <i class="bi bi-stop-circle-fill text-red-600 text-lg"></i>
-            </div>
-            <div>
-                <h3 class="font-bold text-slate-800 text-base">End Visit</h3>
-                <p class="text-xs text-slate-400">All data will be saved and the visit closed.</p>
-            </div>
-            <button type="button" onclick="endVisitModalClose()"
-                    class="ml-auto text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition-colors">
-                <i class="bi bi-x-lg text-base leading-none"></i>
-            </button>
-        </div>
-
-        <!-- Time Out (read-only display) -->
-        <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Time Out</label>
-            <div class="flex items-center gap-2 px-4 py-3 border border-slate-200 bg-slate-50 rounded-xl text-sm text-slate-700">
-                <i class="bi bi-clock text-slate-400"></i>
-                <span id="evTimeDisplay" class="font-semibold"></span>
-                <span class="text-slate-400 text-xs ml-auto">auto-stamped</span>
-            </div>
-        </div>
-
-        <!-- F/U In -->
-        <div>
-            <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Follow-Up In <span class="font-normal normal-case text-slate-400">(optional)</span></label>
-            <div class="flex gap-2">
-                <input type="number" id="evFuWeeks" min="1" placeholder="e.g. 2"
-                       class="flex-1 px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white
-                              focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition">
-                <select id="evFuUnit"
-                        class="px-3 py-3 border border-slate-200 rounded-xl text-sm bg-white
-                               focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition">
-                    <option value="weeks">Weeks</option>
-                    <option value="days">Days</option>
-                </select>
-            </div>
-        </div>
-
-        <!-- Actions -->
-        <div class="flex gap-3 pt-1">
-            <button type="button" id="evConfirmBtn" onclick="endVisitConfirm()"
-                    class="flex-1 py-3 bg-red-600 hover:bg-red-700 active:scale-95
-                           text-white font-bold text-sm rounded-xl shadow-sm transition-all">
-                <i class="bi bi-stop-circle-fill mr-1"></i> Confirm End Visit
-            </button>
-            <button type="button" onclick="endVisitModalClose()"
-                    class="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600
-                           font-semibold text-sm rounded-xl transition-colors">
-                Cancel
-            </button>
-        </div>
-    </div>
-</div>
-
-<script>
-(function () {
-    var _confirmed = false;
-
-    function padTwo(n) { return String(n).padStart(2, '0'); }
-
-    window.endVisitModalClose = function () {
-        var card = document.getElementById('endVisitModalCard');
-        card.style.transform = 'translateY(100%)';
-        setTimeout(function () {
-            document.getElementById('endVisitModal').classList.add('hidden');
-        }, 250);
-    };
-
-    function openEndVisitModal() {
-        var modal = document.getElementById('endVisitModal');
-        var card  = document.getElementById('endVisitModalCard');
-
-        // Stamp current time (overwrite time_out field too)
-        var now = new Date();
-        var hh  = padTwo(now.getHours());
-        var mm  = padTwo(now.getMinutes());
-        var timeStr = hh + ':' + mm;
-        var timeOut = document.querySelector('input[name="time_out"]');
-        if (timeOut) timeOut.value = timeStr;
-        var disp = document.getElementById('evTimeDisplay');
-        if (disp) disp.textContent = timeStr;
-
-        // Pre-fill F/U from hidden inputs (in case user already confirmed once then cancelled)
-        var fuW = document.getElementById('fuWeeksHidden');
-        var fuU = document.getElementById('fuUnitHidden');
-        var evW = document.getElementById('evFuWeeks');
-        var evU = document.getElementById('evFuUnit');
-        if (evW && fuW && fuW.value) evW.value = fuW.value;
-        if (evU && fuU) evU.value = fuU.value || 'weeks';
-
-        modal.classList.remove('hidden');
-        card.style.transform = 'translateY(100%)';
-        requestAnimationFrame(function () {
-            requestAnimationFrame(function () {
-                card.style.transform = 'translateY(0)';
-            });
-        });
-    }
-
-    window.endVisitConfirm = function () {
-        var btn = document.getElementById('evConfirmBtn');
-        // Copy F/U values to hidden form inputs
-        var fuW = document.getElementById('fuWeeksHidden');
-        var fuU = document.getElementById('fuUnitHidden');
-        var evW = document.getElementById('evFuWeeks');
-        var evU = document.getElementById('evFuUnit');
-        if (fuW && evW) fuW.value = evW.value;
-        if (fuU && evU) fuU.value = evU.value;
-
-        // Close modal
-        endVisitModalClose();
-
-        // Set flag and re-trigger submitBtn click (captureAndSubmit will run)
-        _confirmed = true;
-        btn.disabled = true;
-        setTimeout(function () {
-            var sb = document.getElementById('submitBtn');
-            if (sb) sb.click();
-        }, 280); // wait for modal close animation
-    };
-
-    // _pdValidateExtra is checked by app.js immediately before form.submit()
-    window._pdValidateExtra = function () {
-        if (_confirmed) return true; // already went through modal
-        openEndVisitModal();
-        return false; // block submission until confirmed
-    };
-})();
-</script>
 <?php
 // Pass pre-filled ICD codes to JS
 $prevIcdCodes = [];
@@ -1544,4 +1435,50 @@ function toggleAllergySeverity(inputId, selectId) {
 <?php include __DIR__ . '/../includes/drug_autocomplete.php'; ?>
 <?php include __DIR__ . '/../includes/rx_pad_panel.php'; ?>
 <?php $navLocked = true; ?>
+<script>
+/* ── Missed Visit Mode ──────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', function () {
+    var mvToggleBtn = document.getElementById('mvToggleBtn');
+    var mvCancelBtn = document.getElementById('mvCancelBtn');
+    var mvRegular   = document.getElementById('mvRegularState');
+    var mvActive    = document.getElementById('mvActiveState');
+    var mvReason    = document.getElementById('mvReasonText');
+    var mvVitals    = document.getElementById('mvVitalsBanner');
+    var mvSign      = document.getElementById('mvSignBanner');
+    var VITAL_NAMES = ['bp', 'pulse', 'o2sat'];
+
+    function enterMissedMode() {
+        window._pdMissedVisit = true;
+        if (mvRegular) mvRegular.classList.add('hidden');
+        if (mvActive)  mvActive.classList.remove('hidden');
+        if (mvVitals)  mvVitals.style.display = 'flex';
+        if (mvSign)    mvSign.style.display   = 'flex';
+        VITAL_NAMES.forEach(function (n) {
+            var el = document.querySelector('input[name="' + n + '"]');
+            if (el) el.removeAttribute('required');
+        });
+    }
+
+    function exitMissedMode() {
+        window._pdMissedVisit = false;
+        if (mvActive)  mvActive.classList.add('hidden');
+        if (mvRegular) mvRegular.classList.remove('hidden');
+        if (mvReason)  mvReason.value = '';
+        if (mvVitals)  mvVitals.style.display = 'none';
+        if (mvSign)    mvSign.style.display   = 'none';
+        VITAL_NAMES.forEach(function (n) {
+            var el = document.querySelector('input[name="' + n + '"]');
+            if (el) el.setAttribute('required', '');
+        });
+    }
+
+    if (mvToggleBtn) mvToggleBtn.addEventListener('click', enterMissedMode);
+    if (mvCancelBtn) mvCancelBtn.addEventListener('click', exitMissedMode);
+
+    // Auto-enter missed mode if the form was pre-filled with a reason (PHP draft or localStorage restore)
+    if (mvReason && mvReason.value.trim()) {
+        enterMissedMode();
+    }
+});
+</script>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

@@ -42,8 +42,8 @@ $_pvStmt = $pdo->query("
 ");
 $providerList = $_pvStmt->fetchAll(PDO::FETCH_COLUMN);
 
-// Today's schedule for current user (MAs filter by provider when set, else own visits)
-if (!isAdmin() && $providerFilter !== '') {
+// Today's schedule for current user (admins/MAs filter by provider when set, else own visits)
+if ($providerFilter !== '') {
     $myScheduleStmt = $pdo->prepare("
         SELECT sc.*,
                CONCAT(p.first_name,' ',p.last_name) AS patient_name,
@@ -56,6 +56,20 @@ if (!isAdmin() && $providerFilter !== '') {
         LIMIT 6
     ");
     $myScheduleStmt->execute([$today, $providerFilter]);
+} elseif (isAdmin()) {
+    // Admin with no filter: show all of today's visits across all MAs
+    $myScheduleStmt = $pdo->prepare("
+        SELECT sc.*,
+               CONCAT(p.first_name,' ',p.last_name) AS patient_name,
+               p.address AS patient_address,
+               p.id AS patient_id
+        FROM `schedule` sc
+        JOIN patients p ON p.id = sc.patient_id
+        WHERE sc.visit_date = ?
+        ORDER BY sc.visit_order ASC, sc.visit_time ASC
+        LIMIT 6
+    ");
+    $myScheduleStmt->execute([$today]);
 } else {
     $myScheduleStmt = $pdo->prepare("
         SELECT sc.*,
@@ -72,9 +86,12 @@ if (!isAdmin() && $providerFilter !== '') {
 }
 $mySchedule = $myScheduleStmt->fetchAll();
 
-if (!isAdmin() && $providerFilter !== '') {
+if ($providerFilter !== '') {
     $scCountStmt = $pdo->prepare("SELECT COUNT(*) FROM `schedule` WHERE visit_date=? AND provider_name=?");
     $scCountStmt->execute([$today, $providerFilter]);
+} elseif (isAdmin()) {
+    $scCountStmt = $pdo->prepare("SELECT COUNT(*) FROM `schedule` WHERE visit_date=?");
+    $scCountStmt->execute([$today]);
 } else {
     $scCountStmt = $pdo->prepare("SELECT COUNT(*) FROM `schedule` WHERE visit_date=? AND ma_id=?");
     $scCountStmt->execute([$today, $_SESSION['user_id']]);
@@ -341,9 +358,16 @@ include __DIR__ . '/includes/header.php';
 
     <!-- Provider filter (MA only) -->
     <?php if (!isAdmin() && !empty($providerList)):
-        $pvParts    = $providerFilter !== '' ? explode(' ', $providerFilter) : [];
-        $pvInitials = $providerFilter !== '' ? strtoupper(substr($pvParts[0],0,1).(isset($pvParts[1])?substr($pvParts[1],0,1):'')) : '';
         $pvCount    = count($providerList);
+        if ($providerFilter !== '') {
+            $pvCleanF   = preg_replace('/[\s,]+(?:MD|DO|APRN|NP|PA-?C?|RN|DNP|LCSW|PhD|DDS|OD|PharmD)\s*$/i', '', $providerFilter);
+            $pvWordsF   = array_values(array_filter(explode(' ', $pvCleanF)));
+            $pvInitials = count($pvWordsF) >= 2
+                ? strtoupper(substr($pvWordsF[0],0,1) . substr($pvWordsF[count($pvWordsF)-1],0,1))
+                : strtoupper(substr($pvCleanF,0,2));
+        } else {
+            $pvInitials = '';
+        }
     ?>
     <div class="px-4 pt-2 pb-3 border-b border-slate-100" id="pvFilterWrap">
 
@@ -444,9 +468,16 @@ include __DIR__ . '/includes/header.php';
 
                 <?php foreach ($providerList as $pv):
                     $isSel  = ($providerFilter === $pv);
-                    $p2     = explode(' ', $pv);
-                    $ini2   = strtoupper(substr($p2[0],0,1).(isset($p2[1])?substr($p2[1],0,1):''));
-                    // Pick a consistent color per initials
+                    // Extract credential suffix (MD, APRN, etc.) for the subtitle
+                    preg_match('/\b(MD|DO|APRN|NP|PA-?C?|RN|DNP|LCSW|PhD|DDS|OD|PharmD)\b/i', $pv, $_cm);
+                    $pvCred = $_cm[0] ?? '';
+                    // Strip credential + trailing comma/space before computing initials
+                    $pvClean  = preg_replace('/[\s,]+(?:MD|DO|APRN|NP|PA-?C?|RN|DNP|LCSW|PhD|DDS|OD|PharmD)\s*$/i', '', $pv);
+                    $pvWords  = array_values(array_filter(explode(' ', $pvClean)));
+                    $ini2     = count($pvWords) >= 2
+                        ? strtoupper(substr($pvWords[0],0,1) . substr($pvWords[count($pvWords)-1],0,1))
+                        : strtoupper(substr($pvClean,0,2));
+                    // Pick a consistent color per name
                     $hues   = ['bg-violet-100 text-violet-700','bg-pink-100 text-pink-700','bg-sky-100 text-sky-700','bg-teal-100 text-teal-700','bg-amber-100 text-amber-700','bg-rose-100 text-rose-700'];
                     $hue    = $isSel ? '' : $hues[abs(crc32($pv)) % count($hues)];
                 ?>
@@ -460,7 +491,7 @@ include __DIR__ . '/includes/header.php';
                     </span>
                     <div class="flex-1 min-w-0">
                         <div class="font-semibold text-sm <?= $isSel ? 'text-indigo-700' : 'text-slate-800' ?> truncate"><?= h($pv) ?></div>
-                        <div class="text-xs text-slate-400 mt-0.5">Provider</div>
+                        <div class="text-xs text-slate-400 mt-0.5"><?= $pvCred ? h($pvCred) : 'Provider' ?></div>
                     </div>
                     <?php if ($isSel): ?>
                     <span class="shrink-0 w-6 h-6 bg-indigo-600 rounded-full grid place-items-center">
@@ -549,6 +580,9 @@ include __DIR__ . '/includes/header.php';
         document.addEventListener('keydown', function (e) {
             if (e.key === 'Escape' && _open) closePvDropdown();
         });
+        window.addEventListener('scroll', function () {
+            if (_open) closePvDropdown();
+        }, { passive: true });
     }());
     </script>
     <?php endif; ?>
@@ -624,6 +658,27 @@ include __DIR__ . '/includes/header.php';
                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold <?= $sc['bg'] ?> <?= $sc['text'] ?>">
                         <span class="w-1.5 h-1.5 rounded-full <?= $sc['dot'] ?>"></span>
                         <?= ucfirst(str_replace('_',' ',$sv['status'])) ?>
+                    </span>
+                    <?php
+                    $vtRaw = $sv['visit_type'] ?? 'routine';
+                    $vtMap = [
+                        'new_patient'       => ['New Patient',       'bg-teal-100 text-teal-700'],
+                        'routine'           => ['Follow Up',         'bg-violet-100 text-violet-700'],
+                        'follow_up'         => ['Follow Up',         'bg-violet-100 text-violet-700'],
+                        'wound_care'        => ['Wound Care',        'bg-orange-100 text-orange-700'],
+                        'awv'               => ['Medicare AWV',      'bg-sky-100 text-sky-700'],
+                        'medicare_awv'      => ['Medicare AWV',      'bg-sky-100 text-sky-700'],
+                        'ccm'               => ['CCM',               'bg-indigo-100 text-indigo-700'],
+                        'il'                => ['IL Disclosure',     'bg-rose-100 text-rose-700'],
+                        'il_disclosure'     => ['IL Disclosure',     'bg-rose-100 text-rose-700'],
+                        'cognitive_wellness'=> ['Cognitive Wellness','bg-amber-100 text-amber-700'],
+                    ];
+                    $vtKey   = strtolower(trim($vtRaw));
+                    if (strpos($vtKey, 'new') !== false) $vtKey = 'new_patient';
+                    [$vtLabel, $vtCls] = $vtMap[$vtKey] ?? [ucwords(str_replace('_',' ',$vtRaw)), 'bg-slate-100 text-slate-600'];
+                    ?>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold <?= $vtCls ?>">
+                        <?= h($vtLabel) ?>
                     </span>
                 </div>
                 <?php if ($sv['patient_address']): ?>
@@ -1808,32 +1863,128 @@ async function dashStartVisit(visitId, patientId, visitType, visitSubtype, btn) 
     });
 }
 
+/* ── Reset Visit password modal ───────────────────────────────── */
+var _resetVisitId = null;
+var _resetVisitBtn = null;
+
 function dashResetVisit(visitId, btn) {
-    if (!confirm('Reset this visit to Pending and clear the start time?')) return;
-    btn.disabled = true;
-    btn.innerHTML = '<i class="bi bi-hourglass-split animate-spin"></i>';
+    _resetVisitId  = visitId;
+    _resetVisitBtn = btn;
+    document.getElementById('resetVisitPassword').value = '';
+    var errEl = document.getElementById('resetVisitError');
+    errEl.textContent = '';
+    errEl.classList.add('hidden');
+    var confirmBtn = document.getElementById('resetVisitConfirmBtn');
+    confirmBtn.disabled = false;
+    confirmBtn.innerHTML = 'Confirm Reset';
+    document.getElementById('resetVisitModal').classList.remove('hidden');
+    setTimeout(function () { document.getElementById('resetVisitPassword').focus(); }, 60);
+}
+
+function resetVisitModalClose() {
+    document.getElementById('resetVisitModal').classList.add('hidden');
+    _resetVisitId  = null;
+    _resetVisitBtn = null;
+}
+
+function resetVisitModalConfirm() {
+    var password = document.getElementById('resetVisitPassword').value;
+    var errEl    = document.getElementById('resetVisitError');
+    if (!password) {
+        errEl.textContent = 'Password is required.';
+        errEl.classList.remove('hidden');
+        return;
+    }
+    var confirmBtn = document.getElementById('resetVisitConfirmBtn');
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Verifying…';
     fetch(window._pdBase + '/api/schedule_update.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ csrf: window._pdCsrf, id: visitId, action: 'reset_visit' })
+        body: JSON.stringify({ csrf: window._pdCsrf, id: _resetVisitId, action: 'reset_visit', admin_password: password })
     })
     .then(r => r.json())
     .then(data => {
         if (data.ok) {
+            document.getElementById('resetVisitModal').classList.add('hidden');
             location.reload();
         } else {
-            btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i> Reset';
+            errEl.textContent = data.error || 'Action failed.';
+            errEl.classList.remove('hidden');
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = 'Confirm Reset';
         }
     })
     .catch(() => {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-arrow-counterclockwise"></i> Reset';
+        errEl.textContent = 'Network error. Please try again.';
+        errEl.classList.remove('hidden');
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = 'Confirm Reset';
     });
 }
 
+/* ── Undo End password modal ─────────────────────────────────── */
+var _undoEndVisitId = null;
+var _undoEndBtn     = null;
+
 function dashUndoEndVisit(visitId, btn) {
-    if (!confirm('Undo the End Visit and set this visit back to In Progress?')) return;
+    _undoEndVisitId = visitId;
+    _undoEndBtn     = btn;
+    document.getElementById('undoEndPassword').value = '';
+    var errEl = document.getElementById('undoEndError');
+    errEl.textContent = '';
+    errEl.classList.add('hidden');
+    var confirmBtn = document.getElementById('undoEndConfirmBtn');
+    confirmBtn.disabled = false;
+    confirmBtn.innerHTML = 'Confirm Undo';
+    document.getElementById('undoEndModal').classList.remove('hidden');
+    setTimeout(function () { document.getElementById('undoEndPassword').focus(); }, 60);
+}
+
+function undoEndModalClose() {
+    document.getElementById('undoEndModal').classList.add('hidden');
+    _undoEndVisitId = null;
+    _undoEndBtn     = null;
+}
+
+function undoEndModalConfirm() {
+    var password = document.getElementById('undoEndPassword').value;
+    var errEl    = document.getElementById('undoEndError');
+    if (!password) {
+        errEl.textContent = 'Password is required.';
+        errEl.classList.remove('hidden');
+        return;
+    }
+    var confirmBtn  = document.getElementById('undoEndConfirmBtn');
+    confirmBtn.disabled = true;
+    confirmBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Verifying…';
+    fetch(window._pdBase + '/api/schedule_update.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csrf: window._pdCsrf, id: _undoEndVisitId, action: 'undo_end', admin_password: password })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.ok) {
+            document.getElementById('undoEndModal').classList.add('hidden');
+            location.reload();
+        } else {
+            errEl.textContent = data.error || 'Action failed.';
+            errEl.classList.remove('hidden');
+            confirmBtn.disabled = false;
+            confirmBtn.innerHTML = 'Confirm Undo';
+        }
+    })
+    .catch(() => {
+        errEl.textContent = 'Network error. Please try again.';
+        errEl.classList.remove('hidden');
+        confirmBtn.disabled = false;
+        confirmBtn.innerHTML = 'Confirm Undo';
+    });
+}
+
+/* legacy path kept for non-admin callers — unused on admin dashboard */
+function _dashUndoEndVisitDirect(visitId, btn) {
     btn.disabled = true;
     btn.innerHTML = '<i class="bi bi-hourglass-split animate-spin"></i>';
     fetch(window._pdBase + '/api/schedule_update.php', {
@@ -1856,5 +2007,74 @@ function dashUndoEndVisit(visitId, btn) {
     });
 }
 </script>
+
+<!-- ── Reset Visit Confirmation Modal ─────────────────────────────────── -->
+<div id="resetVisitModal" class="hidden fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4" onclick="if(event.target===this)resetVisitModalClose()">
+  <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-sm p-6">
+    <div class="flex items-center gap-3 mb-4">
+      <div class="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center flex-shrink-0">
+        <i class="bi bi-shield-lock-fill text-orange-500 dark:text-orange-400 text-lg"></i>
+      </div>
+      <div>
+        <h3 class="font-bold text-slate-800 dark:text-white text-sm">Reset Visit</h3>
+        <p class="text-xs text-slate-500 dark:text-slate-400">This will set the visit back to Pending and clear the start time.</p>
+      </div>
+    </div>
+    <p class="text-xs text-slate-600 dark:text-slate-300 mb-4">Enter your admin password to authorize this action.</p>
+    <div class="mb-4">
+      <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Password</label>
+      <input type="password" id="resetVisitPassword" autocomplete="current-password"
+             onkeydown="if(event.key==='Enter')resetVisitModalConfirm()"
+             class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+             placeholder="Enter your password">
+      <p id="resetVisitError" class="hidden text-xs text-red-500 mt-1.5"></p>
+    </div>
+    <div class="flex gap-2 justify-end">
+      <button onclick="resetVisitModalClose()"
+              class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 active:scale-95 transition-all">
+        Cancel
+      </button>
+      <button id="resetVisitConfirmBtn" onclick="resetVisitModalConfirm()"
+              class="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-orange-500 hover:bg-orange-600 active:scale-95 transition-all">
+        Confirm Reset
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Undo End Confirmation Modal ──────────────────────────────────── -->
+<div id="undoEndModal" class="hidden fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4" onclick="if(event.target===this)undoEndModalClose()">
+  <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-sm p-6">
+    <div class="flex items-center gap-3 mb-4">
+      <div class="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center flex-shrink-0">
+        <i class="bi bi-shield-lock-fill text-amber-600 dark:text-amber-400 text-lg"></i>
+      </div>
+      <div>
+        <h3 class="font-bold text-slate-800 dark:text-white text-sm">Undo End Visit</h3>
+        <p class="text-xs text-slate-500 dark:text-slate-400">This will revert the visit back to In Progress.</p>
+      </div>
+    </div>
+    <p class="text-xs text-slate-600 dark:text-slate-300 mb-4">Enter your admin password to authorize this action.</p>
+    <div class="mb-4">
+      <label class="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-1">Password</label>
+      <input type="password" id="undoEndPassword" autocomplete="current-password"
+             onkeydown="if(event.key==='Enter')undoEndModalConfirm()"
+             class="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-800 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+             placeholder="Enter your password">
+      <p id="undoEndError" class="hidden text-xs text-red-500 mt-1.5"></p>
+    </div>
+    <div class="flex gap-2 justify-end">
+      <button onclick="undoEndModalClose()"
+              class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 active:scale-95 transition-all">
+        Cancel
+      </button>
+      <button id="undoEndConfirmBtn" onclick="undoEndModalConfirm()"
+              class="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-amber-500 hover:bg-amber-600 active:scale-95 transition-all">
+        Confirm Undo
+      </button>
+    </div>
+  </div>
+</div>
+
 <?php include __DIR__ . '/includes/map_panel.php'; ?>
 <?php include __DIR__ . '/includes/footer.php'; ?>

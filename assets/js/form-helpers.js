@@ -420,9 +420,9 @@
                         '<button type="button" class="hw-undo ml-1 px-3 py-1.5 text-xs bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-all">' +
                           '<i class="bi bi-arrow-counterclockwise"></i> Undo</button>' +
                       '</div>' +
-                      '<div class="hw-canvas-wrap relative" style="touch-action:none;">' +
+                      '<div class="hw-canvas-wrap relative" style="touch-action:none;background:#ffffff;">' +
                         '<canvas class="hw-canvas block" style="width:100%;height:220px;cursor:crosshair;touch-action:none;display:block;"></canvas>' +
-                        '<div class="hw-placeholder absolute inset-0 flex items-center justify-center text-slate-300 pointer-events-none select-none italic text-sm text-center px-6">' +
+                        '<div class="hw-placeholder absolute inset-0 flex items-center justify-center text-slate-400 pointer-events-none select-none italic text-sm text-center px-6">' +
                           'Write medication names, doses &amp; frequencies with your stylus or finger&hellip;</div>' +
                       '</div>' +
                       '<div class="flex flex-wrap items-center gap-3 px-4 py-3 bg-slate-50 border-t border-slate-200">' +

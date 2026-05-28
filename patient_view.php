@@ -2224,7 +2224,8 @@ function updateBatch() {
         allBar.classList.remove('hidden');
     }
 }
-document.getElementById('chkAll').addEventListener('change', function () {
+var chkAllEl = document.getElementById('chkAll');
+if (chkAllEl) chkAllEl.addEventListener('change', function () {
     var isChecked = this.checked;
     document.querySelectorAll('.form-row').forEach(function (tr) {
         if (tr.style.display !== 'none') {
@@ -2635,6 +2636,8 @@ $photosJson = json_encode(array_map(fn($p) => [
     const toggleBtn   = document.getElementById('compareToggleBtn');
     const clearBtn    = document.getElementById('clearCompareBtn');
     const panel       = document.getElementById('comparePanel');
+
+    if (!toggleBtn) return;
 
     // Toggle compare mode
     toggleBtn.addEventListener('click', () => {

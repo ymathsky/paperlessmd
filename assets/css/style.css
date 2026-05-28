@@ -6,7 +6,8 @@
 /* ---- Print ---- */
 @media print {
     .no-print, nav, footer { display: none !important; }
-    body { background: white !important; }
+    html, body, html.dark body { background: white !important; background-color: white !important; color: #000 !important; color-scheme: light !important; }
+    *, *::before, *::after { animation: none !important; transition: none !important; opacity: 1 !important; transform: none !important; }
     .print-doc { box-shadow: none !important; border: 1px solid #ddd !important; }
     a { text-decoration: none !important; color: #000 !important; }
     .badge-print { border: 1px solid #999 !important; }
@@ -1287,6 +1288,8 @@ html.dark #printDoc .bwc-section-hdr { background: #333 !important; color: #fff 
 html.dark #printDoc input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]),
 html.dark #printDoc textarea,
 html.dark #printDoc select { background-color: #fff !important; color: #000 !important; border-color: #cbd5e1 !important; }
+
+
 
 /* ── Colored text inside dark-mode-overridden containers ─────────────
    Only targets elements WITHOUT their own bg-* class (badges/pills are

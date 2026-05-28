@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const canvas  = document.getElementById('signaturePad');
     const sigData = document.getElementById('sigData');
     let sigPad    = null;
+    let _pdSigKey = null;
 
     if (canvas && typeof SignaturePad !== 'undefined') {
         const wrapper = canvas.closest('.sig-wrapper') || canvas.parentElement;
@@ -17,6 +18,21 @@ document.addEventListener('DOMContentLoaded', function () {
             maxWidth:        3.5,
         });
         canvas.style.touchAction = 'none';
+
+        // Compute session-storage key so signature survives accidental reloads
+        _pdSigKey = (function () {
+            var mf = document.getElementById('mainForm');
+            if (!mf) return null;
+            var ft  = (mf.querySelector('[name="form_type"]')  || {}).value || '';
+            var pid = (mf.querySelector('[name="patient_id"]') || {}).value || '';
+            return (ft && pid) ? 'pd_sig_' + ft + '_' + pid : null;
+        }());
+
+        // On each stroke end: keep hidden input + sessionStorage current
+        sigPad.addEventListener('endStroke', function () {
+            if (sigData) sigData.value = sigPad.toDataURL('image/png');
+            if (_pdSigKey) { try { sessionStorage.setItem(_pdSigKey, sigPad.toDataURL('image/png')); } catch(e) {} }
+        });
 
         function resizeCanvas(restoreSig) {
             const ratio = Math.max(window.devicePixelRatio || 1, 1);
@@ -46,6 +62,15 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (pPadArea && !pPadArea.classList.contains('hidden')) {
                         sigPad.fromDataURL(window._patientSavedSignature);
                     }
+                } else if (_pdSigKey) {
+                    // Restore from sessionStorage (survives accidental page reload)
+                    try {
+                        var _stored = sessionStorage.getItem(_pdSigKey);
+                        if (_stored) {
+                            if (sigData) sigData.value = _stored;
+                            sigPad.fromDataURL(_stored);
+                        }
+                    } catch(e) {}
                 }
             }
         })(0);
@@ -56,7 +81,11 @@ document.addEventListener('DOMContentLoaded', function () {
         if (clearBtn) {
             clearBtn.addEventListener('click', () => {
                 if (sigPad.isEmpty()) return;
-                if (confirm('Clear the patient signature? This cannot be undone.')) sigPad.clear();
+                if (confirm('Clear the patient signature? This cannot be undone.')) {
+                    sigPad.clear();
+                    if (sigData) sigData.value = '';
+                    if (_pdSigKey) { try { sessionStorage.removeItem(_pdSigKey); } catch(e) {} }
+                }
             });
         }
 
@@ -286,14 +315,14 @@ document.addEventListener('DOMContentLoaded', function () {
         // Validate patient signature
         let valid = true;
 
-        if ((!sigPad || !maSigPad) && !isEditOverride) {
+        if ((!sigPad || !maSigPad) && !isEditOverride && !window._pdMissedVisit) {
             alert('Signature pad failed to load. Please refresh the page and try again.');
             return;
         }
 
         if (sigPad) {
             if (!usingSavedPatientSig && sigPad.isEmpty()) {
-                if (!isEditOverride) {
+                if (!isEditOverride && !window._pdMissedVisit) {
                     if (sigAlert) { sigAlert.classList.remove('hidden'); sigAlert.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
                     valid = false;
                 } else if (sigAlert) {
@@ -309,7 +338,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (maSigPad) {
             // If using saved signature the hidden input is already populated; pad may be hidden
             if (!usingSavedMaSig && maSigPad.isEmpty()) {
-                if (!isEditOverride) {
+                if (!isEditOverride && !window._pdMissedVisit) {
                     if (maSigAlert) { maSigAlert.classList.remove('hidden'); if (valid) maSigAlert.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
                     valid = false;
                 } else if (maSigAlert) {
@@ -331,6 +360,9 @@ document.addEventListener('DOMContentLoaded', function () {
             submitBtn.innerHTML = '<i class="bi bi-arrow-repeat text-xl" style="display:inline-block;animation:spin 1s linear infinite"></i> Saving…';
         }
 
+        // Clear session cache — form is being submitted
+        if (_pdSigKey) { try { sessionStorage.removeItem(_pdSigKey); } catch(e) {} }
+        window._pdSubmitting = true;
         mainForm.submit();
     }
 

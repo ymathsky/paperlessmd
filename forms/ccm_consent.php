@@ -59,6 +59,7 @@ include __DIR__ . '/../includes/header.php';
         <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
         <input type="hidden" name="patient_id" value="<?= $patient_id ?>">
         <input type="hidden" name="form_type"  value="ccm_consent">
+        <input type="hidden" name="visit_id"    value="<?= $visit_id ?>">
         <input type="hidden" id="wiz-form-key" value="ccm_consent_<?= $patient_id ?>">
 
         <div class="px-6 pb-2">

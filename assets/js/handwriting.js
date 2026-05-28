@@ -54,8 +54,13 @@ function initHwPad(wrap) {
             canvasEl.style.height = '220px';
             canvasEl.getContext('2d').scale(ratio, ratio);
 
+            var ctx = canvasEl.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvasEl.width, canvasEl.height);
+
             pad = new SignaturePad(canvasEl, {
                 penColor: 'rgb(15,23,42)',
+                backgroundColor: 'rgb(255,255,255)',
                 minWidth: 0.8,
                 maxWidth: 1.5
             });

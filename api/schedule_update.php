@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/audit.php';
 requireNotBillingApi();
 
 header('Content-Type: application/json');
@@ -170,12 +171,36 @@ if ($action === 'undo_end') {
         echo json_encode(['ok' => false, 'error' => 'Invalid parameters']);
         exit;
     }
+    // Admin accounts must supply their password to authorize the undo
+    if (isAdmin()) {
+        $adminPassword = (string)($body['admin_password'] ?? '');
+        if ($adminPassword === '') {
+            echo json_encode(['ok' => false, 'error' => 'Password is required.']);
+            exit;
+        }
+        $pwStmt = $pdo->prepare('SELECT password_hash FROM staff WHERE id = ? LIMIT 1');
+        $pwStmt->execute([(int)$_SESSION['user_id']]);
+        $storedHash = $pwStmt->fetchColumn();
+        if (!$storedHash || !password_verify($adminPassword, $storedHash)) {
+            echo json_encode(['ok' => false, 'error' => 'Incorrect password.']);
+            exit;
+        }
+    }
     $stmt = $pdo->prepare("UPDATE `schedule` SET status='en_route', visit_ended_at=NULL WHERE id=?");
     $stmt->execute([$id]);
     if ($stmt->rowCount() === 0) {
         echo json_encode(['ok' => false, 'error' => 'Entry not found or not authorized']);
         exit;
     }
+    // Fetch patient info for audit label
+    $auditRow = $pdo->prepare("SELECT CONCAT(p.first_name,' ',p.last_name) AS patient_name, sc.patient_id, sc.visit_date FROM `schedule` sc JOIN patients p ON p.id = sc.patient_id WHERE sc.id = ? LIMIT 1");
+    $auditRow->execute([$id]);
+    $auditData = $auditRow->fetch(PDO::FETCH_ASSOC);
+    auditLog($pdo, 'visit_undo_end', 'patient',
+        $auditData ? (int)$auditData['patient_id'] : null,
+        $auditData ? $auditData['patient_name']    : null,
+        'schedule_id=' . $id . ($auditData ? '; visit_date=' . $auditData['visit_date'] : '')
+    );
     echo json_encode(['ok' => true]);
     exit;
 }
@@ -186,12 +211,36 @@ if ($action === 'reset_visit') {
         echo json_encode(['ok' => false, 'error' => 'Invalid parameters']);
         exit;
     }
+    // Admin accounts must supply their password to authorize the reset
+    if (isAdmin()) {
+        $adminPassword = (string)($body['admin_password'] ?? '');
+        if ($adminPassword === '') {
+            echo json_encode(['ok' => false, 'error' => 'Password is required.']);
+            exit;
+        }
+        $pwStmt = $pdo->prepare('SELECT password_hash FROM staff WHERE id = ? LIMIT 1');
+        $pwStmt->execute([(int)$_SESSION['user_id']]);
+        $storedHash = $pwStmt->fetchColumn();
+        if (!$storedHash || !password_verify($adminPassword, $storedHash)) {
+            echo json_encode(['ok' => false, 'error' => 'Incorrect password.']);
+            exit;
+        }
+    }
     $stmt = $pdo->prepare("UPDATE `schedule` SET status='pending', visit_started_at=NULL WHERE id=?");
     $stmt->execute([$id]);
     if ($stmt->rowCount() === 0) {
         echo json_encode(['ok' => false, 'error' => 'Entry not found or not authorized']);
         exit;
     }
+    // Fetch patient info for audit label
+    $auditRow = $pdo->prepare("SELECT CONCAT(p.first_name,' ',p.last_name) AS patient_name, sc.patient_id, sc.visit_date FROM `schedule` sc JOIN patients p ON p.id = sc.patient_id WHERE sc.id = ? LIMIT 1");
+    $auditRow->execute([$id]);
+    $auditData = $auditRow->fetch(PDO::FETCH_ASSOC);
+    auditLog($pdo, 'visit_reset', 'patient',
+        $auditData ? (int)$auditData['patient_id'] : null,
+        $auditData ? $auditData['patient_name']    : null,
+        'schedule_id=' . $id . ($auditData ? '; visit_date=' . $auditData['visit_date'] : '')
+    );
     echo json_encode(['ok' => true]);
     exit;
 }
@@ -255,6 +304,26 @@ if ($action === 'edit') {
         $fields[] = 'provider_name = ?';
         $params[] = trim($body['provider_name']) ?: null;
     }
+    if (isset($body['company'])) {
+        $allowed_companies = ['Beyond Wound Care Inc.', 'Visiting Medical Physician Inc.'];
+        $co = $body['company'];
+        if (!in_array($co, $allowed_companies, true)) {
+            echo json_encode(['ok' => false, 'error' => 'Invalid company']);
+            exit;
+        }
+        $fields[] = 'company = ?';
+        $params[] = $co;
+    }
+    if (isset($body['visit_subtype'])) {
+        $allowed_subtypes = ['wound_care', 'primary_care', ''];
+        $vs = $body['visit_subtype'];
+        if (!in_array($vs, $allowed_subtypes, true)) {
+            echo json_encode(['ok' => false, 'error' => 'Invalid visit subtype']);
+            exit;
+        }
+        $fields[] = 'visit_subtype = ?';
+        $params[] = $vs !== '' ? $vs : null;
+    }
     if (isset($body['visit_order'])) {
         $fields[] = 'visit_order = ?';
         $params[] = max(1, (int)$body['visit_order']);
@@ -290,6 +359,39 @@ if ($action === 'edit') {
     $stmt->execute($params);
 
     echo json_encode(['ok' => true]);
+    exit;
+}
+
+if ($action === 'get') {
+    $id = (int)($body['id'] ?? 0);
+    if (!$id) {
+        echo json_encode(['ok' => false, 'error' => 'Invalid parameters']);
+        exit;
+    }
+
+    $stmt = $pdo->prepare(
+        "SELECT sc.*, CONCAT(p.first_name, ' ', p.last_name) AS patient_name
+         FROM `schedule` sc
+         JOIN patients p ON p.id = sc.patient_id
+         WHERE sc.id = ? LIMIT 1"
+    );
+    $stmt->execute([$id]);
+    $visit = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$visit) {
+        echo json_encode(['ok' => false, 'error' => 'Visit not found']);
+        exit;
+    }
+
+    // MAs may only view their own visits
+    $role = $_SESSION['role'] ?? '';
+    $uid  = (int)($_SESSION['user_id'] ?? 0);
+    if ($role === 'ma' && (int)$visit['ma_id'] !== $uid) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Not authorized']);
+        exit;
+    }
+
+    echo json_encode(['ok' => true, 'visit' => $visit]);
     exit;
 }
 

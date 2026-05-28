@@ -766,6 +766,21 @@ window._pdCsrf = '<?= htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8') ?>';
 
     tickId = setInterval(tick, 1000);
     scheduleAlarm(); // start idle countdown
+
+    // ── Background presence heartbeat ──────────────────────────────
+    // Silently pings session_ping every 3 min so last_active_at stays
+    // current in the DB (used by the MA Location Monitor online indicator).
+    (function () {
+        var PING_INTERVAL = 3 * 60 * 1000; // 3 minutes
+        function silentPing() {
+            fetch((window._pdBase || '') + '/api/session_ping.php', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ csrf: csrf }),
+            }).catch(function () { /* ignore network errors */ });
+        }
+        setInterval(silentPing, PING_INTERVAL);
+    }());
 }());
 </script>
 <script>

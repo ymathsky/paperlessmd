@@ -179,7 +179,7 @@ try {
 } catch (PDOException $e) { /* ignore */ }
 
 // Provider staff accounts for the edit modal dropdown
-$providerStaff = $pdo->query("SELECT id, full_name FROM staff WHERE active=1 AND role='admin' ORDER BY full_name")->fetchAll();
+$providerStaff = $pdo->query("SELECT id, full_name FROM staff WHERE active=1 AND role IN ('provider','admin') AND username != 'admin' ORDER BY full_name")->fetchAll();
 
 include __DIR__ . '/includes/header.php';
 ?>
@@ -385,10 +385,13 @@ $renderVisitCard = function(array $v, int $idx, bool $showMaName) use ($statusDe
     ];
     $grad    = $statusGrad[$v['status']];
     $vtIcon  = $vtIcons[$vt] ?? 'bi-calendar2-check';
+    $_subtypeLabels = ['wound_care'=>'Wound Care','primary_care'=>'Primary Care'];
+    $subtypeLabel = ($vt === 'new_patient' && !empty($v['visit_subtype'])) ? ($_subtypeLabels[$v['visit_subtype']] ?? null) : null;
     ?>
 
     <div class="rounded-2xl mb-4 overflow-hidden flex flex-col print-visit-card"
          id="visit-<?= $v['id'] ?>"
+         data-status="<?= $v['status'] ?>"
          style="box-shadow:0 8px 32px rgba(0,0,0,0.18),0 2px 8px rgba(0,0,0,0.10);">
 
         <!-- ── HEADER: colored gradient ── -->
@@ -408,16 +411,8 @@ $renderVisitCard = function(array $v, int $idx, bool $showMaName) use ($statusDe
                         <i class="bi bi-clock" style="font-size:11px;"></i><?= date('g:i A', strtotime($v['visit_time'])) ?>
                     </span>
                     <?php endif; ?>
-                    <?php if ($v['patient_address']): ?>
-                    <button onclick="openMapPanel(<?= htmlspecialchars(json_encode($v['patient_address']), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($v['patient_name']), ENT_QUOTES) ?>, <?= htmlspecialchars(json_encode($mapsUrl), ENT_QUOTES) ?>); if(window._pdSendLocation)window._pdSendLocation();"
-                            style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;
-                                   border-radius:10px;background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.3);
-                                   color:#fff;cursor:pointer;transition:background 0.15s;" title="Navigate"
-                            class="no-print">
-                        <i class="bi bi-map-fill" style="font-size:13px;"></i>
-                    </button>
-                    <?php endif; ?>
-                    <button onclick="openEditModal(<?= htmlspecialchars(json_encode(['id'=>$v['id'],'visit_time'=>$v['visit_time'],'visit_type'=>$v['visit_type'] ?? 'routine','notes'=>$v['notes'] ?? '','provider_name'=>$v['provider_name'] ?? '','visit_order'=>$v['visit_order'],'visit_date'=>$v['visit_date'],'ma_id'=>$v['ma_id'],'patient_name'=>$v['patient_name']]), ENT_QUOTES) ?>)"
+
+                    <button onclick="openEditModal(<?= (int)$v['id'] ?>, <?= htmlspecialchars(json_encode($v['patient_name'] ?? ''), ENT_QUOTES) ?>)"
                             style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;
                                    border-radius:10px;background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.3);
                                    color:#fff;cursor:pointer;transition:background 0.15s;" title="Edit visit"
@@ -455,7 +450,15 @@ $renderVisitCard = function(array $v, int $idx, bool $showMaName) use ($statusDe
                     <i class="bi <?= $vtIcon ?>" style="font-size:12px;"></i>
                     <?= h($_vtl[$vt] ?? 'Follow-Up') ?>
                 </span>
-                <span style="background:rgba(255,255,255,0.08);color:#cbd5e1;border:1px solid rgba(255,255,255,0.12);
+                <?php if ($subtypeLabel): ?>
+                <span style="background:rgba(16,185,129,0.18);color:#6ee7b7;border:1px solid rgba(16,185,129,0.35);
+                             display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:20px;
+                             font-size:12px;font-weight:700;">
+                    <i class="bi bi-tag-fill" style="font-size:11px;"></i>
+                    <?= h($subtypeLabel) ?>
+                </span>
+                <?php endif; ?>
+                <span style="background:rgba(255,255,255,0.08);color:#cbd5e1;border:1px solid rgba(255,255,255,0.12);"
                              display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;
                              font-size:12px;font-weight:700;">
                     <i class="bi <?= $sd['icon'] ?>" style="font-size:11px;"></i>
@@ -654,11 +657,22 @@ $renderVisitCard = function(array $v, int $idx, bool $showMaName) use ($statusDe
 </div>
 
 <!-- Status summary bar (single compact row of 4 pills) -->
+<?php
+$_filterRings = ['pending'=>'#64748b','en_route'=>'#3b82f6','completed'=>'#10b981','missed'=>'#f87171'];
+?>
+<style>
+.stat-filter-pill { cursor:pointer; transition:box-shadow 0.15s,transform 0.15s; user-select:none; }
+.stat-filter-pill:hover { opacity:0.82; }
+.stat-filter-pill.filter-active { transform:scale(1.05); }
+</style>
 <div class="flex items-center gap-2 mb-4 print-stat-bar">
     <?php
     $displayCounts = ($view === 'week') ? $weekCounts : $counts;
     foreach ($statusDefs as $key => $def): ?>
-    <div class="flex-1 flex flex-col items-center justify-center gap-0.5 <?= $def['bg'] ?> border <?= $def['border'] ?> rounded-xl py-2 shadow-sm">
+    <div class="flex-1 flex flex-col items-center justify-center gap-0.5 <?= $def['bg'] ?> border <?= $def['border'] ?> rounded-xl py-2 shadow-sm stat-filter-pill"
+         data-filter="<?= $key ?>"
+         data-ring="<?= $_filterRings[$key] ?>"
+         onclick="filterByStatus('<?= $key ?>')">
         <div class="flex items-center gap-1">
             <i class="bi <?= $def['icon'] ?> <?= $def['text'] ?> text-[12px]"></i>
             <span class="text-[14px] font-extrabold <?= $def['text'] ?> leading-none"><?= $displayCounts[$key] ?></span>
@@ -667,6 +681,36 @@ $renderVisitCard = function(array $v, int $idx, bool $showMaName) use ($statusDe
     </div>
     <?php endforeach; ?>
 </div>
+<script>
+var _statusFilter = null;
+function filterByStatus(status) {
+    var pills = document.querySelectorAll('.stat-filter-pill');
+    var cards = document.querySelectorAll('.print-visit-card');
+    var sections = document.querySelectorAll('.ma-section');
+    // Toggle off if clicking the already-active filter
+    if (_statusFilter === status) {
+        _statusFilter = null;
+        pills.forEach(function(p) { p.classList.remove('filter-active'); p.style.boxShadow = ''; });
+        cards.forEach(function(c) { c.style.display = ''; });
+        sections.forEach(function(s) { s.style.display = ''; });
+        return;
+    }
+    _statusFilter = status;
+    pills.forEach(function(p) {
+        var active = p.dataset.filter === status;
+        p.classList.toggle('filter-active', active);
+        p.style.boxShadow = active ? '0 0 0 2.5px ' + p.dataset.ring + ', 0 0 0 4px white' : '';
+    });
+    cards.forEach(function(c) { c.style.display = (c.dataset.status === status) ? '' : 'none'; });
+    sections.forEach(function(s) {
+        var hasVisible = Array.from(s.querySelectorAll('.print-visit-card')).some(function(c) { return c.style.display !== 'none'; });
+        s.style.display = hasVisible ? '' : 'none';
+    });
+}
+<?php if ($view === 'day'): ?>
+document.addEventListener('DOMContentLoaded', function() { filterByStatus('pending'); });
+<?php endif; ?>
+</script>
 
 <?php if ($view === 'week'): ?>
 <!-- ═══════════════════════ WEEKLY VIEW ═══════════════════════ -->
@@ -832,78 +876,161 @@ document.querySelectorAll('.ma-pill[id^="pill-"]:not(#pill-all)').forEach(btn =>
 <div id="editModalBackdrop" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 no-print" onclick="closeEditModal()">
 </div>
 <div id="editModal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none no-print">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg pointer-events-auto" onclick="event.stopPropagation()">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg pointer-events-auto flex flex-col max-h-[90vh]" onclick="event.stopPropagation()">
         <!-- Header -->
-        <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-violet-600 rounded-t-2xl">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-violet-600 rounded-t-2xl flex-shrink-0">
             <h3 id="editModalTitle" class="font-bold text-white text-base truncate pr-4"></h3>
             <button onclick="closeEditModal()" class="w-8 h-8 flex items-center justify-center rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition">
                 <i class="bi bi-x-lg"></i>
             </button>
         </div>
-        <!-- Body -->
-        <div class="px-6 py-5 space-y-4">
-            <div class="grid grid-cols-2 gap-4">
-                <!-- Visit Time -->
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1.5"><i class="bi bi-clock mr-1 text-slate-400"></i>Visit Time</label>
-                    <input type="time" id="editVisitTime"
-                           class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent">
-                </div>
-                <!-- Visit Order -->
-                <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1.5"><i class="bi bi-list-ol mr-1 text-slate-400"></i>Visit Order</label>
-                    <input type="number" id="editOrder" min="1" max="99"
-                           class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent">
+        <!-- Body (scrollable) -->
+        <div id="editModalBody" class="px-6 py-5 space-y-5 overflow-y-auto">
+
+            <!-- 1. Practice / Company -->
+            <div>
+                <p class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <i class="bi bi-building-fill text-slate-400"></i> Practice
+                </p>
+                <div class="grid grid-cols-2 gap-2.5">
+                    <label class="flex items-center gap-3 p-3 border-2 rounded-xl cursor-pointer transition-all
+                                  has-[:checked]:border-blue-500 has-[:checked]:bg-blue-50
+                                  [&:not(:has(:checked))]:border-slate-200 [&:not(:has(:checked))]:bg-white">
+                        <input type="radio" name="editCompany" value="Beyond Wound Care Inc."
+                               class="w-4 h-4 text-blue-600 border-slate-300 flex-shrink-0">
+                        <div class="leading-tight min-w-0">
+                            <div class="font-semibold text-sm text-slate-800">Beyond Wound Care Inc.</div>
+                            <div class="text-xs text-slate-500">BWC</div>
+                        </div>
+                    </label>
+                    <label class="flex items-center gap-3 p-3 border-2 rounded-xl cursor-pointer transition-all
+                                  has-[:checked]:border-teal-500 has-[:checked]:bg-teal-50
+                                  [&:not(:has(:checked))]:border-slate-200 [&:not(:has(:checked))]:bg-white">
+                        <input type="radio" name="editCompany" value="Visiting Medical Physician Inc."
+                               class="w-4 h-4 text-teal-600 border-slate-300 flex-shrink-0">
+                        <div class="leading-tight min-w-0">
+                            <div class="font-semibold text-sm text-slate-800">Visiting Medical Physician Inc.</div>
+                            <div class="text-xs text-slate-500">VMP</div>
+                        </div>
+                    </label>
                 </div>
             </div>
-            <!-- Visit Type -->
-            <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1.5"><i class="bi bi-tag mr-1 text-slate-400"></i>Visit Type</label>
-                <select id="editVisitType" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent bg-white">
-                    <option value="routine">Follow-Up</option>
-                    <option value="new_patient">New Patient</option>
-                    <option value="wound_care">Wound Care</option>
-                    <option value="awv">Annual Wellness Visit</option>
-                    <option value="ccm">CCM</option>
-                    <option value="il">IL Disclosure</option>
-                </select>
-            </div>
-            <!-- Provider -->
-            <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1.5"><i class="bi bi-person-badge mr-1 text-slate-400"></i>Provider Name</label>
-                <select id="editProvider" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent bg-white">
+
+            <!-- 2. Attending Provider -->
+            <div class="p-4 bg-teal-50 border border-teal-200 rounded-2xl">
+                <p class="text-xs font-bold text-teal-700 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <i class="bi bi-person-badge-fill text-teal-500"></i> Attending Provider
+                </p>
+                <select id="editProvider"
+                        class="w-full px-3 py-2.5 border-2 border-teal-300 rounded-xl text-sm bg-white font-semibold
+                               focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-teal-400 transition">
                     <option value="">— None —</option>
                     <?php foreach ($providerStaff as $ps): ?>
                     <option value="<?= h($ps['full_name']) ?>"><?= h($ps['full_name']) ?></option>
                     <?php endforeach; ?>
                 </select>
             </div>
-            <!-- Schedule Notes -->
+
+            <!-- 3. Visit Time + Order -->
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1.5"><i class="bi bi-clock mr-1 text-slate-400"></i>Visit Time</label>
+                    <input type="time" id="editVisitTime"
+                           class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1.5"><i class="bi bi-list-ol mr-1 text-slate-400"></i>Visit Order</label>
+                    <input type="number" id="editOrder" min="1" max="99"
+                           class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent">
+                </div>
+            </div>
+
+            <!-- 4. Visit Type pills -->
+            <div>
+                <p class="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
+                    <i class="bi bi-tag-fill text-slate-400"></i> Visit Type
+                </p>
+                <input type="hidden" id="editVtHidden" value="routine">
+                <input type="hidden" id="editSubtypeHidden" value="wound_care">
+                <div class="grid grid-cols-3 gap-2" id="editVtPills">
+                    <button type="button" onclick="editSetVt('routine',this)" data-val="routine"
+                            class="vt-pill-edit inline-flex flex-col items-center gap-1 px-2 py-3 rounded-xl text-xs font-semibold border transition-all
+                                   bg-white text-slate-600 border-slate-200 hover:border-indigo-300 hover:text-indigo-600">
+                        <i class="bi bi-activity text-sm"></i> Follow-Up
+                    </button>
+                    <button type="button" onclick="editSetVt('new_patient',this)" data-val="new_patient"
+                            class="vt-pill-edit inline-flex flex-col items-center gap-1 px-2 py-3 rounded-xl text-xs font-semibold border transition-all
+                                   bg-white text-slate-600 border-slate-200 hover:border-emerald-300 hover:text-emerald-600">
+                        <i class="bi bi-person-plus-fill text-sm"></i> New Patient
+                    </button>
+                    <button type="button" onclick="editSetVt('wound_care',this)" data-val="wound_care"
+                            class="vt-pill-edit inline-flex flex-col items-center gap-1 px-2 py-3 rounded-xl text-xs font-semibold border transition-all
+                                   bg-white text-slate-600 border-slate-200 hover:border-rose-300 hover:text-rose-600">
+                        <i class="bi bi-bandaid-fill text-sm"></i> Wound Care
+                    </button>
+                    <button type="button" onclick="editSetVt('awv',this)" data-val="awv"
+                            class="vt-pill-edit inline-flex flex-col items-center gap-1 px-2 py-3 rounded-xl text-xs font-semibold border transition-all
+                                   bg-white text-slate-600 border-slate-200 hover:border-violet-300 hover:text-violet-600">
+                        <i class="bi bi-heart-pulse-fill text-sm"></i> AWV
+                    </button>
+                    <button type="button" onclick="editSetVt('ccm',this)" data-val="ccm"
+                            class="vt-pill-edit inline-flex flex-col items-center gap-1 px-2 py-3 rounded-xl text-xs font-semibold border transition-all
+                                   bg-white text-slate-600 border-slate-200 hover:border-blue-300 hover:text-blue-600">
+                        <i class="bi bi-capsule text-sm"></i> CCM
+                    </button>
+                    <button type="button" onclick="editSetVt('il',this)" data-val="il"
+                            class="vt-pill-edit inline-flex flex-col items-center gap-1 px-2 py-3 rounded-xl text-xs font-semibold border transition-all
+                                   bg-white text-slate-600 border-slate-200 hover:border-amber-300 hover:text-amber-600">
+                        <i class="bi bi-file-earmark-text-fill text-sm"></i> IL Disc.
+                    </button>
+                </div>
+                <!-- New Patient subtype -->
+                <div id="editSubtypeRow" class="hidden mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">New Patient Type</label>
+                    <div class="flex gap-2">
+                        <button type="button" onclick="editSetSubtype('wound_care',this)" data-val="wound_care"
+                                class="np-subtype-edit flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all
+                                       bg-white text-slate-600 border-slate-200 hover:border-emerald-300 hover:text-emerald-600">
+                            <i class="bi bi-bandaid-fill"></i> Wound Care
+                        </button>
+                        <button type="button" onclick="editSetSubtype('primary_care',this)" data-val="primary_care"
+                                class="np-subtype-edit flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all
+                                       bg-white text-slate-600 border-slate-200 hover:border-emerald-300 hover:text-emerald-600">
+                            <i class="bi bi-heart-pulse-fill"></i> Primary Care
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. Schedule Notes -->
             <div>
                 <label class="block text-xs font-semibold text-slate-600 mb-1.5"><i class="bi bi-sticky mr-1 text-slate-400"></i>Schedule Notes <span class="text-slate-400 font-normal">(instructions / pre-visit)</span></label>
                 <textarea id="editNotes" rows="2" placeholder="e.g. Bring blood pressure log, fasting required…"
                           class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent resize-none"></textarea>
             </div>
+
             <?php if (isAdmin()): ?>
-            <!-- Admin: Visit Date -->
-            <div id="editDateRow">
-                <label class="block text-xs font-semibold text-slate-600 mb-1.5"><i class="bi bi-calendar3 mr-1 text-slate-400"></i>Visit Date <span class="text-violet-600 font-semibold">(Admin)</span></label>
-                <input type="date" id="editVisitDate"
-                       class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent">
-            </div>
-            <!-- Admin: Reassign MA -->
-            <div id="editMaRow">
-                <label class="block text-xs font-semibold text-slate-600 mb-1.5"><i class="bi bi-person-fill mr-1 text-slate-400"></i>Assigned MA <span class="text-violet-600 font-semibold">(Admin)</span></label>
-                <select id="editMaId" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent bg-white">
-                    <?php foreach ($allMas as $m): ?>
-                    <option value="<?= $m['id'] ?>"><?= h($m['full_name']) ?></option>
-                    <?php endforeach; ?>
-                </select>
+            <!-- Admin: Date + MA -->
+            <div class="grid grid-cols-2 gap-4 p-4 bg-violet-50 border border-violet-200 rounded-xl">
+                <div id="editDateRow">
+                    <label class="block text-xs font-semibold text-violet-700 mb-1.5"><i class="bi bi-calendar3 mr-1"></i>Visit Date <span class="text-violet-500 font-normal">(Admin)</span></label>
+                    <input type="date" id="editVisitDate"
+                           class="w-full px-3 py-2 border border-violet-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent bg-white">
+                </div>
+                <div id="editMaRow">
+                    <label class="block text-xs font-semibold text-violet-700 mb-1.5"><i class="bi bi-person-fill mr-1"></i>Assigned MA <span class="text-violet-500 font-normal">(Admin)</span></label>
+                    <select id="editMaId" class="w-full px-3 py-2 border border-violet-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent bg-white">
+                        <?php foreach ($allMas as $m): ?>
+                        <option value="<?= $m['id'] ?>"><?= h($m['full_name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
             </div>
             <?php endif; ?>
+
         </div>
         <!-- Footer -->
-        <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-3 bg-slate-50 rounded-b-2xl">
+        <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-end gap-3 bg-slate-50 rounded-b-2xl flex-shrink-0">
             <button onclick="closeEditModal()" class="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-slate-800 transition">Cancel</button>
             <button id="editSaveBtn" onclick="saveEdit()"
                     class="flex items-center gap-2 px-5 py-2 bg-violet-600 hover:bg-violet-700 active:scale-95 text-white text-sm font-bold rounded-xl shadow-sm transition-all">
@@ -1460,23 +1587,90 @@ function updateStatus(visitId, status) {
 
 // ── Edit Modal ────────────────────────────────────────────────────────────────
 let _editVisitId = null;
+let _editLoading  = false;
 
-function openEditModal(visit) {
-    _editVisitId = visit.id;
-    document.getElementById('editModalTitle').textContent = 'Edit Visit — ' + visit.patient_name;
-    document.getElementById('editVisitTime').value        = visit.visit_time ? visit.visit_time.substring(0,5) : '';
-    document.getElementById('editVisitType').value        = visit.visit_type || 'routine';
-    document.getElementById('editNotes').value            = visit.notes || '';
-    document.getElementById('editProvider').value         = visit.provider_name || '';
-    document.getElementById('editOrder').value            = visit.visit_order || 1;
+const _editVtColors = {
+    routine:     'indigo',
+    new_patient: 'emerald',
+    wound_care:  'rose',
+    awv:         'violet',
+    ccm:         'blue',
+    il:          'amber',
+};
+
+function editSetVt(val, btn) {
+    document.getElementById('editVtHidden').value = val;
+    document.querySelectorAll('#editVtPills .vt-pill-edit').forEach(p => {
+        const c = _editVtColors[p.dataset.val] || 'indigo';
+        if (p.dataset.val === val) {
+            p.className = p.className.replace(/bg-\S+ text-\S+ border-\S+( shadow-sm)?/g, '').trim();
+            p.classList.add('bg-'+c+'-600', 'text-white', 'border-'+c+'-600', 'shadow-sm');
+        } else {
+            p.className = p.className.replace(/bg-\S+-600 text-white border-\S+-600 shadow-sm/g, '').trim();
+            p.classList.add('bg-white', 'text-slate-600', 'border-slate-200');
+        }
+    });
+    document.getElementById('editSubtypeRow').classList.toggle('hidden', val !== 'new_patient');
+}
+
+function editSetSubtype(val, btn) {
+    document.getElementById('editSubtypeHidden').value = val;
+    document.querySelectorAll('#editSubtypeRow .np-subtype-edit').forEach(p => {
+        if (p.dataset.val === val) {
+            p.className = p.className.replace(/bg-emerald-600 text-white border-emerald-600 shadow-sm/g, '').trim();
+            p.classList.add('bg-emerald-600', 'text-white', 'border-emerald-600', 'shadow-sm');
+        } else {
+            p.className = p.className.replace(/bg-emerald-600 text-white border-emerald-600 shadow-sm/g, '').trim();
+            p.classList.add('bg-white', 'text-slate-600', 'border-slate-200');
+        }
+    });
+}
+
+function _populateEditModal(visit) {
+    document.getElementById('editVisitTime').value = visit.visit_time ? visit.visit_time.substring(0,5) : '';
+    document.getElementById('editNotes').value     = visit.notes || '';
+    document.getElementById('editProvider').value  = visit.provider_name || '';
+    document.getElementById('editOrder').value     = visit.visit_order || 1;
+    // Company radio
+    const company = visit.company || 'Beyond Wound Care Inc.';
+    document.querySelectorAll('input[name="editCompany"]').forEach(r => { r.checked = r.value === company; });
+    // Visit type pills + subtype
+    editSetVt(visit.visit_type || 'routine', null);
+    editSetSubtype(visit.visit_subtype || 'wound_care', null);
     // Admin-only fields
-    const dateRow = document.getElementById('editDateRow');
-    const maRow   = document.getElementById('editMaRow');
-    if (dateRow) { document.getElementById('editVisitDate').value = visit.visit_date || ''; }
-    if (maRow)   { document.getElementById('editMaId').value = visit.ma_id || ''; }
+    const dateEl = document.getElementById('editVisitDate');
+    const maEl   = document.getElementById('editMaId');
+    if (dateEl) dateEl.value = visit.visit_date || '';
+    if (maEl)   maEl.value   = visit.ma_id || '';
+}
+
+async function openEditModal(visitId, patientName) {
+    _editVisitId = visitId;
+    document.getElementById('editModalTitle').textContent = 'Edit Visit — ' + patientName;
+    // Show modal with loading state
+    const body = document.getElementById('editModalBody');
+    body.innerHTML = '<div class="flex items-center justify-center py-12 text-slate-400"><i class="bi bi-hourglass-split animate-spin text-2xl mr-3"></i><span class="text-sm">Loading visit data…</span></div>';
+    document.getElementById('editSaveBtn').disabled = true;
     document.getElementById('editModal').classList.remove('hidden');
     document.getElementById('editModalBackdrop').classList.remove('hidden');
-    document.getElementById('editVisitTime').focus();
+
+    try {
+        const r = await fetch(BASE + '/api/schedule_update.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ csrf: CSRF, action: 'get', id: visitId })
+        });
+        const d = await r.json();
+        if (!d.ok) { pdToast(d.error || 'Could not load visit.', 'error'); closeEditModal(); return; }
+        // Restore body and populate
+        body.innerHTML = _editModalBodyHTML;
+        document.getElementById('editSaveBtn').disabled = false;
+        _populateEditModal(d.visit);
+        document.getElementById('editVisitTime').focus();
+    } catch {
+        pdToast('Network error. Please try again.', 'error');
+        closeEditModal();
+    }
 }
 
 function closeEditModal() {
@@ -1497,10 +1691,12 @@ async function saveEdit() {
         action:        'edit',
         id:            _editVisitId,
         visit_time:    document.getElementById('editVisitTime').value,
-        visit_type:    document.getElementById('editVisitType').value,
+        visit_type:    document.getElementById('editVtHidden').value,
+        visit_subtype: document.getElementById('editSubtypeHidden').value,
         notes:         document.getElementById('editNotes').value,
         provider_name: document.getElementById('editProvider').value,
         visit_order:   parseInt(document.getElementById('editOrder').value) || 1,
+        company:       document.querySelector('input[name="editCompany"]:checked')?.value || 'Beyond Wound Care Inc.',
     };
     const dateEl = document.getElementById('editVisitDate');
     const maEl   = document.getElementById('editMaId');
@@ -1524,6 +1720,12 @@ async function saveEdit() {
     btn.disabled = false;
     btn.innerHTML = orig;
 }
+
+// Snapshot the body template once DOM is ready so we can restore it after loading
+let _editModalBodyHTML = '';
+document.addEventListener('DOMContentLoaded', () => {
+    _editModalBodyHTML = document.getElementById('editModalBody').innerHTML;
+});
 
 // Close on Escape key
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeEditModal(); });

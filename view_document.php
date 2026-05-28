@@ -219,7 +219,7 @@ include __DIR__ . '/includes/header.php';
         <i class="bi bi-pencil-square"></i> Edit Form
     </a>
     <?php endif; ?>
-    <button onclick="window.print()"
+    <button onclick="pdPrint()"
             class="inline-flex items-center gap-2 px-5 py-2.5 bg-slate-700 hover:bg-slate-800 text-white
                    font-semibold rounded-xl transition-all shadow-sm text-sm">
         <i class="bi bi-printer-fill"></i> Print
@@ -691,4 +691,26 @@ if (canAccessClinical() && !isBilling()) {
 })();
 </script>
 
+<script>
+(function () {
+    var _wasDark = false;
+    function beforePrint() {
+        var html = document.documentElement;
+        _wasDark = html.classList.contains('dark');
+        if (_wasDark) html.classList.remove('dark');
+        /* Kill page-fade animation so opacity is 1 during print */
+        var pf = document.querySelector('.page-fade');
+        if (pf) { pf.style.animation = 'none'; pf.style.opacity = '1'; pf.style.transform = 'none'; }
+    }
+    function afterPrint() {
+        if (_wasDark) document.documentElement.classList.add('dark');
+    }
+    window.addEventListener('beforeprint', beforePrint);
+    window.addEventListener('afterprint',  afterPrint);
+    window.pdPrint = function () {
+        beforePrint();
+        setTimeout(function () { window.print(); }, 30);
+    };
+})();
+</script>
 <?php include __DIR__ . '/includes/footer.php'; ?>

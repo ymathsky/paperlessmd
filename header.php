@@ -261,8 +261,9 @@ if (!isBilling()) {
         showLockToast();
     });
 
-    // Warn on tab close, refresh, or manual URL change
+    // Warn on tab close, refresh, or manual URL change (skip when submitting a form)
     window.addEventListener('beforeunload', function (e) {
+        if (window._pdSubmitting) return;
         e.preventDefault();
         e.returnValue = '';
     });

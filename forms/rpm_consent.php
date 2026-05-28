@@ -4,6 +4,7 @@ require_once __DIR__ . '/../includes/db.php';
 requireNotBilling();
 
 $patient_id = (int)($_GET['patient_id'] ?? 0);
+$visit_id   = (int)($_GET['visit_id']   ?? 0);
 if (!$patient_id) { header('Location: ' . BASE_URL . '/patients.php'); exit; }
 $pStmt = $pdo->prepare("SELECT * FROM patients WHERE id = ?");
 $pStmt->execute([$patient_id]);
@@ -48,6 +49,7 @@ include __DIR__ . '/../includes/header.php';
         <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
         <input type="hidden" name="patient_id" value="<?= $patient_id ?>">
         <input type="hidden" name="form_type"  value="rpm_consent">
+        <input type="hidden" name="visit_id"    value="<?= $visit_id ?>">
 
         <div class="px-6 py-6 space-y-6">
         <?php include __DIR__ . '/../includes/form_company_selector.php'; ?>
@@ -141,7 +143,7 @@ include __DIR__ . '/../includes/header.php';
                    class="px-5 py-2.5 text-sm font-semibold text-slate-500 hover:text-slate-700 transition-colors">
                     Cancel
                 </a>
-                <button type="submit" id="submitBtn"
+                <button type="button" id="submitBtn"
                         class="flex items-center gap-2 px-8 py-3 bg-teal-700 hover:bg-teal-800
                                text-white font-bold rounded-xl transition-all shadow-md hover:shadow-lg text-sm active:scale-95">
                     <i class="bi bi-check-circle-fill"></i> Sign &amp; Submit

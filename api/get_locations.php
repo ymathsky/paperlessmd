@@ -49,6 +49,21 @@ try {
         ORDER BY s.full_name ASC
     ")->fetchAll(PDO::FETCH_ASSOC);
 
+    // Convert stored app-timezone timestamps to UTC ISO 8601 so the browser
+    // parses them correctly regardless of the viewer's local timezone.
+    $appTz = new DateTimeZone(defined('APP_TIMEZONE') ? APP_TIMEZONE : 'America/Chicago');
+    $utcTz = new DateTimeZone('UTC');
+    foreach ($rows as &$row) {
+        foreach (['last_active_at', 'recorded_at'] as $col) {
+            if (!empty($row[$col])) {
+                $dt = new DateTime($row[$col], $appTz);
+                $dt->setTimezone($utcTz);
+                $row[$col] = $dt->format('c'); // e.g. 2026-05-29T14:00:00+00:00
+            }
+        }
+    }
+    unset($row);
+
     echo json_encode(['ok' => true, 'locations' => $rows]);
 } catch (PDOException $e) {
     http_response_code(500);

@@ -97,6 +97,7 @@ include __DIR__ . '/../includes/header.php';
         <input type="hidden" name="csrf_token" value="<?= csrfToken() ?>">
         <input type="hidden" name="patient_id" value="<?= $patient_id ?>">
         <input type="hidden" name="form_type"  value="cognitive_wellness">
+        <input type="hidden" name="visit_id"    value="<?= $visit_id ?>">
         <input type="hidden" name="step1_score" id="step1_total" value="0">
         <input type="hidden" name="step2_score" id="step2_total" value="0">
         <input type="hidden" name="step3_score" id="step3_total" value="0">

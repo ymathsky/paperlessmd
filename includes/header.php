@@ -187,6 +187,7 @@ if (!empty($_SESSION['user_id'])) {
             <span class="text-[10px] font-bold uppercase tracking-widest text-blue-400/70">Admin</span>
         </div>
         <?php foreach ([
+            ['href' => '/admin/all_forms.php',         'key' => 'all_forms',          'icon' => 'bi-folder2-open',            'label' => 'All Forms'],
             ['href' => '/admin/schedule_manage.php',  'key' => 'schedule_manage',  'icon' => 'bi-calendar-week-fill', 'label' => 'Manage Schedule'],
             ['href' => '/admin/recurring_schedule.php','key' => 'recurring_schedule','icon' => 'bi-arrow-repeat',      'label' => 'Recurring Schedule'],
             ['href' => '/admin/wound_photos.php',    'key' => 'wound_photos',     'icon' => 'bi-camera-fill',         'label' => 'Wound Photos'],
@@ -285,8 +286,9 @@ if (!empty($_SESSION['user_id'])) {
         showLockToast();
     });
 
-    // Warn on tab close, refresh, or manual URL change
+    // Warn on tab close, refresh, or manual URL change (skip when submitting a form)
     window.addEventListener('beforeunload', function (e) {
+        if (window._pdSubmitting) return;
         e.preventDefault();
         e.returnValue = '';
     });

@@ -21,9 +21,12 @@ $maSig      = $_POST['ma_signature'] ?? '';
 $poaName    = trim($_POST['poa_name'] ?? '');
 $poaRel     = trim($_POST['poa_relationship'] ?? '');
 $_editOverride = (isAdmin() || isMa()) && ($_POST['edit_override'] ?? '') === '1';
+// Missed visit: when missed_visit_reason is set, vitals and signatures are not required.
+$isMissedVisit = ($formType === 'vital_cs' && !empty(trim($_POST['missed_visit_reason'] ?? '')));
 // vital_cs is draft only when signatures are absent (in-progress visit); once both sigs are
 // present (End Visit confirmed) treat it as signed so the record is finalised.
-$forceDraft = ($formType === 'vital_cs' && (!$signature || !$maSig));
+// Missed visits bypass this — they are always finalised on submit.
+$forceDraft = ($formType === 'vital_cs' && !$isMissedVisit && (!$signature || !$maSig));
 
 $allowed = ['vital_cs', 'new_patient', 'abn', 'pf_signup', 'ccm_consent', 'cognitive_wellness', 'medicare_awv', 'il_disclosure', 'wound_care_consent', 'informed_consent_wound', 'rpm_consent', 'new_patient_pocket', 'new_patient_pocket_pc'];
 if (!$patientId || !in_array($formType, $allowed, true)) {
@@ -41,11 +44,11 @@ if (!$chk->fetch()) {
 // (exempt intake forms — new patients won't have a visit on schedule yet)
 $intakeForms = ['new_patient', 'new_patient_pocket', 'new_patient_pocket_pc', 'pf_signup'];
 if (!isAdmin() && !in_array($formType, $intakeForms, true)) {
-    $schedChk = $pdo->prepare("
-        SELECT id FROM `schedule`
-        WHERE patient_id = ? AND visit_date = CURDATE() AND status != 'missed'
-        LIMIT 1
-    ");
+    // Missed visits allow any schedule status (the visit may already be marked 'missed')
+    $schedSql = $isMissedVisit
+        ? "SELECT id FROM `schedule` WHERE patient_id = ? AND visit_date = CURDATE() LIMIT 1"
+        : "SELECT id FROM `schedule` WHERE patient_id = ? AND visit_date = CURDATE() AND status != 'missed' LIMIT 1";
+    $schedChk = $pdo->prepare($schedSql);
     $schedChk->execute([$patientId]);
     if (!$schedChk->fetchColumn()) {
         http_response_code(403);
@@ -133,8 +136,8 @@ if ($_isNewPatientPocket) {
     $providerPrintName = trim($formData['provider_print_name'] ?? '') ?: null;
 }
 
-// Require both signatures
-if (!$forceDraft) {
+// Require both signatures (skipped for missed visits — no patient present)
+if (!$forceDraft && !$isMissedVisit) {
     if (!$signature) {
         http_response_code(400);
         die('Patient signature is required.');
@@ -216,15 +219,39 @@ if ($status === 'signed' && $visitId > 0) {
     )->execute([$visitId, $patientId]);
 }
 
-// Email notification — new form awaiting provider countersignature
-require_once __DIR__ . '/../includes/mailer.php';
-require_once __DIR__ . '/../includes/notifications.php';
-if ($status === 'signed') {
-    notifyFormSigned($pdo, (int)$newId, $patientId, $formType, (int)$_SESSION['user_id']);
+
+// ── Draft: redirect back to form to continue ──────────────────────────────
+if ($formType === 'vital_cs' && $status === 'draft') {
+    $q = [
+        'patient_id'   => $patientId,
+        'edit'         => 1,
+        'draft_saved'  => 1,
+    ];
+    if ($visitId > 0) {
+        $q['visit_id'] = $visitId;
+    }
+    header('Location: ' . BASE_URL . '/forms/vital_cs.php?' . http_build_query($q));
+    exit;
 }
 
+// ── Signed: redirect browser immediately; email + reconciliation run after ─
+header('Location: ' . BASE_URL . '/view_document.php?id=' . $newId);
+if (function_exists('fastcgi_finish_request')) {
+    // PHP-FPM: flush the redirect to the client now so the browser navigates
+    // right away, while the script continues running in the background.
+    session_write_close();
+    while (ob_get_level()) ob_end_clean();
+    fastcgi_finish_request();
+}
+ignore_user_abort(true);
+
+// ── Email notification (background — browser already navigated) ────────────
+require_once __DIR__ . '/../includes/mailer.php';
+require_once __DIR__ . '/../includes/notifications.php';
+notifyFormSigned($pdo, (int)$newId, $patientId, $formType, (int)$_SESSION['user_id']);
+
 // ── Medication reconciliation for Visit Consent forms ─────────────────────
-if (in_array($formType, ['vital_cs', 'new_patient_pocket', 'new_patient_pocket_pc'], true) && $status === 'signed') {
+if (in_array($formType, ['vital_cs', 'new_patient_pocket', 'new_patient_pocket_pc'], true)) {
     $staffId  = (int)$_SESSION['user_id'];
     // Use submitted med_count (dynamic rows), read from $_POST since it's excluded from $formData; cap at 30
     $medCount = min(30, max(6, (int)($_POST['med_count'] ?? 6)));
@@ -287,18 +314,3 @@ if (in_array($formType, ['vital_cs', 'new_patient_pocket', 'new_patient_pocket_p
     }
 }
 
-if ($formType === 'vital_cs' && $status === 'draft') {
-    $q = [
-        'patient_id'   => $patientId,
-        'edit'         => 1,
-        'draft_saved'  => 1,
-    ];
-    if ($visitId > 0) {
-        $q['visit_id'] = $visitId;
-    }
-    header('Location: ' . BASE_URL . '/forms/vital_cs.php?' . http_build_query($q));
-    exit;
-}
-
-header('Location: ' . BASE_URL . '/view_document.php?id=' . $newId);
-exit;

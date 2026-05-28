@@ -364,10 +364,10 @@ $_rxCompJson = json_encode($_rxCompanies);
             html, body { background: white !important; color: black !important; margin: 0 !important; padding: 0 !important; }
             /* Strip all backgrounds so dark app theme doesn't bleed through */
             * { background: transparent !important; box-shadow: none !important; }
-            /* Hide all page content */
-            body * { visibility: hidden !important; }
+            /* Hide all page content — only when RX pad is the thing being printed */
+            body.rx-printing * { visibility: hidden !important; }
             /* Show only the print layout — absolute so content paginates naturally without blank first page */
-            #rxPrintLayout {
+            body.rx-printing #rxPrintLayout {
                 visibility: visible !important;
                 display: block !important;
                 position: absolute !important;
@@ -377,8 +377,10 @@ $_rxCompJson = json_encode($_rxCompanies);
                 overflow: visible !important;
                 background: white !important;
             }
-            #rxPrintLayout * { visibility: visible !important; }
+            body.rx-printing #rxPrintLayout * { visibility: visible !important; }
             #rxPrintLayout .rxpl-page { background: white !important; }
+            /* When NOT printing the RX pad, keep the layout hidden */
+            body:not(.rx-printing) #rxPrintLayout { display: none !important; }
             #rxPadPanel, #rxPadOverlay { display: none !important; visibility: hidden !important; }
             .rxpl-page {
                 width: 5.5in;
@@ -868,12 +870,14 @@ $_rxCompJson = json_encode($_rxCompanies);
         // Slide panel out of the way so it doesn't obscure print preview
         if (panelEl)  panelEl.style.transform  = 'translateY(calc(100% + 2rem))';
         if (overlayEl) overlayEl.style.display  = 'none';
+        document.body.classList.add('rx-printing');
         var _rxCleanup = function () {
             printEl.style.display = 'none';
             printEl.style.zIndex = '-9999';
             // Restore panel
             if (panelEl)  panelEl.style.transform  = 'translateY(0)';
             if (overlayEl) overlayEl.style.display = '';
+            document.body.classList.remove('rx-printing');
             clearTimeout(_rxFallback);
         };
         var _rxFallback = setTimeout(_rxCleanup, 60000);

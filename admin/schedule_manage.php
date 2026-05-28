@@ -471,8 +471,8 @@ include __DIR__ . '/../includes/header.php';
                         <i class="bi bi-arrow-counterclockwise mr-1"></i> Reset
                     </button>
                     <button type="submit" id="assignSubmitBtn"
-                            class="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold rounded-xl text-sm transition-all shadow-sm">
-                        <i class="bi bi-calendar-check-fill"></i> Assign Visit
+                            class="flex items-center gap-2 px-8 py-3.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold rounded-xl text-base transition-all shadow-sm">
+                        <i class="bi bi-calendar-check-fill text-lg"></i> Assign Visit
                     </button>
                 </div>
             </div>

@@ -65,11 +65,11 @@ $hwUid         = 'hw_' . substr(md5($hwFieldId . microtime()), 0, 8);
         </div>
 
         <!-- Canvas -->
-        <div class="hw-canvas-wrap relative" style="touch-action:none;">
+        <div class="hw-canvas-wrap relative" style="touch-action:none;background:#ffffff;">
             <canvas class="hw-canvas block"
                     style="width:100%;height:220px;cursor:crosshair;touch-action:none;display:block;"></canvas>
             <div class="hw-placeholder absolute inset-0 flex items-center justify-center
-                        text-slate-300 pointer-events-none select-none italic text-sm text-center px-6">
+                        text-slate-400 pointer-events-none select-none italic text-sm text-center px-6">
                 <?= $hwPlaceholder ?>
             </div>
         </div>
