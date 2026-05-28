@@ -122,6 +122,21 @@ try {
     $activeMeds = $medsStmt->fetchAll();
 } catch (PDOException $e) { /* table not yet migrated &mdash; fall back to empty */ }
 
+// ── Pharmacy prefill: patients table is the source of truth ─────────────
+// If the patient already has a pharmacy saved, use it; otherwise fall back
+// to whatever was recorded in the most recent form submission.
+foreach (['pharmacy_name','pharmacy_phone','pharmacy_address'] as $_pk) {
+    if (empty($prev[$_pk]) && !empty($patient[$_pk])) {
+        $prev[$_pk] = $patient[$_pk];
+    }
+}
+// Build autocomplete list of all distinct pharmacy names in the system
+$_pharmacyNames = [];
+try {
+    $_phStmt = $pdo->query("SELECT DISTINCT pharmacy_name FROM patients WHERE pharmacy_name IS NOT NULL AND pharmacy_name != '' ORDER BY pharmacy_name");
+    $_pharmacyNames = $_phStmt->fetchAll(PDO::FETCH_COLUMN);
+} catch (PDOException $e) {}
+
 // All active meds pre-filled, then at least 2 empty rows for new entries
 $medRows = [];
 foreach ($activeMeds as $m) {
@@ -429,6 +444,37 @@ include __DIR__ . '/../includes/header.php';
              data-step="2"
              data-title="Medications"
              data-icon="bi-capsule">
+
+            <!-- Pharmacy -->
+            <div class="wiz-section">
+                <div class="wiz-section-hd">
+                    <i class="bi bi-bag-plus text-red-400"></i> Pharmacy
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Pharmacy Name</label>
+                        <input type="text" name="pharmacy_name"
+                               value="<?= pv($prev,'pharmacy_name') ?>"
+                               list="pharmacyNameList"
+                               class="w-full px-4 py-3 border <?= pv($prev,'pharmacy_name') ? 'border-amber-300' : 'border-slate-200' ?> rounded-xl text-sm bg-slate-50
+                                      focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition focus:bg-white"
+                               placeholder="e.g. CVS, Walgreens...">
+                        <datalist id="pharmacyNameList">
+                            <?php foreach ($_pharmacyNames as $_phn): ?>
+                            <option value="<?= h($_phn) ?>">
+                            <?php endforeach; ?>
+                        </datalist>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Pharmacy Phone</label>
+                        <input type="tel" name="pharmacy_phone"
+                               value="<?= pv($prev,'pharmacy_phone') ?>"
+                               class="w-full px-4 py-3 border <?= pv($prev,'pharmacy_phone') ? 'border-amber-300' : 'border-slate-200' ?> rounded-xl text-sm bg-slate-50
+                                      focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition focus:bg-white"
+                               placeholder="Phone number">
+                    </div>
+                </div>
+            </div>
 
             <p class="form-section-title"><i class="bi bi-bag-heart text-red-500"></i> Allergies</p>
 
