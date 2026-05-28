@@ -18,12 +18,6 @@ $endVisitId  ??= 0;
     </button>
 
     <div class="flex items-center gap-3 ml-auto">
-        <a href="<?= $cancelUrl ?>"
-           class="flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold
-                  text-slate-500 hover:text-slate-700 transition-colors">
-            Cancel
-        </a>
-
         <!-- Next (hidden on last step) -->
         <button type="button" id="wiz-next"
                 class="flex items-center gap-2 px-7 py-3 <?= $accentClass ?>
