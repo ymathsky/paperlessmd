@@ -395,6 +395,9 @@ document.addEventListener('DOMContentLoaded', function () {
             var lbl = document.getElementById('_uplPct');
             if (bar) bar.style.width = '100%';
             if (lbl) lbl.textContent = 'Done! Redirecting…';
+            // Clear PDF annotation session data on successful submit
+            var _pidEl = mainForm.querySelector('input[name="patient_id"]');
+            if (_pidEl) { try { sessionStorage.removeItem('pd_pdf_annot_' + _pidEl.value); } catch(e) {} }
             window.location.href = _xhr.responseURL || mainForm.action;
         };
         _xhr.onerror = function () {

@@ -1170,6 +1170,7 @@ $extraJs = <<<JSBLOCK
     var hiddensEl  = document.getElementById('pdfAnnotHiddens');
     var limitMsg   = document.getElementById('pdfPageLimitMsg');
     var penBtns    = document.querySelectorAll('.pdf-pen-btn');
+    var _pdfSKey   = 'pd_pdf_annot_' + ((document.querySelector('input[name="patient_id"]') || {}).value || 'x');
 
     var pdfDoc       = null;
     var curPage      = 1;
@@ -1301,6 +1302,7 @@ $extraJs = <<<JSBLOCK
         pdfDoc = null;
         pageDrawings = {};
         if (pad) { pad.off(); pad = null; }
+        try { sessionStorage.removeItem(_pdfSKey); } catch(e) {}
     });
 
     saveBtn.addEventListener('click', function () {
@@ -1409,7 +1411,16 @@ $extraJs = <<<JSBLOCK
         fileEl.value = '';
         saveBtn.disabled = false;
         saveBtn.innerHTML = '<i class="bi bi-check2-circle"></i> Save Annotations';
+        // Persist to sessionStorage so annotations survive a page refresh
+        try { sessionStorage.setItem(_pdfSKey, JSON.stringify(pngs)); } catch(e) {}
     }
+
+    // Restore annotated pages from sessionStorage on page load
+    (function () {
+        var _saved;
+        try { _saved = JSON.parse(sessionStorage.getItem(_pdfSKey) || 'null'); } catch(e) {}
+        if (Array.isArray(_saved) && _saved.some(Boolean)) commitResults(_saved);
+    })();
 })();
 </script>
 JSBLOCK;
