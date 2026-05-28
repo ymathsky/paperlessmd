@@ -743,7 +743,7 @@ if ($_qnVisitId > 0) {
         useBtn.classList.remove('hidden');
         document.getElementById('wpZoomWrap').classList.add('hidden');
         if (camStream) camStream.getTracks().forEach(function (t) { t.enabled = false; });
-        camCanvas.toBlob(function (b) { snapBlob = b; }, 'image/jpeg', 0.92);
+        camCanvas.toBlob(function (b) { snapBlob = b; }, 'image/jpeg', 0.97);
     });
     retakeBtn.addEventListener('click', function () {
         snapBlob = null;
@@ -764,7 +764,7 @@ if ($_qnVisitId > 0) {
         if (!snapBlob) return;
         currentBlob = snapBlob;
         currentFile = null;
-        wpShowPreview(camCanvas.toDataURL('image/jpeg', 0.92), 'Camera');
+        wpShowPreview(camCanvas.toDataURL('image/jpeg', 0.97), 'Camera');
         wpCloseCamera();
         wpAutoUpload();
     });
@@ -904,12 +904,87 @@ if ($_qnVisitId > 0) {
         el.classList.remove('hidden');
     }
 
+    // ── Offline photo queue ────────────────────────────────────────
+    var _wpPendingQueue    = [];
+    var _wpOnlineListening = false;
+
+    function _wpQueueLocally(blob, filename, loc, note) {
+        _wpPendingQueue.push({ blob: blob, filename: filename, loc: loc, note: note });
+        savedCount++;
+        var badge = document.getElementById('wpBadge');
+        badge.textContent = savedCount;
+        badge.classList.remove('hidden');
+        badge.style.background = '#f97316'; // orange = pending
+        var n = _wpPendingQueue.length;
+        wpSetStatus(
+            '<i class="bi bi-wifi-off mr-1"></i> No connection — ' + n + ' photo' + (n > 1 ? 's' : '') +
+            ' saved locally. Will upload when you\'re back online.',
+            'error'
+        );
+        var btn = document.getElementById('wpSubmitBtn');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-camera-fill mr-1"></i> Take Another Photo';
+        if (!_wpOnlineListening) {
+            _wpOnlineListening = true;
+            window.addEventListener('online', _wpFlushQueue);
+        }
+    }
+
+    function _wpFlushQueue() {
+        if (!_wpPendingQueue.length) return;
+        var batch = _wpPendingQueue.splice(0);
+        var synced = 0;
+        function tryNext() {
+            if (!batch.length) {
+                if (synced > 0) {
+                    wpSetStatus('<i class="bi bi-check-circle-fill mr-1"></i> ' + synced + ' queued photo' + (synced > 1 ? 's' : '') + ' uploaded!', 'success');
+                    var badge = document.getElementById('wpBadge');
+                    badge.style.background = '';
+                    badge.textContent = savedCount;
+                }
+                return;
+            }
+            var item = batch.shift();
+            var fd = new FormData();
+            fd.append('csrf_token',     csrfToken);
+            fd.append('patient_id',     patientId);
+            fd.append('wound_location', item.loc  || '');
+            fd.append('description',    item.note || '');
+            fd.append('photo', item.blob, item.filename);
+            fetch(uploadUrl, { method: 'POST', body: fd })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (!d.success) throw new Error(d.error || 'Upload failed');
+                synced++;
+                var grid  = document.getElementById('wpSavedGrid');
+                var thumb = document.createElement('div');
+                thumb.className = 'relative rounded-xl overflow-hidden aspect-square bg-slate-100';
+                thumb.innerHTML = '<img src="' + d.url + '" alt="Wound photo" class="w-full h-full object-cover">' +
+                    (item.loc ? '<span class="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[9px] text-center px-1 py-0.5 truncate">' + item.loc + '</span>' : '');
+                grid.prepend(thumb);
+                document.getElementById('wpSavedWrap').classList.remove('hidden');
+                tryNext();
+            })
+            .catch(function () { _wpPendingQueue.push(item); tryNext(); });
+        }
+        tryNext();
+    }
+
     // ── Auto-upload (fires immediately when photo is set) ────────
     function wpAutoUpload() {
         if (!currentBlob && !currentFile) return;
         lastPhotoId = 0;
         var loc  = document.getElementById('wpLocation').value.trim();
         var note = document.getElementById('wpNote').value.trim();
+        // Queue locally when offline
+        if (!navigator.onLine) {
+            var _ob = currentBlob, _of = currentFile;
+            var _fn = _ob ? ('wound-' + Date.now() + '.jpg') : _of.name;
+            currentBlob = null; currentFile = null;
+            document.getElementById('wpPreviewWrap').classList.add('hidden');
+            _wpQueueLocally(_ob || _of, _fn, loc, note);
+            return;
+        }
         var fd   = new FormData();
         fd.append('csrf_token',     csrfToken);
         fd.append('patient_id',     patientId);
@@ -940,16 +1015,51 @@ if ($_qnVisitId > 0) {
                 + (loc ? '<span class="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[9px] text-center px-1 py-0.5 truncate">' + loc + '</span>' : '');
             grid.prepend(thumb);
             document.getElementById('wpSavedWrap').classList.remove('hidden');
-            wpSetStatus('<i class="bi bi-check-circle-fill mr-1"></i> Photo saved! Optionally add location or note below.', 'success');
+            // Reset state immediately — location/note stay pre-filled for the next shot
+            currentBlob = null; currentFile = null;
+            lastPhotoId = data.id || 0;
+            document.getElementById('wpPreviewWrap').classList.add('hidden');
+            document.getElementById('wpPreviewImg').src = '';
+            document.getElementById('wpFileGallery').value = '';
+            wpSetStatus(
+                '<span style="display:flex;align-items:center;justify-content:space-between;gap:8px;">' +
+                '<span><i class="bi bi-check-circle-fill mr-1"></i> Photo saved!</span>' +
+                '<button type="button" onclick="wpTakeAnother()" style="padding:4px 12px;background:#7c3aed;color:#fff;font-size:11px;font-weight:700;border-radius:8px;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:4px;"><i class="bi bi-camera-fill"></i> Take Another</button>' +
+                '</span>',
+                'success'
+            );
             btn.innerHTML = '<i class="bi bi-pencil-fill mr-1"></i> Update Location / Note';
             btn.disabled = false;
         })
         .catch(function (err) {
+            // Network failure — queue locally
+            if (!navigator.onLine || err instanceof TypeError) {
+                var _qb = currentBlob, _qf = currentFile;
+                var _qn = _qb ? ('wound-' + Date.now() + '.jpg') : (_qf ? _qf.name : 'wound.jpg');
+                currentBlob = null; currentFile = null;
+                document.getElementById('wpPreviewWrap').classList.add('hidden');
+                _wpQueueLocally(_qb || _qf, _qn, loc, note);
+                return;
+            }
             wpSetStatus('<i class="bi bi-x-circle-fill mr-1"></i> ' + err.message + ' — tap to retry.', 'error');
             btn.disabled = false;
             btn.innerHTML = '<i class="bi bi-cloud-upload-fill mr-1"></i> Retry Save';
         });
     }
+
+    // ── Take another photo immediately after save ─────────────────
+    window.wpTakeAnother = function () {
+        currentBlob = null; currentFile = null;
+        lastPhotoId = 0;
+        document.getElementById('wpPreviewWrap').classList.add('hidden');
+        document.getElementById('wpPreviewImg').src = '';
+        document.getElementById('wpFileGallery').value = '';
+        document.getElementById('wpStatus').classList.add('hidden');
+        var btn = document.getElementById('wpSubmitBtn');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-cloud-upload-fill"></i> Save Photo to Chart';
+        wpOpenCamera();
+    };
 
     // ── Submit — updates location/note on already-saved photo ─────
     window.wpSubmit = function () {
