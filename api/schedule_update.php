@@ -47,6 +47,15 @@ if ($action === 'status') {
         exit;
     }
 
+    // MAs may only update visits assigned to them
+    $_apiRole = $_SESSION['role'] ?? '';
+    $_apiUid  = (int)($_SESSION['user_id'] ?? 0);
+    if ($_apiRole === 'ma' && (int)$visit['ma_id'] !== $_apiUid) {
+        http_response_code(403);
+        echo json_encode(['ok' => false, 'error' => 'Not authorized for this visit']);
+        exit;
+    }
+
     $autoCompleted = null;
     if ($status === 'en_route') {
         $openStmt = $pdo->prepare("SELECT sc.id, sc.patient_id, CONCAT(p.first_name, ' ', p.last_name) AS patient_name

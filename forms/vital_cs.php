@@ -6,6 +6,31 @@ requireNotBilling();
 $patient_id = (int)($_GET['patient_id'] ?? 0);
 if (!$patient_id) { header('Location: ' . BASE_URL . '/patients.php'); exit; }
 
+// ── Visit ownership check ────────────────────────────────────────────────
+// If a visit_id is in the URL, verify it belongs to this patient and that
+// the logged-in user is allowed to open this form.
+// MAs may only open visits assigned to them; admins / providers / pcc are unrestricted.
+$_visitId   = (int)($_GET['visit_id'] ?? 0);
+$_visitRow  = null;
+if ($_visitId) {
+    $_vStmt = $pdo->prepare(
+        "SELECT id, ma_id FROM `schedule` WHERE id = ? AND patient_id = ? LIMIT 1"
+    );
+    $_vStmt->execute([$_visitId, $patient_id]);
+    $_visitRow = $_vStmt->fetch();
+    if (!$_visitRow) {
+        // visit_id doesn't belong to this patient — block
+        header('Location: ' . BASE_URL . '/patients.php');
+        exit;
+    }
+    $_role = $_SESSION['role'] ?? '';
+    $_uid  = (int)($_SESSION['user_id'] ?? 0);
+    if ($_role === 'ma' && (int)$_visitRow['ma_id'] !== $_uid) {
+        header('Location: ' . BASE_URL . '/dashboard.php?err=not_assigned');
+        exit;
+    }
+}
+
 $_schedVtMap = [
     'new_patient'  => 'New',
     'routine'      => 'Follow Up',
