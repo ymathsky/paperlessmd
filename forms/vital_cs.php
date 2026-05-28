@@ -626,8 +626,8 @@ include __DIR__ . '/../includes/header.php';
                 <!-- PDF Annotator Panel -->
                 <div id="pdfAnnotPanel" class="hidden mt-3 border-2 border-red-200 rounded-2xl overflow-hidden no-print">
                     <!-- Toolbar -->
-                    <div class="flex flex-wrap items-center gap-3 px-4 py-3 bg-red-50 border-b border-red-200">
-                        <!-- Page nav always visible at top -->
+                    <div class="flex flex-wrap items-center gap-2 px-3 py-2.5 bg-red-50 border-b border-red-200">
+                        <!-- Page nav -->
                         <button type="button" id="pdfPrevBtn"
                                 class="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                             <i class="bi bi-chevron-left text-sm"></i>
@@ -640,17 +640,31 @@ include __DIR__ . '/../includes/header.php';
                                 class="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                             <i class="bi bi-chevron-right text-sm"></i>
                         </button>
-                        <div class="flex items-center gap-2 ml-auto flex-wrap">
+                        <!-- Pen sizes -->
+                        <div class="flex items-center gap-2 px-1">
                             <button type="button" class="pdf-pen-btn w-5 h-5 rounded-full bg-slate-800 border-2 border-red-500" data-min="0.8" data-max="1.5" title="Fine pen"></button>
                             <button type="button" class="pdf-pen-btn w-6 h-6 rounded-full bg-slate-800 border-2 border-transparent hover:border-red-400" data-min="1.5" data-max="3" title="Medium pen"></button>
                             <button type="button" class="pdf-pen-btn w-7 h-7 rounded-full bg-slate-800 border-2 border-transparent hover:border-red-400" data-min="3" data-max="6" title="Thick pen"></button>
-                            <button type="button" id="pdfAnnotUndo"
-                                    class="px-2.5 py-1 text-xs bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors">
-                                <i class="bi bi-arrow-counterclockwise"></i> Undo
+                        </div>
+                        <!-- Undo / Clear -->
+                        <button type="button" id="pdfAnnotUndo"
+                                class="px-2.5 py-1 text-xs bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors">
+                            <i class="bi bi-arrow-counterclockwise"></i> Undo
+                        </button>
+                        <button type="button" id="pdfAnnotClear"
+                                class="px-2.5 py-1 text-xs bg-white border border-red-200 text-red-500 rounded-lg hover:bg-red-50 transition-colors">
+                            <i class="bi bi-eraser"></i> Clear
+                        </button>
+                        <!-- Save / Cancel always visible -->
+                        <span id="pdfPageLimitMsg" class="hidden text-xs text-amber-600 ml-1"><i class="bi bi-info-circle"></i> Max 4 pages</span>
+                        <div class="flex items-center gap-2 ml-auto">
+                            <button type="button" id="pdfAnnotCancel"
+                                    class="px-3 py-1.5 text-xs text-slate-400 hover:text-slate-600 border border-slate-200 bg-white rounded-lg transition-colors">
+                                Cancel
                             </button>
-                            <button type="button" id="pdfAnnotClear"
-                                    class="px-2.5 py-1 text-xs bg-white border border-red-200 text-red-500 rounded-lg hover:bg-red-50 transition-colors">
-                                <i class="bi bi-eraser"></i> Clear
+                            <button type="button" id="pdfAnnotSave"
+                                    class="px-4 py-1.5 bg-red-600 hover:bg-red-700 active:scale-95 text-white font-bold text-xs rounded-lg shadow-sm transition-all">
+                                <i class="bi bi-check2-circle"></i> Save
                             </button>
                         </div>
                     </div>
@@ -660,18 +674,6 @@ include __DIR__ . '/../includes/header.php';
                             <canvas id="pdfBgCanvas"></canvas>
                             <canvas id="pdfDrawCanvas" style="position:absolute;top:0;left:0;touch-action:none;"></canvas>
                         </div>
-                    </div>
-                    <!-- Save bar -->
-                    <div class="flex flex-wrap items-center gap-3 px-4 py-3 bg-slate-50 border-t border-slate-200">
-                        <span id="pdfPageLimitMsg" class="hidden text-xs text-amber-600"><i class="bi bi-info-circle"></i> Only first 4 pages will be saved</span>
-                        <button type="button" id="pdfAnnotSave"
-                                class="ml-auto px-5 py-2.5 bg-red-600 hover:bg-red-700 active:scale-95 text-white font-bold text-sm rounded-xl shadow-sm transition-all">
-                            <i class="bi bi-check2-circle"></i> Save Annotations
-                        </button>
-                        <button type="button" id="pdfAnnotCancel"
-                                class="px-4 py-2 text-slate-400 hover:text-slate-600 text-sm transition-colors">
-                            Cancel
-                        </button>
                     </div>
                 </div>
                 <!-- Saved page thumbnails -->
