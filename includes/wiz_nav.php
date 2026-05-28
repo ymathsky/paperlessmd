@@ -29,7 +29,7 @@ $endVisitId  ??= 0;
         <button type="button" id="submitBtn"
                 class="hidden flex items-center justify-center gap-2 px-8 py-3 <?= $accentClass ?>
                        text-white font-bold rounded-xl transition-all shadow-md hover:shadow-lg text-base active:scale-95 flex-1 sm:flex-none">
-            <i class="bi bi-check2-circle text-xl"></i> Submit &amp; Save
+            <i class="bi bi-stop-circle-fill text-xl"></i> End Visit
         </button>
 
         <?php if ($endVisitId): ?>
