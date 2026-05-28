@@ -914,23 +914,9 @@ include __DIR__ . '/../includes/header.php';
                 </div>
             </div>
 
-            <!-- F/U in (weeks/days) -->
-            <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1.5">F/U In</label>
-                <div class="flex gap-2">
-                    <input type="number" name="fu_weeks" min="1"
-                           value="<?= pv($prev,'fu_weeks') ?>"
-                           class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
-                                  focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition focus:bg-white"
-                           placeholder="e.g. 2">
-                    <select name="fu_unit"
-                            class="px-3 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
-                                   focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition focus:bg-white">
-                        <option value="weeks" <?= pv($prev,'fu_unit') === 'days' ? '' : 'selected' ?>>Weeks</option>
-                        <option value="days"  <?= pv($prev,'fu_unit') === 'days' ? 'selected' : '' ?>>Days</option>
-                    </select>
-                </div>
-            </div>
+            <!-- Hidden F/U inputs — populated by End Visit modal -->
+            <input type="hidden" name="fu_weeks" id="fuWeeksHidden" value="<?= pv($prev,'fu_weeks') ?>">
+            <input type="hidden" name="fu_unit"  id="fuUnitHidden"  value="<?= pv($prev,'fu_unit') ?: 'weeks' ?>">
 
             <?php include __DIR__ . '/../includes/sig_block.php'; ?>
 
@@ -946,6 +932,147 @@ include __DIR__ . '/../includes/header.php';
         </div><!-- /px-6 -->
     </form>
 </div><!-- /card -->
+
+<!-- ── End Visit Confirmation Modal ─────────────────────────────────────── -->
+<div id="endVisitModal" class="hidden fixed inset-0 z-[300] flex items-end sm:items-center justify-center no-print">
+    <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="endVisitModalClose()"></div>
+    <div id="endVisitModalCard"
+         class="relative bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-sm shadow-2xl p-6 space-y-5
+                translate-y-full transition-transform duration-300"
+         style="padding-bottom:calc(4.5rem + env(safe-area-inset-bottom))">
+
+        <!-- Header -->
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center shrink-0">
+                <i class="bi bi-stop-circle-fill text-red-600 text-lg"></i>
+            </div>
+            <div>
+                <h3 class="font-bold text-slate-800 text-base">End Visit</h3>
+                <p class="text-xs text-slate-400">All data will be saved and the visit closed.</p>
+            </div>
+            <button type="button" onclick="endVisitModalClose()"
+                    class="ml-auto text-slate-400 hover:text-slate-700 p-1 rounded-lg hover:bg-slate-100 transition-colors">
+                <i class="bi bi-x-lg text-base leading-none"></i>
+            </button>
+        </div>
+
+        <!-- Time Out (read-only display) -->
+        <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Time Out</label>
+            <div class="flex items-center gap-2 px-4 py-3 border border-slate-200 bg-slate-50 rounded-xl text-sm text-slate-700">
+                <i class="bi bi-clock text-slate-400"></i>
+                <span id="evTimeDisplay" class="font-semibold"></span>
+                <span class="text-slate-400 text-xs ml-auto">auto-stamped</span>
+            </div>
+        </div>
+
+        <!-- F/U In -->
+        <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Follow-Up In <span class="font-normal normal-case text-slate-400">(optional)</span></label>
+            <div class="flex gap-2">
+                <input type="number" id="evFuWeeks" min="1" placeholder="e.g. 2"
+                       class="flex-1 px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white
+                              focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition">
+                <select id="evFuUnit"
+                        class="px-3 py-3 border border-slate-200 rounded-xl text-sm bg-white
+                               focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition">
+                    <option value="weeks">Weeks</option>
+                    <option value="days">Days</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="flex gap-3 pt-1">
+            <button type="button" id="evConfirmBtn" onclick="endVisitConfirm()"
+                    class="flex-1 py-3 bg-red-600 hover:bg-red-700 active:scale-95
+                           text-white font-bold text-sm rounded-xl shadow-sm transition-all">
+                <i class="bi bi-stop-circle-fill mr-1"></i> Confirm End Visit
+            </button>
+            <button type="button" onclick="endVisitModalClose()"
+                    class="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600
+                           font-semibold text-sm rounded-xl transition-colors">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var _confirmed = false;
+
+    function padTwo(n) { return String(n).padStart(2, '0'); }
+
+    window.endVisitModalClose = function () {
+        var card = document.getElementById('endVisitModalCard');
+        card.style.transform = 'translateY(100%)';
+        setTimeout(function () {
+            document.getElementById('endVisitModal').classList.add('hidden');
+        }, 250);
+    };
+
+    function openEndVisitModal() {
+        var modal = document.getElementById('endVisitModal');
+        var card  = document.getElementById('endVisitModalCard');
+
+        // Stamp current time (overwrite time_out field too)
+        var now = new Date();
+        var hh  = padTwo(now.getHours());
+        var mm  = padTwo(now.getMinutes());
+        var timeStr = hh + ':' + mm;
+        var timeOut = document.querySelector('input[name="time_out"]');
+        if (timeOut) timeOut.value = timeStr;
+        var disp = document.getElementById('evTimeDisplay');
+        if (disp) disp.textContent = timeStr;
+
+        // Pre-fill F/U from hidden inputs (in case user already confirmed once then cancelled)
+        var fuW = document.getElementById('fuWeeksHidden');
+        var fuU = document.getElementById('fuUnitHidden');
+        var evW = document.getElementById('evFuWeeks');
+        var evU = document.getElementById('evFuUnit');
+        if (evW && fuW && fuW.value) evW.value = fuW.value;
+        if (evU && fuU) evU.value = fuU.value || 'weeks';
+
+        modal.classList.remove('hidden');
+        card.style.transform = 'translateY(100%)';
+        requestAnimationFrame(function () {
+            requestAnimationFrame(function () {
+                card.style.transform = 'translateY(0)';
+            });
+        });
+    }
+
+    window.endVisitConfirm = function () {
+        var btn = document.getElementById('evConfirmBtn');
+        // Copy F/U values to hidden form inputs
+        var fuW = document.getElementById('fuWeeksHidden');
+        var fuU = document.getElementById('fuUnitHidden');
+        var evW = document.getElementById('evFuWeeks');
+        var evU = document.getElementById('evFuUnit');
+        if (fuW && evW) fuW.value = evW.value;
+        if (fuU && evU) fuU.value = evU.value;
+
+        // Close modal
+        endVisitModalClose();
+
+        // Set flag and re-trigger submitBtn click (captureAndSubmit will run)
+        _confirmed = true;
+        btn.disabled = true;
+        setTimeout(function () {
+            var sb = document.getElementById('submitBtn');
+            if (sb) sb.click();
+        }, 280); // wait for modal close animation
+    };
+
+    // _pdValidateExtra is checked by app.js immediately before form.submit()
+    window._pdValidateExtra = function () {
+        if (_confirmed) return true; // already went through modal
+        openEndVisitModal();
+        return false; // block submission until confirmed
+    };
+})();
+</script>
 <?php
 // Pass pre-filled ICD codes to JS
 $prevIcdCodes = [];
