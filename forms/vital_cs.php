@@ -66,6 +66,8 @@ if (!empty($_visitRow['provider_name'])) {
         $_schedProvider = (string)($__sp->fetchColumn() ?: '');
     } catch (PDOException $e) {}
 }
+// Lock the field whenever we have a schedule-sourced provider (MA cannot change it)
+$_providerLocked = $_schedProvider !== '';
 
 // Edit mode: allow re-opening a signed CS form without the one-signature redirect
 $_csEditMode = !empty($_GET['edit']);
@@ -256,7 +258,7 @@ include __DIR__ . '/../includes/header.php';
                 <div class="space-y-4">
                     <div>
                         <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Provider</label>
-                        <?php $_providerValue = h($_schedProvider ?: pv($prev, 'provider_name')); $_providerLocked = $_schedProvider !== ''; ?>
+                        <?php $_providerValue = h($_schedProvider ?: pv($prev, 'provider_name')); ?>
                         <input type="text" name="provider_name"
                                required data-label="Provider Name"
                                <?= !$_providerLocked ? 'list="providerNameList"' : '' ?>
