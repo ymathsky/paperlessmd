@@ -21,7 +21,9 @@ $maSig      = $_POST['ma_signature'] ?? '';
 $poaName    = trim($_POST['poa_name'] ?? '');
 $poaRel     = trim($_POST['poa_relationship'] ?? '');
 $_editOverride = (isAdmin() || isMa()) && ($_POST['edit_override'] ?? '') === '1';
-$forceDraft = ($formType === 'vital_cs');
+// vital_cs is draft only when signatures are absent (in-progress visit); once both sigs are
+// present (End Visit confirmed) treat it as signed so the record is finalised.
+$forceDraft = ($formType === 'vital_cs' && (!$signature || !$maSig));
 
 $allowed = ['vital_cs', 'new_patient', 'abn', 'pf_signup', 'ccm_consent', 'cognitive_wellness', 'medicare_awv', 'il_disclosure', 'wound_care_consent', 'informed_consent_wound', 'rpm_consent', 'new_patient_pocket', 'new_patient_pocket_pc'];
 if (!$patientId || !in_array($formType, $allowed, true)) {

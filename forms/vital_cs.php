@@ -250,6 +250,7 @@ include __DIR__ . '/../includes/header.php';
         <input type="hidden" name="csrf_token"  value="<?= csrfToken() ?>">
         <input type="hidden" name="patient_id"  value="<?= $patient_id ?>">
         <input type="hidden" name="form_type"   value="vital_cs">
+        <input type="hidden" name="visit_id"    value="<?= $_visitId ?>">
         <input type="hidden" name="med_count"   value="<?= count($medRows) ?>">
         <?php if ($_csEditMode): ?>
         <input type="hidden" name="edit_override" value="1">
