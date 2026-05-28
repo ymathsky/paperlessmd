@@ -560,13 +560,7 @@ include __DIR__ . '/../includes/header.php';
 
             <p class="form-section-title"><i class="bi bi-capsule text-red-500"></i> Medication List &amp; Reconciliation</p>
 
-            <?php if (!empty($activeMeds)): ?>
-            <a href="<?= BASE_URL ?>/patient_view.php?id=<?= $patient_id ?>&tab=meds" target="_blank"
-               class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50
-                      border border-emerald-200 px-3 py-1.5 rounded-full hover:bg-emerald-100 transition-colors mb-1">
-                <i class="bi bi-arrow-counterclockwise"></i><?= count($activeMeds) ?> meds from master list &mdash; Manage
-            </a>
-            <?php endif; ?>
+
 
             <!-- Clean card list (rendered by JS) -->
             <div id="medEmptyMsg"
