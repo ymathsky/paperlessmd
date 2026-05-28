@@ -61,7 +61,7 @@ if (!empty($_visitRow['provider_name'])) {
     $_schedProvider = (string)$_visitRow['provider_name'];
 } else {
     try {
-        $__sp = $pdo->prepare("SELECT provider_name FROM `schedule` WHERE patient_id = ? AND visit_date = CURDATE() AND COALESCE(provider_name,'') != '' ORDER BY id DESC LIMIT 1");
+        $__sp = $pdo->prepare("SELECT provider_name FROM `schedule` WHERE patient_id = ? AND COALESCE(provider_name,'') != '' ORDER BY visit_date DESC, id DESC LIMIT 1");
         $__sp->execute([$patient_id]);
         $_schedProvider = (string)($__sp->fetchColumn() ?: '');
     } catch (PDOException $e) {}
