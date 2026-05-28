@@ -14,7 +14,7 @@ $_visitId   = (int)($_GET['visit_id'] ?? 0);
 $_visitRow  = null;
 if ($_visitId) {
     $_vStmt = $pdo->prepare(
-        "SELECT id, ma_id, provider_name FROM `schedule` WHERE id = ? AND patient_id = ? LIMIT 1"
+        "SELECT id, ma_id, provider_name, visit_date, visit_time FROM `schedule` WHERE id = ? AND patient_id = ? LIMIT 1"
     );
     $_vStmt->execute([$_visitId, $patient_id]);
     $_visitRow = $_vStmt->fetch();
@@ -57,17 +57,24 @@ try {
 
 // Auto-fill provider name — prefer the specific visit's provider_name, fall back to any today's visit
 $_schedProvider = '';
+$_schedDate     = date('Y-m-d');
+$_schedTime     = '';
 if (!empty($_visitRow['provider_name'])) {
     $_schedProvider = (string)$_visitRow['provider_name'];
+    $_schedDate     = (string)($_visitRow['visit_date'] ?: date('Y-m-d'));
+    $_schedTime     = (string)($_visitRow['visit_time'] ?: '');
 } else {
     try {
-        $__sp = $pdo->prepare("SELECT provider_name FROM `schedule` WHERE patient_id = ? AND COALESCE(provider_name,'') != '' ORDER BY visit_date DESC, id DESC LIMIT 1");
+        $__sp = $pdo->prepare("SELECT provider_name, visit_date, visit_time FROM `schedule` WHERE patient_id = ? AND COALESCE(provider_name,'') != '' ORDER BY visit_date DESC, id DESC LIMIT 1");
         $__sp->execute([$patient_id]);
-        $_schedProvider = (string)($__sp->fetchColumn() ?: '');
+        $__sr = $__sp->fetch(PDO::FETCH_ASSOC);
+        if ($__sr) {
+            $_schedProvider = (string)($__sr['provider_name'] ?: '');
+            $_schedDate     = (string)($__sr['visit_date'] ?: date('Y-m-d'));
+            $_schedTime     = (string)($__sr['visit_time'] ?: '');
+        }
     } catch (PDOException $e) {}
 }
-// Lock the field whenever we have a schedule-sourced provider (MA cannot change it)
-$_providerLocked = $_schedProvider !== '';
 
 // Edit mode: allow re-opening a signed CS form without the one-signature redirect
 $_csEditMode = !empty($_GET['edit']);
@@ -271,44 +278,36 @@ include __DIR__ . '/../includes/header.php';
                 <div class="wiz-section-hd">
                     <i class="bi bi-person-badge"></i> Provider, Date &amp; Time
                 </div>
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Provider</label>
-                        <?php $_providerValue = h($_schedProvider ?: pv($prev, 'provider_name')); ?>
-                        <input type="text" name="provider_name"
-                               required data-label="Provider Name"
-                               <?= !$_providerLocked ? 'list="providerNameList"' : '' ?>
-                               value="<?= $_providerValue ?>"
-                               <?= $_providerLocked ? 'readonly' : '' ?>
-                               class="w-full px-4 py-3 border rounded-xl text-sm transition
-                                      <?= $_providerLocked
-                                            ? 'border-slate-200 bg-slate-100 text-slate-500 cursor-not-allowed'
-                                            : 'border-slate-200 bg-white focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent' ?>"
-                               placeholder="Attending provider name">
-                        <?php if (!$_providerLocked): ?>
-                        <datalist id="providerNameList">
-                            <?php foreach ($_providerNames as $_pn): ?>
-                            <option value="<?= h($_pn) ?>">
-                            <?php endforeach; ?>
-                        </datalist>
-                        <?php endif; ?>
-                    </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Date of Visit</label>
-                            <input type="date" name="form_date" value="<?= date('Y-m-d') ?>"
-                                   required data-label="Date of Visit"
-                                   class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white
-                                          focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition">
+                <?php
+                    $_dispProvider = h($_schedProvider ?: pv($prev, 'provider_name') ?: '—');
+                    $_dispDate     = $_schedDate ? date('M j, Y', strtotime($_schedDate)) : date('M j, Y');
+                    $_dispTime     = $_schedTime ? date('g:i A', strtotime($_schedTime)) : '—';
+                ?>
+                <input type="hidden" name="provider_name" value="<?= h($_schedProvider ?: pv($prev, 'provider_name')) ?>">
+                <input type="hidden" name="form_date"     value="<?= h($_schedDate) ?>">
+                <input type="hidden" name="time_in"       value="<?= h($_schedTime) ?>">
+                <div class="divide-y divide-slate-100 rounded-xl border border-slate-100 overflow-hidden">
+                    <div class="flex items-center gap-3 px-4 py-3 bg-slate-50">
+                        <i class="bi bi-person-badge-fill text-red-400 text-base shrink-0"></i>
+                        <div class="min-w-0">
+                            <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wide leading-none mb-0.5">Provider</p>
+                            <p class="text-sm font-bold text-slate-800 truncate"><?= $_dispProvider ?></p>
                         </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">
-                                <i class="bi bi-clock text-red-400 mr-1"></i>Time In
-                            </label>
-                            <input type="time" name="time_in"
-                                   required data-label="Time In"
-                                   class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white
-                                          focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent transition">
+                    </div>
+                    <div class="grid grid-cols-2 divide-x divide-slate-100">
+                        <div class="flex items-center gap-3 px-4 py-3 bg-slate-50">
+                            <i class="bi bi-calendar3 text-red-400 text-base shrink-0"></i>
+                            <div>
+                                <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wide leading-none mb-0.5">Date of Visit</p>
+                                <p class="text-sm font-bold text-slate-800"><?= $_dispDate ?></p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3 px-4 py-3 bg-slate-50">
+                            <i class="bi bi-clock-fill text-red-400 text-base shrink-0"></i>
+                            <div>
+                                <p class="text-[10px] font-semibold text-slate-400 uppercase tracking-wide leading-none mb-0.5">Time In</p>
+                                <p class="text-sm font-bold text-slate-800"><?= $_dispTime ?></p>
+                            </div>
                         </div>
                     </div>
                 </div>
