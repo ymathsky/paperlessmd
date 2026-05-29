@@ -93,6 +93,7 @@ if ($action === 'status') {
         if ($parsed) {
             $diffSec = abs(time() - $parsed->getTimestamp());
             if ($diffSec <= 600) { // accept if within 10 minutes
+                $parsed->setTimezone(new DateTimeZone(APP_TIMEZONE));
                 $clientStartedAt = $parsed->format('Y-m-d H:i:s');
             }
         }

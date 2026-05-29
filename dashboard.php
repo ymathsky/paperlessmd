@@ -1817,6 +1817,12 @@ async function dashStartVisit(visitId, patientId, visitType, visitSubtype, btn) 
     btn.disabled = true;
     btn.innerHTML = '<i class="bi bi-hourglass-split animate-spin"></i>';
 
+    // Capture exact click time once and derive time_in in the app's configured timezone
+    const _clickedAt = new Date();
+    const _appTz = window._pdTimezone || 'America/Chicago';
+    const _tiParts = new Intl.DateTimeFormat('en-US', { timeZone: _appTz, hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(_clickedAt);
+    const _ti = _tiParts.find(p => p.type === 'hour').value.padStart(2,'0') + ':' + _tiParts.find(p => p.type === 'minute').value.padStart(2,'0');
+
     const vType = visitType.toLowerCase();
     const npType = (visitSubtype === 'primary_care') ? 'primary_care' : 'wound_care';
     
@@ -1841,14 +1847,12 @@ async function dashStartVisit(visitId, patientId, visitType, visitSubtype, btn) 
     fetch(window._pdBase + '/api/schedule_update.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ csrf: window._pdCsrf, id: visitId, action: 'status', status: 'en_route', started_at: new Date().toISOString() })
+        body: JSON.stringify({ csrf: window._pdCsrf, id: visitId, action: 'status', status: 'en_route', started_at: _clickedAt.toISOString() })
     })
     .then(r => r.json())
     .then(data => {
         if (data.ok) {
             if (window.closeMapPanel) window.closeMapPanel();
-            const _now = new Date();
-            const _ti = String(_now.getHours()).padStart(2,'0') + ':' + String(_now.getMinutes()).padStart(2,'0');
             window.location.href = window._pdBase + formPath
                 + '?patient_id=' + patientId
                 + '&visit_id=' + visitId
