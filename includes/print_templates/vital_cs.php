@@ -51,6 +51,13 @@ $height  = vd($data, 'height');
 $weight  = vd($data, 'weight');
 $resp    = vd($data, 'resp');
 
+$_src = function($key) use ($data) {
+    $v = vd($data, $key . '_source');
+    if ($v === 'per_patient') return 'Per patient';
+    if ($v === 'checked')     return 'Checked';
+    return '';
+};
+
 $chiefComplaint = vd($data, 'chief_complaint');
 $pharmacyName   = vd($data, 'pharmacy_name');
 $pharmacyPhone  = vd($data, 'pharmacy_phone');
@@ -137,9 +144,9 @@ $vtOptions = ['New', 'Follow Up', 'Sick', 'Post Hospital F/U'];
             <td><strong>O2SAT:</strong><br><?= $o2sat ?></td>
         </tr>
         <tr>
-            <td><strong>GLUCOSE:</strong><br><?= $glucose ?><br><small>Checked or Per patient</small></td>
-            <td><strong>HEIGHT:</strong><br><?= $height ?><br><small>Checked or Per patient</small></td>
-            <td><strong>WEIGHT:</strong><br><?= $weight ?><br><small>Checked or Per patient</small></td>
+            <td><strong>GLUCOSE:</strong><br><?= $glucose ?><?php if ($_src('glucose')): ?><br><small><?= $_src('glucose') ?></small><?php endif; ?></td>
+            <td><strong>HEIGHT:</strong><br><?= $height ?><?php if ($_src('height')): ?><br><small><?= $_src('height') ?></small><?php endif; ?></td>
+            <td><strong>WEIGHT:</strong><br><?= $weight ?><?php if ($_src('weight')): ?><br><small><?= $_src('weight') ?></small><?php endif; ?></td>
             <td><strong>RESP:</strong><br><?= $resp ?></td>
         </tr>
         <tr>
