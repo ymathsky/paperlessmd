@@ -547,8 +547,8 @@ JS;
                    class="w-full max-w-sm px-4 py-2.5 border border-slate-200 rounded-xl text-sm
                           focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent bg-white">
         </div>
-        <div class="relative border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 overflow-hidden" style="touch-action:none;">
-            <canvas id="provCanvas" class="w-full block" style="height:140px;"></canvas>
+        <div class="relative border-2 border-dashed border-slate-300 rounded-xl overflow-hidden" style="touch-action:none;background:#fff;">
+            <canvas id="provCanvas" class="w-full block" style="height:140px;background:#fff;"></canvas>
             <div id="provPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center text-slate-300 pointer-events-none select-none">
                 <i class="bi bi-pencil-square text-4xl mb-1"></i>
                 <span class="text-sm font-medium">Provider sign here</span>
