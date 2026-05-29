@@ -132,7 +132,6 @@ function nppSigBlock(array $f, array $fd, string $sigDate): void { ?>
 <?php }
 
 function nppProviderSigBlock(array $f, array $fd): void { ?>
-<?php if (empty($f['provider_signature']) && empty($fd['provider_print_name']) && empty($f['provider_name']) && empty($fd['provider_name']) && empty($fd['provider_npi'])) return; ?>
 <div style="margin-top:12pt;">
     <table style="width:100%;border-collapse:collapse;font-size:9pt;">
         <tr>
@@ -325,6 +324,7 @@ function nppFooter(string $formTitle, string $ptName, string $sigDate, string $c
 </div>
 
 <?php nppSigBlock($f, $fd, $sigDate); ?>
+<?php nppProviderSigBlock($f, $fd); ?>
 <?php nppFooter('CCM Consent', $ptName, $sigDate, $_coName); ?>
 </div>
 
@@ -383,6 +383,7 @@ foreach ($abnOpts as $opt => $text): ?>
 <?php endif; ?>
 
 <?php nppSigBlock($f, $fd, $sigDate); ?>
+<?php nppProviderSigBlock($f, $fd); ?>
 <?php nppFooter('Advance Beneficiary Notice (ABN)', $ptName, $sigDate, $_coName); ?>
 </div>
 
@@ -439,6 +440,7 @@ foreach ($abnOpts as $opt => $text): ?>
 </p>
 
 <?php nppSigBlock($f, $fd, $sigDate); ?>
+<?php nppProviderSigBlock($f, $fd); ?>
 <?php nppFooter('Informed Consent for Wound Care Treatment', $ptName, $sigDate, $_coName); ?>
 </div>
 
@@ -486,6 +488,7 @@ foreach ($abnOpts as $opt => $text): ?>
 </div>
 
 <?php nppSigBlock($f, $fd, $sigDate); ?>
+<?php nppProviderSigBlock($f, $fd); ?>
 <?php nppFooter('PHI Authorization (IL DHS)', $ptName, $sigDate, $_coName); ?>
 </div>
 
@@ -531,5 +534,6 @@ foreach ($abnOpts as $opt => $text): ?>
 <?php endif; ?>
 
 <?php nppSigBlock($f, $fd, $sigDate); ?>
+<?php nppProviderSigBlock($f, $fd); ?>
 <?php nppFooter('Patient Fusion Portal Consent', $ptName, $sigDate, $_coName); ?>
 </div>
