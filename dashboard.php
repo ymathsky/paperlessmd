@@ -1847,11 +1847,14 @@ async function dashStartVisit(visitId, patientId, visitType, visitSubtype, btn) 
     .then(data => {
         if (data.ok) {
             if (window.closeMapPanel) window.closeMapPanel();
+            const _now = new Date();
+            const _ti = String(_now.getHours()).padStart(2,'0') + ':' + String(_now.getMinutes()).padStart(2,'0');
             window.location.href = window._pdBase + formPath
                 + '?patient_id=' + patientId
                 + '&visit_id=' + visitId
                 + '&sched_visit_type=' + encodeURIComponent(visitType)
-                + npParam;
+                + npParam
+                + '&time_in=' + _ti;
         } else {
             btn.disabled = false;
             btn.innerHTML = '<i class="bi bi-play-fill"></i> Start';
