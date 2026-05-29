@@ -31,8 +31,14 @@ $provider = vd($data, 'provider_name') ?: '_______________________';
 $visitType = vd($data, 'visit_type');
 $fuWeeks  = vd($data, 'fu_weeks');
 $fuUnit   = strtoupper(vd($data, 'fu_unit') ?: 'WEEKS');
-$timeIn   = vd($data, 'time_in');
-$timeOut  = vd($data, 'time_out');
+// Format time values as 12-hour (handles HH:MM or HH:MM:SS)
+$_fmtTime = function($t) {
+    if (!$t) return '';
+    $ts = @strtotime('1970-01-01 ' . $t);
+    return ($ts !== false) ? date('g:i A', $ts) : $t;
+};
+$timeIn   = $_fmtTime(vd($data, 'time_in'));
+$timeOut  = $_fmtTime(vd($data, 'time_out'));
 $homebound = vd($data, 'homebound');   // 'homebound' or 'not_homebound'
 $missedReason = vd($data, 'missed_visit_reason');
 
@@ -55,12 +61,15 @@ $races          = vdArr($data, 'race');
 // ICD-10 codes
 $icdCodes = vdArr($data, 'icd10_codes');
 
-// Medications (med_type_1 through med_type_6)
+// Medications — read up to med_count (or 20 max); skip empty rows
 $meds = [];
-for ($i = 1; $i <= 6; $i++) {
+$_medMax = max(6, min(20, (int)vd($data, 'med_count')));
+for ($i = 1; $i <= $_medMax; $i++) {
+    $_mn = vd($data, "med_name_$i");
+    if ($_mn === '') continue;
     $meds[] = [
         'type' => vd($data, "med_type_$i"),
-        'name' => vd($data, "med_name_$i"),
+        'name' => $_mn,
         'freq' => vd($data, "med_freq_$i"),
     ];
 }
