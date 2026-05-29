@@ -412,6 +412,7 @@ $renderVisitCard = function(array $v, int $idx, bool $showMaName) use ($statusDe
                     </span>
                     <?php endif; ?>
 
+                    <?php if (isAdmin()): ?>
                     <button onclick="openEditModal(<?= (int)$v['id'] ?>, <?= htmlspecialchars(json_encode($v['patient_name'] ?? ''), ENT_QUOTES) ?>)"
                             style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;
                                    border-radius:10px;background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.3);
@@ -419,6 +420,7 @@ $renderVisitCard = function(array $v, int $idx, bool $showMaName) use ($statusDe
                             class="no-print">
                         <i class="bi bi-pencil-fill" style="font-size:11px;"></i>
                     </button>
+                    <?php endif; ?>
                 </div>
             </div>
             <?php if (!empty($v['visit_started_at']) || !empty($v['visit_ended_at'])): ?>
@@ -544,12 +546,14 @@ $renderVisitCard = function(array $v, int $idx, bool $showMaName) use ($statusDe
                              border:1px solid rgba(16,185,129,0.3);border-radius:50px;font-size:15px;font-weight:800;">
                     <i class="bi bi-check-circle-fill"></i> Visit Complete
                 </span>
+                <?php if (isAdmin()): ?>
                 <button onclick="undoEndVisit(<?= $v['id'] ?>, this)"
                         style="display:flex;align-items:center;gap:6px;padding:13px 14px;background:rgba(251,191,36,0.12);
                                color:#fde68a;border:1px solid rgba(251,191,36,0.3);border-radius:50px;
                                font-size:13px;font-weight:700;cursor:pointer;transition:all 0.15s;flex-shrink:0;">
                     <i class="bi bi-arrow-counterclockwise"></i> Undo
                 </button>
+                <?php endif; ?>
                 <?php elseif ($v['status'] === 'missed'): ?>
                 <button onclick="updateStatus(<?= $v['id'] ?>, 'pending')"
                         style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;
