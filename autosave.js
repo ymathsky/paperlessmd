@@ -95,10 +95,17 @@
 
         /* ── Restore saved draft ─────────────────────────────────────────── */
         function restore(saved) {
-            /* Reset all checkboxes first so unchecked ones don't linger */
+            /* Reset only checkbox groups that have saved data so PHP defaults
+               are preserved for any group the user never explicitly touched. */
+            var _savedCbGroups = {};
+            for (var _k in saved) {
+                if (!Object.prototype.hasOwnProperty.call(saved, _k)) continue;
+                var _probe = form.querySelector('[name="' + _k.replace(/"/g, '\\"') + '"]');
+                if (_probe && _probe.type === 'checkbox') _savedCbGroups[_k] = true;
+            }
             var els = form.elements;
             for (var i = 0; i < els.length; i++) {
-                if (els[i].type === 'checkbox') els[i].checked = false;
+                if (els[i].type === 'checkbox' && _savedCbGroups[els[i].name]) els[i].checked = false;
             }
 
             for (var name in saved) {
@@ -136,6 +143,8 @@
                 var ts    = saved.__ts ? new Date(saved.__ts).getTime() : 0;
                 if (ts && (Date.now() - ts) < EXPIRY_MS) {
                     restore(saved);
+                    /* Re-sync card-based lists (e.g. medications) that live outside regular inputs */
+                    if (typeof window._medRebuildFromDom === 'function') { window._medRebuildFromDom(); }
                     var ageMin = Math.round((Date.now() - ts) / 60000);
                     var ageStr = ageMin < 1 ? 'just now' : ageMin + ' min ago';
                     showBadge('Draft restored (' + ageStr + ')', false);

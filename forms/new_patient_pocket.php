@@ -122,10 +122,13 @@ $medRows = [];
 foreach ($activeMeds as $m) {
     $medRows[] = ['med_id' => $m['id'], 'med_name' => $m['med_name'], 'med_freq' => $m['med_frequency'], 'med_type' => 'Refill'];
 }
-$emptyTarget = count($activeMeds) + 2;
-while (count($medRows) < $emptyTarget) {
-    $medRows[] = ['med_id' => 0, 'med_name' => '', 'med_freq' => '', 'med_type' => ''];
-}
+
+// Build autocomplete list of all distinct pharmacy names in the system
+$_pharmacyNames = [];
+try {
+    $_phStmt = $pdo->query("SELECT DISTINCT pharmacy_name FROM patients WHERE pharmacy_name IS NOT NULL AND pharmacy_name != '' ORDER BY pharmacy_name");
+    $_pharmacyNames = $_phStmt->fetchAll(PDO::FETCH_COLUMN);
+} catch (PDOException $e) {}
 
 $dob          = $patient['dob'] ?? '';
 $formattedDob = $dob ? date('m/d/Y', strtotime($dob)) : '';
@@ -248,21 +251,7 @@ include __DIR__ . '/../includes/header.php';
                         </div>
                     </div>
                 </div>
-                <div class="mt-4">
-                        <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">F/U In</label>
-                        <div class="flex gap-2">
-                            <input type="number" name="fu_weeks" min="1"
-                                   class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-white
-                                          focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition"
-                                   placeholder="e.g. 2">
-                            <select name="fu_unit"
-                                    class="px-3 py-3 border border-slate-200 rounded-xl text-sm bg-white
-                                           focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition">
-                                <option value="weeks">Weeks</option>
-                                <option value="days">Days</option>
-                            </select>
-                        </div>
-                </div>
+
             </div>
 
             <!-- Section: Visit Type -->
@@ -361,38 +350,58 @@ include __DIR__ . '/../includes/header.php';
         <div class="wiz-step hidden space-y-6 py-4"
              data-step="1" data-title="Vitals" data-icon="bi-heart-pulse">
 
-            <p class="form-section-title">
-                <i class="bi bi-heart-pulse text-indigo-500"></i>
-                Section 2 of 9 &mdash; Vital Signs &amp; Clinical <span class="text-slate-400 font-normal text-xs">(Visit Consent / CS)</span>
-            </p>
-
-            <div class="vitals-quick-grid grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <?php
-                $vitals = [
-                    ['name'=>'bp',      'label'=>'BP',       'placeholder'=>'120/80'],
-                    ['name'=>'pulse',   'label'=>'Pulse',    'placeholder'=>'72 bpm'],
-                    ['name'=>'temp',    'label'=>'Temp',     'placeholder'=>'98.6°F'],
-                    ['name'=>'o2sat',   'label'=>'O2Sat',    'placeholder'=>'98%'],
-                    ['name'=>'glucose', 'label'=>'Glucose',  'placeholder'=>'mg/dL'],
-                    ['name'=>'height',  'label'=>'Height',   'placeholder'=>'in / cm'],
-                    ['name'=>'weight',  'label'=>'Weight',   'placeholder'=>'lbs / kg'],
-                    ['name'=>'resp',    'label'=>'Resp',     'placeholder'=>'breaths/min'],
-                ];
-                foreach ($vitals as $v):
-                    $prefilled = pv($prev, $v['name']);
-                ?>
-                <div class="bg-slate-50 border <?= $prefilled ? 'border-amber-300' : 'border-slate-200' ?> rounded-xl p-3">
-                    <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">
-                        <?= $v['label'] ?>
-                        <?php if ($prefilled): ?><span class="ml-1 text-amber-400" title="Pre-filled"><i class="bi bi-arrow-counterclockwise"></i></span><?php endif; ?>
-                    </label>
-                    <input type="text" name="<?= $v['name'] ?>" value="<?= $prefilled ?>"
-                           class="w-full bg-transparent text-sm font-semibold text-slate-800 border-0 border-b border-slate-300 pb-1
-                                  focus:outline-none focus:border-indigo-400 transition"
-                           placeholder="<?= $v['placeholder'] ?>">
-                    <p class="text-xs text-slate-400 mt-2">Checked or Per patient</p>
+            <div class="wiz-section">
+                <div class="wiz-section-hd">
+                    <i class="bi bi-heart-pulse text-red-400"></i> Vital Signs
                 </div>
-                <?php endforeach; ?>
+
+                <!-- Missed visit banner -->
+                <div id="mvVitalsBanner" style="display:none"
+                     class="flex items-center gap-2.5 px-4 py-3 bg-amber-50 border border-amber-200
+                            text-amber-800 rounded-xl text-sm font-medium mb-2">
+                    <i class="bi bi-calendar-x-fill text-amber-500 text-base flex-shrink-0"></i>
+                    Missed Visit &mdash; vital signs are optional. Fill what you know or skip this step.
+                </div>
+
+                <div class="vitals-quick-grid grid grid-cols-2 gap-3 pt-1">
+                    <?php
+                    $vitals = [
+                        ['name'=>'bp',      'label'=>'BP',       'placeholder'=>'120/80',      'req'=>true],
+                        ['name'=>'pulse',   'label'=>'Pulse',    'placeholder'=>'72 bpm',      'req'=>true],
+                        ['name'=>'temp',    'label'=>'Temp',     'placeholder'=>'98.6°F',      'req'=>false],
+                        ['name'=>'o2sat',   'label'=>'O2Sat',    'placeholder'=>'98%',         'req'=>true],
+                        ['name'=>'glucose', 'label'=>'Glucose',  'placeholder'=>'mg/dL',       'req'=>false],
+                        ['name'=>'height',  'label'=>'Height',   'placeholder'=>'in / cm',     'req'=>false],
+                        ['name'=>'weight',  'label'=>'Weight',   'placeholder'=>'lbs / kg',    'req'=>false],
+                        ['name'=>'resp',    'label'=>'Resp',     'placeholder'=>'breaths/min', 'req'=>false],
+                    ];
+                    foreach ($vitals as $v):
+                        $prefilled = pv($prev, $v['name']);
+                    ?>
+                    <div class="vital-card border <?= $prefilled ? 'border-amber-300' : 'border-slate-200' ?> rounded-xl p-3">
+                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">
+                            <?= $v['label'] ?><?= $v['req'] ? ' <span class="text-red-400">*</span>' : '' ?>
+                            <?php if ($prefilled): ?><span class="ml-1 text-amber-400" title="Pre-filled"><i class="bi bi-arrow-counterclockwise"></i></span><?php endif; ?>
+                        </label>
+                        <input type="text" name="<?= $v['name'] ?>" value="<?= $prefilled ?>"
+                               <?= $v['req'] ? 'required data-label="' . $v['label'] . '"' : '' ?>
+                               data-voice-numbers-only="1"
+                               class="w-full bg-transparent text-sm font-semibold text-slate-800 border-0 border-b border-slate-300 pb-1
+                                      focus:outline-none focus:border-indigo-400 transition"
+                               placeholder="<?= $v['placeholder'] ?>">
+                        <div class="flex flex-col gap-1 mt-2.5">
+                            <label class="vital-src flex items-center justify-center gap-1 py-1 px-2 border-2 border-slate-200 rounded-lg cursor-pointer text-xs font-semibold transition-all">
+                                <input type="radio" name="<?= $v['name'] ?>_source" value="checked" checked class="sr-only">
+                                <i class="bi bi-check2"></i> Checked
+                            </label>
+                            <label class="vital-src vital-pp flex items-center justify-center gap-1 py-1 px-2 border-2 border-slate-200 rounded-lg cursor-pointer text-xs font-semibold transition-all">
+                                <input type="radio" name="<?= $v['name'] ?>_source" value="per_patient" class="sr-only">
+                                <i class="bi bi-person"></i> Per patient
+                            </label>
+                        </div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
             </div>
 
         </div><!-- /step 1 -->
@@ -404,26 +413,40 @@ include __DIR__ . '/../includes/header.php';
         <div class="wiz-step hidden space-y-6 py-4"
              data-step="2" data-title="Medications" data-icon="bi-capsule">
 
-            <p class="form-section-title">
-                <i class="bi bi-bag-heart text-indigo-500"></i>
-                Section 3 of 9 &mdash; Pharmacy, Allergies &amp; Medications <span class="text-slate-400 font-normal text-xs">(Visit Consent / CS)</span>
-            </p>
+            <!-- Pharmacy -->
+            <div class="wiz-section">
+                <div class="wiz-section-hd">
+                    <i class="bi bi-bag-plus text-indigo-400"></i> Pharmacy
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Pharmacy Name</label>
+                        <input type="text" name="pharmacy_name"
+                               value="<?= pv($prev,'pharmacy_name') ?>"
+                               list="pharmacyNameList"
+                               class="w-full px-4 py-3 border <?= pv($prev,'pharmacy_name') ? 'border-amber-300' : 'border-slate-200' ?> rounded-xl text-sm bg-slate-50
+                                      focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition focus:bg-white"
+                               placeholder="e.g. CVS, Walgreens...">
+                        <datalist id="pharmacyNameList">
+                            <?php foreach ($_pharmacyNames as $_phn): ?>
+                            <option value="<?= h($_phn) ?>">
+                            <?php endforeach; ?>
+                        </datalist>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Pharmacy Phone</label>
+                        <input type="tel" name="pharmacy_phone"
+                               value="<?= pv($prev,'pharmacy_phone') ?>"
+                               class="w-full px-4 py-3 border <?= pv($prev,'pharmacy_phone') ? 'border-amber-300' : 'border-slate-200' ?> rounded-xl text-sm bg-slate-50
+                                      focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition focus:bg-white"
+                               placeholder="Phone number">
+                    </div>
+                </div>
+            </div>
+
+            <p class="form-section-title"><i class="bi bi-bag-heart text-indigo-500"></i> Allergies</p>
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Pharmacy</label>
-                    <input type="text" name="pharmacy_name" value="<?= pv($prev,'pharmacy_name') ?>"
-                           class="w-full px-4 py-3 border <?= pv($prev,'pharmacy_name') ? 'border-amber-300' : 'border-slate-200' ?> rounded-xl text-sm bg-slate-50
-                                  focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition focus:bg-white"
-                           placeholder="Pharmacy name">
-                </div>
-                <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-1.5">Pharmacy Phone</label>
-                    <input type="tel" name="pharmacy_phone" value="<?= pv($prev,'pharmacy_phone') ?>"
-                           class="w-full px-4 py-3 border <?= pv($prev,'pharmacy_phone') ? 'border-amber-300' : 'border-slate-200' ?> rounded-xl text-sm bg-slate-50
-                                  focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition focus:bg-white"
-                           placeholder="Phone number">
-                </div>
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-1.5">Assistive Device</label>
                     <input type="text" name="assistive_device" value="<?= pv($prev,'assistive_device') ?>"
@@ -450,6 +473,7 @@ include __DIR__ . '/../includes/header.php';
                 </div>
             </div>
 
+            <!-- Race -->
             <div>
                 <label class="block text-sm font-semibold text-slate-700 mb-2">Race</label>
                 <div class="flex flex-wrap gap-2">
@@ -468,100 +492,102 @@ include __DIR__ . '/../includes/header.php';
 
             <p class="form-section-title"><i class="bi bi-capsule text-indigo-500"></i> Medication List &amp; Reconciliation</p>
 
-            <?php if (!empty($activeMeds)): ?>
-            <a href="<?= BASE_URL ?>/patient_view.php?id=<?= $patient_id ?>&tab=meds" target="_blank"
-               class="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700 bg-emerald-50
-                      border border-emerald-200 px-3 py-1.5 rounded-full hover:bg-emerald-100 transition-colors mb-2">
-                <i class="bi bi-arrow-counterclockwise"></i><?= count($activeMeds) ?> meds from master list &mdash; Manage
-            </a>
-            <?php endif; ?>
-
-            <div class="overflow-x-auto border border-slate-200 rounded-xl">
-                <table class="w-full text-sm">
-                    <thead class="bg-slate-50 med-rows-thead">
-                        <tr>
-                            <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide w-28">New / Refill</th>
-                            <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide">Medication &amp; Dose</th>
-                            <th class="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wide w-36">Frequency</th>
-                            <th class="w-8 no-print"></th>
-                        </tr>
-                    </thead>
-                    <tbody class="med-rows-tbody divide-y divide-slate-100">
-                        <?php foreach ($medRows as $mi => $row):
-                            $i           = $mi + 1;
-                            $isPrefilled = $row['med_id'] > 0;
-                        ?>
-                        <input type="hidden" name="med_id_<?= $i ?>" value="<?= $row['med_id'] ?>">
-                        <tr class="<?= $isPrefilled ? 'bg-emerald-50/30 med-prefilled' : '' ?>">
-                            <td class="px-3 py-2" data-label="Type">
-                                <select name="med_type_<?= $i ?>"
-                                        class="w-full px-2 py-2 border <?= $isPrefilled ? 'border-emerald-200' : 'border-slate-200' ?> rounded-lg text-xs bg-white
-                                               focus:outline-none focus:ring-2 focus:ring-indigo-400">
-                                    <option value="">&mdash;</option>
-                                    <?php foreach (['New','Refill','D/C'] as $opt): ?>
-                                    <option <?= $row['med_type'] === $opt ? 'selected' : '' ?>><?= $opt ?></option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </td>
-                            <td class="px-3 py-2" data-label="Medication &amp; Dose">
-                                <?php if ($isPrefilled): ?><div class="flex items-center gap-1.5"><?php endif; ?>
-                                <?php if ($isPrefilled): ?><i class="bi bi-capsule text-emerald-500 text-xs shrink-0"></i><?php endif; ?>
-                                <input type="text" name="med_name_<?= $i ?>" value="<?= h($row['med_name']) ?>"
-                                       class="w-full px-3 py-2 border <?= $isPrefilled ? 'border-emerald-200' : 'border-slate-200' ?> rounded-lg text-sm bg-white
-                                              focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                                       placeholder="Medication name and dose">
-                                <?php if ($isPrefilled): ?></div><?php endif; ?>
-                            </td>
-                            <td class="px-3 py-2" data-label="Frequency">
-                                <input type="text" name="med_freq_<?= $i ?>" value="<?= h($row['med_freq']) ?>"
-                                       class="w-full px-3 py-2 border <?= $isPrefilled ? 'border-emerald-200' : 'border-slate-200' ?> rounded-lg text-sm bg-white
-                                              focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                                       placeholder="e.g. BID">
-                            </td>
-                            <td class="px-2 py-2 no-print">
-                                <?php if (!$isPrefilled): ?>
-                                <button type="button" class="med-remove-btn text-slate-300 hover:text-red-500 transition-colors"
-                                        title="Remove row"
-                                        onclick="(function(btn){var tr=btn.closest('tr');tr&&tr.remove();})(this)">
-                                    <i class="bi bi-x-circle text-base"></i>
-                                </button>
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
+            <!-- Clean card list (rendered by JS) -->
+            <div id="medEmptyMsg"
+                 class="text-center py-8 text-slate-400 text-sm border-2 border-dashed border-slate-200 rounded-2xl">
+                <i class="bi bi-capsule text-3xl block mb-2 opacity-40"></i>
+                No medications added yet &mdash; tap <strong>Add Medication</strong> below
             </div>
-            <div class="flex items-center gap-4 mt-2">
-                <button type="button" id="medAddRow"
-                        class="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-50 hover:bg-indigo-100
-                               border border-indigo-200 text-indigo-700 font-semibold text-sm rounded-xl transition-all no-print">
-                    <i class="bi bi-plus-circle"></i> Add Row
+            <div id="medCardList" class="space-y-2"></div>
+
+            <!-- Add button + hint -->
+            <div class="flex flex-wrap items-center gap-3 mt-2 no-print">
+                <button type="button" id="medAddBtn"
+                        class="inline-flex items-center gap-1.5 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700
+                               active:scale-95 text-white font-bold text-sm rounded-xl transition-all shadow-sm">
+                    <i class="bi bi-plus-circle-fill"></i> Add Medication
                 </button>
-                <label class="inline-flex items-center gap-2 px-4 py-2 bg-red-50 hover:bg-red-100
-                              border border-red-200 text-red-700 font-semibold text-sm rounded-xl
-                              transition-all cursor-pointer no-print">
-                    <i class="bi bi-file-earmark-pdf text-red-500"></i> Upload PDF &amp; Annotate
-                    <input type="file" id="pdfAnnotFile" accept="application/pdf" class="sr-only">
-                </label>
                 <p class="text-xs text-slate-400">
                     <i class="bi bi-info-circle mr-0.5 text-emerald-500"></i>
                     Set type to <strong class="text-indigo-600">D/C</strong> to discontinue &mdash;
-                    <strong class="text-emerald-600">New</strong> rows are added to the master list on save.
+                    <strong class="text-emerald-600">New</strong> meds are added to the master list on save.
                 </p>
             </div>
 
-            <!-- PDF Annotator Panel -->
-            <div id="pdfAnnotPanel" class="hidden mt-3 border-2 border-red-200 rounded-2xl overflow-hidden no-print">
-                <div class="flex flex-wrap items-center gap-3 px-4 py-3 bg-red-50 border-b border-red-200">
-                    <span class="text-sm font-semibold text-red-700">
-                        <i class="bi bi-file-earmark-pdf mr-1"></i>
-                        Page <span id="pdfCurPage">1</span> / <span id="pdfTotPages">?</span>
-                    </span>
-                    <div class="flex items-center gap-2 ml-auto flex-wrap">
+            <!-- Hidden inputs (managed by JS) -->
+            <input type="hidden" name="med_count" id="medCountField" value="0">
+            <input type="hidden" name="med_list_json" id="medListJson" value="">
+            <div id="medHiddens"></div>
+
+            <!-- ── Medication Attachments ─────────────────────────────── -->
+            <div class="wiz-section mt-2">
+                <div class="wiz-section-hd">
+                    <i class="bi bi-paperclip text-indigo-400"></i> Medication Attachments
+                    <span class="ml-auto text-xs font-normal normal-case tracking-normal text-slate-400">optional</span>
+                </div>
+
+                <!-- Handwriting pad (tablet stylus) -->
+                <?php
+                $hwFieldName   = 'med_handwriting';
+                $hwFieldId     = 'medHandwritingData';
+                $hwLabel       = 'Handwrite Medications (stylus / draw)';
+                $hwPlaceholder = 'Write medication names, doses &amp; frequencies with your stylus or finger&hellip;';
+                $hwExisting    = '';
+                include __DIR__ . '/../includes/handwriting_pad.php';
+                ?>
+
+                <!-- Extra handwriting pads added dynamically -->
+                <div id="hwExtraContainer"></div>
+
+                <!-- Add another drawing + PDF annotator row -->
+                <div class="flex flex-wrap items-center gap-3 mt-3 no-print">
+                    <button type="button" id="addMoreHw"
+                            class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 hover:bg-indigo-100
+                                   border border-indigo-200 text-indigo-700 font-semibold text-sm rounded-xl transition-all">
+                        <i class="bi bi-plus-square"></i> Add Another Drawing
+                    </button>
+                    <label class="inline-flex items-center gap-2 px-4 py-2 bg-red-50 hover:bg-red-100
+                                  border border-red-200 text-red-700 font-semibold text-sm rounded-xl
+                                  transition-all cursor-pointer no-print">
+                        <i class="bi bi-file-earmark-pdf text-red-500"></i> Upload PDF &amp; Annotate
+                        <input type="file" id="pdfAnnotFile" accept="application/pdf" class="sr-only">
+                    </label>
+                </div>
+
+                <!-- PDF Annotator Panel -->
+                <div id="pdfAnnotPanel" class="hidden mt-3 border-2 border-red-200 rounded-2xl overflow-hidden no-print">
+                    <!-- Toolbar row 1: nav + save/cancel -->
+                    <div class="flex items-center gap-2 px-3 py-2 bg-red-50 border-b border-red-100">
+                        <button type="button" id="pdfPrevBtn"
+                                class="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                            <i class="bi bi-chevron-left text-sm"></i>
+                        </button>
+                        <span class="text-sm font-semibold text-red-700 whitespace-nowrap">
+                            <i class="bi bi-file-earmark-pdf mr-1"></i>
+                            Page <span id="pdfCurPage">1</span> / <span id="pdfTotPages">?</span>
+                        </span>
+                        <button type="button" id="pdfNextBtn"
+                                class="w-8 h-8 flex items-center justify-center bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                            <i class="bi bi-chevron-right text-sm"></i>
+                        </button>
+                        <span id="pdfPageLimitMsg" class="hidden text-xs text-amber-600 ml-1 whitespace-nowrap"><i class="bi bi-info-circle"></i> Max 4 pages</span>
+                        <div class="flex items-center gap-2 ml-auto">
+                            <button type="button" id="pdfAnnotCancel"
+                                    class="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-700 border border-slate-200 bg-white rounded-lg transition-colors whitespace-nowrap">
+                                Cancel
+                            </button>
+                            <button type="button" id="pdfAnnotSave"
+                                    class="px-4 py-1.5 bg-red-600 hover:bg-red-700 active:scale-95 text-white font-bold text-xs rounded-lg shadow-sm transition-all whitespace-nowrap">
+                                <i class="bi bi-check2-circle"></i> Save
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Toolbar row 2: drawing tools -->
+                    <div class="flex items-center gap-2 px-3 py-2 bg-red-50 border-b border-red-200">
                         <button type="button" class="pdf-pen-btn w-5 h-5 rounded-full bg-slate-800 border-2 border-red-500" data-min="0.8" data-max="1.5" title="Fine pen"></button>
                         <button type="button" class="pdf-pen-btn w-6 h-6 rounded-full bg-slate-800 border-2 border-transparent hover:border-red-400" data-min="1.5" data-max="3" title="Medium pen"></button>
                         <button type="button" class="pdf-pen-btn w-7 h-7 rounded-full bg-slate-800 border-2 border-transparent hover:border-red-400" data-min="3" data-max="6" title="Thick pen"></button>
+                        <div class="w-px h-5 bg-slate-200 mx-1"></div>
                         <button type="button" id="pdfAnnotUndo"
                                 class="px-2.5 py-1 text-xs bg-white border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50 transition-colors">
                             <i class="bi bi-arrow-counterclockwise"></i> Undo
@@ -571,37 +597,264 @@ include __DIR__ . '/../includes/header.php';
                             <i class="bi bi-eraser"></i> Clear
                         </button>
                     </div>
-                </div>
-                <div id="pdfCanvasWrap" class="relative bg-slate-100 overflow-auto" style="max-height:60vh;">
-                    <div id="pdfCanvasContainer" class="relative inline-block" style="touch-action:none;cursor:crosshair;">
-                        <canvas id="pdfBgCanvas"></canvas>
-                        <canvas id="pdfDrawCanvas" style="position:absolute;top:0;left:0;touch-action:none;"></canvas>
+                    <!-- Canvas area -->
+                    <div id="pdfCanvasWrap" class="relative bg-slate-100 overflow-auto" style="max-height:60vh;">
+                        <div id="pdfCanvasContainer" class="relative inline-block" style="touch-action:none;cursor:crosshair;">
+                            <canvas id="pdfBgCanvas"></canvas>
+                            <canvas id="pdfDrawCanvas" style="position:absolute;top:0;left:0;touch-action:none;"></canvas>
+                        </div>
                     </div>
                 </div>
-                <div class="flex flex-wrap items-center gap-3 px-4 py-3 bg-slate-50 border-t border-slate-200">
-                    <button type="button" id="pdfPrevBtn"
-                            class="px-3.5 py-2 bg-white border border-slate-200 text-sm font-semibold text-slate-600 rounded-xl hover:bg-slate-50 transition-colors">
-                        <i class="bi bi-chevron-left"></i> Prev
-                    </button>
-                    <button type="button" id="pdfNextBtn"
-                            class="px-3.5 py-2 bg-white border border-slate-200 text-sm font-semibold text-slate-600 rounded-xl hover:bg-slate-50 transition-colors">
-                        Next <i class="bi bi-chevron-right"></i>
-                    </button>
-                    <span id="pdfPageLimitMsg" class="hidden text-xs text-amber-600"><i class="bi bi-info-circle"></i> Only first 4 pages will be saved</span>
-                    <button type="button" id="pdfAnnotSave"
-                            class="ml-auto px-5 py-2.5 bg-red-600 hover:bg-red-700 active:scale-95 text-white font-bold text-sm rounded-xl shadow-sm transition-all">
-                        <i class="bi bi-check2-circle"></i> Save Annotations
-                    </button>
-                    <button type="button" id="pdfAnnotCancel"
-                            class="px-4 py-2 text-slate-400 hover:text-slate-600 text-sm transition-colors">
-                        Cancel
-                    </button>
+                <!-- Saved page thumbnails -->
+                <div id="pdfAnnotThumbs" class="hidden flex-wrap gap-2 mt-2 no-print"></div>
+                <!-- Hidden PNG fields written by JS -->
+                <div id="pdfAnnotHiddens"></div>
+            </div><!-- /wiz-section Medication Attachments -->
+
+            <!-- ── PDF Loading Modal ──────────────────────────────────── -->
+            <div id="pdfLoadModal" class="hidden fixed inset-0 z-[9999] flex items-center justify-center no-print">
+                <div class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+                <div class="relative bg-white rounded-2xl shadow-2xl border border-slate-100 p-6 w-72 flex flex-col items-center gap-4">
+                    <div class="w-12 h-12 rounded-full border-4 border-indigo-100 border-t-indigo-600 animate-spin"></div>
+                    <div class="text-center">
+                        <p class="font-bold text-slate-800 text-sm mb-1">Processing PDF</p>
+                        <p id="pdfLoadStatus" class="text-xs text-slate-500">Reading file&hellip;</p>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                        <div id="pdfLoadBar" class="bg-indigo-500 h-full rounded-full transition-all duration-500" style="width:0%"></div>
+                    </div>
                 </div>
             </div>
-            <!-- Saved page thumbnails -->
-            <div id="pdfAnnotThumbs" class="hidden flex-wrap gap-2 mt-2 no-print"></div>
-            <!-- Hidden PNG fields (med_handwriting_2 .. _5) written by JS -->
-            <div id="pdfAnnotHiddens"></div>
+
+            <!-- ── Add / Edit Medication Modal ───────────────────────── -->
+            <div id="medModal" class="hidden fixed inset-0 z-[9999] flex items-center justify-center no-print">
+                <div id="medModalBackdrop" class="absolute inset-0 bg-black/60 backdrop-blur-sm"
+                     onclick="medModalClose()"></div>
+                <div class="relative bg-white rounded-2xl w-full shadow-2xl border border-slate-100 p-5 space-y-4 transition-transform duration-300"
+                     style="max-width:26rem"
+                     id="medModalCard">
+                    <div class="flex items-center justify-between mb-1">
+                        <h3 id="medModalTitle" class="font-bold text-slate-800 text-base">Add Medication</h3>
+                        <button type="button" onclick="medModalClose()"
+                                class="text-slate-400 hover:text-slate-700 transition-colors p-1 rounded-lg hover:bg-slate-100">
+                            <i class="bi bi-x-lg text-lg leading-none"></i>
+                        </button>
+                    </div>
+                    <!-- Type -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Type</label>
+                        <div class="grid grid-cols-3 gap-2">
+                            <?php foreach (['New','Refill','D/C'] as $_mt): ?>
+                            <label class="flex items-center justify-center gap-1.5 py-2.5 border-2 border-slate-200 rounded-xl cursor-pointer text-sm font-semibold
+                                          has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50 has-[:checked]:text-indigo-700 transition-colors">
+                                <input type="radio" name="_med_type_modal" value="<?= $_mt ?>"
+                                       class="sr-only" <?= $_mt === 'Refill' ? 'checked' : '' ?>>
+                                <?= $_mt ?>
+                            </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    <!-- Name -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Medication &amp; Dose</label>
+                        <input type="text" id="medModalName"
+                               class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
+                                      focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition focus:bg-white"
+                               placeholder="e.g. Metformin 500mg">
+                    </div>
+                    <!-- Frequency -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5 uppercase tracking-wide">Frequency</label>
+                        <input type="text" id="medModalFreq"
+                               class="w-full px-4 py-3 border border-slate-200 rounded-xl text-sm bg-slate-50
+                                      focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition focus:bg-white"
+                               placeholder="e.g. BID, Once daily">
+                    </div>
+                    <!-- Actions -->
+                    <div class="flex gap-3 pt-1">
+                        <button type="button" id="medModalSaveBtn"
+                                onclick="medModalSave()"
+                                class="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-95
+                                       text-white font-bold text-sm rounded-xl shadow-sm transition-all">
+                            <i class="bi bi-check2-circle mr-1"></i> Save
+                        </button>
+                        <button type="button" onclick="medModalClose()"
+                                class="px-5 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600
+                                       font-semibold text-sm rounded-xl transition-colors">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Medication JS ──────────────────────────────────────── -->
+            <script>
+            (function () {
+                var _meds = <?php
+                    echo json_encode(array_map(function($r) {
+                        return [
+                            'id'        => (int)$r['med_id'],
+                            'type'      => $r['med_type'],
+                            'name'      => $r['med_name'],
+                            'freq'      => $r['med_freq'],
+                            'prefilled' => $r['med_id'] > 0,
+                        ];
+                    }, array_filter($medRows, function($r){ return $r['med_name'] !== ''; })));
+                ?>;
+
+                var _editIdx = null;
+
+                function escHtml(s) {
+                    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+                }
+
+                function renderList() {
+                    var list  = document.getElementById('medCardList');
+                    var empty = document.getElementById('medEmptyMsg');
+                    list.innerHTML = '';
+                    if (!_meds.length) { empty.classList.remove('hidden'); syncHiddens(); return; }
+                    empty.classList.add('hidden');
+                    _meds.forEach(function(m, i) {
+                        var isDc = m.type === 'D/C';
+                        var typeCls = isDc ? 'bg-red-100 text-red-700'
+                            : (m.type === 'New' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700');
+                        var card = document.createElement('div');
+                        card.className = 'flex items-center gap-3 px-4 py-3 border rounded-xl transition-colors '
+                            + (m.prefilled ? 'border-emerald-200 bg-emerald-50/40' : 'border-slate-200 bg-white')
+                            + (isDc ? ' opacity-50' : '');
+                        card.innerHTML =
+                            '<span class="shrink-0 inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold ' + typeCls + '">'
+                                + (m.type || '—') + '</span>'
+                            + '<div class="flex-1 min-w-0">'
+                                + '<p class="text-sm font-semibold text-slate-800 truncate' + (isDc ? ' line-through' : '') + '">'
+                                    + escHtml(m.name || '—') + '</p>'
+                                + '<p class="text-xs text-slate-400 truncate">' + escHtml(m.freq || '') + '</p>'
+                            + '</div>'
+                            + (m.prefilled ? '<i class="bi bi-capsule text-emerald-400 text-sm shrink-0" title="From master list"></i>' : '')
+                            + '<button type="button" onclick="medEdit(' + i + ')" title="Edit"'
+                                + ' class="no-print shrink-0 w-8 h-8 flex items-center justify-center rounded-lg'
+                                + ' text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors">'
+                                + '<i class="bi bi-pencil text-sm"></i></button>'
+                            + '<button type="button" onclick="medRemove(' + i + ')" title="' + (m.prefilled ? 'D/C' : 'Remove') + '"'
+                                + ' class="no-print shrink-0 w-8 h-8 flex items-center justify-center rounded-lg'
+                                + ' text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors">'
+                                + '<i class="bi bi-' + (m.prefilled ? 'slash-circle' : 'x-circle') + ' text-base"></i></button>';
+                        list.appendChild(card);
+                    });
+                    syncHiddens();
+                }
+
+                function syncHiddens() {
+                    var wrap = document.getElementById('medHiddens');
+                    var cf   = document.getElementById('medCountField');
+                    var jf   = document.getElementById('medListJson');
+                    wrap.innerHTML = '';
+                    var count = 0;
+                    _meds.forEach(function(m) {
+                        count++;
+                        wrap.innerHTML +=
+                            '<input type="hidden" name="med_id_' + count + '" value="' + m.id + '">'
+                            + '<input type="hidden" name="med_type_' + count + '" value="' + escHtml(m.type) + '">'
+                            + '<input type="hidden" name="med_name_' + count + '" value="' + escHtml(m.name) + '">'
+                            + '<input type="hidden" name="med_freq_' + count + '" value="' + escHtml(m.freq) + '">';
+                    });
+                    cf.value = count;
+                    if (jf) jf.value = JSON.stringify(_meds);
+                }
+
+                window.medModalClose = function() {
+                    var modal = document.getElementById('medModal');
+                    var card  = document.getElementById('medModalCard');
+                    card.style.transform = 'translateY(100%)';
+                    setTimeout(function(){ modal.classList.add('hidden'); }, 250);
+                    _editIdx = null;
+                };
+
+                window.medEdit = function(idx) {
+                    _editIdx = idx;
+                    var m = _meds[idx];
+                    document.getElementById('medModalTitle').textContent = 'Edit Medication';
+                    document.getElementById('medModalName').value = m.name;
+                    document.getElementById('medModalFreq').value = m.freq;
+                    document.querySelectorAll('[name="_med_type_modal"]').forEach(function(r){
+                        r.checked = (r.value === m.type);
+                    });
+                    openModalAnimate();
+                };
+
+                window.medRemove = function(idx) {
+                    var m = _meds[idx];
+                    if (m.prefilled) {
+                        _meds[idx].type = (m.type === 'D/C') ? 'Refill' : 'D/C';
+                    } else {
+                        _meds.splice(idx, 1);
+                    }
+                    renderList();
+                };
+
+                function openModalAnimate() {
+                    var modal = document.getElementById('medModal');
+                    var card  = document.getElementById('medModalCard');
+                    modal.classList.remove('hidden');
+                    card.style.transform = 'translateY(100%)';
+                    requestAnimationFrame(function(){
+                        requestAnimationFrame(function(){
+                            card.style.transform = 'translateY(0)';
+                        });
+                    });
+                }
+
+                window.medModalSave = function() {
+                    var name   = document.getElementById('medModalName').value.trim();
+                    var freq   = document.getElementById('medModalFreq').value.trim();
+                    var typeEl = document.querySelector('[name="_med_type_modal"]:checked');
+                    var type   = typeEl ? typeEl.value : 'Refill';
+                    if (!name) {
+                        document.getElementById('medModalName').focus();
+                        document.getElementById('medModalName').classList.add('ring-2','ring-indigo-400','border-indigo-400');
+                        return;
+                    }
+                    document.getElementById('medModalName').classList.remove('ring-2','ring-indigo-400','border-indigo-400');
+                    if (_editIdx !== null) {
+                        _meds[_editIdx].type = type;
+                        _meds[_editIdx].name = name;
+                        _meds[_editIdx].freq = freq;
+                    } else {
+                        _meds.push({ id: 0, type: type, name: name, freq: freq, prefilled: false });
+                    }
+                    medModalClose();
+                    renderList();
+                };
+
+                document.getElementById('medAddBtn').addEventListener('click', function() {
+                    _editIdx = null;
+                    document.getElementById('medModalTitle').textContent = 'Add Medication';
+                    document.getElementById('medModalName').value = '';
+                    document.getElementById('medModalFreq').value = '';
+                    var refillRadio = document.querySelector('[name="_med_type_modal"][value="Refill"]');
+                    if (refillRadio) refillRadio.checked = true;
+                    openModalAnimate();
+                });
+
+                ['medModalName','medModalFreq'].forEach(function(id){
+                    document.getElementById(id).addEventListener('keydown', function(e){
+                        if (e.key === 'Enter') { e.preventDefault(); medModalSave(); }
+                    });
+                });
+
+                renderList();
+
+                /* Allow autosave to rebuild the card list after draft restore */
+                window._medRebuildFromDom = function () {
+                    var jf = document.getElementById('medListJson');
+                    if (!jf || !jf.value) return;
+                    try {
+                        var parsed = JSON.parse(jf.value);
+                        if (Array.isArray(parsed)) { _meds = parsed; renderList(); }
+                    } catch (e) {}
+                };
+            })();
+            </script>
 
         </div><!-- /step 2 -->
 
@@ -763,6 +1016,7 @@ If secondary insurance is available will bill 20% to secondary insurance.</texta
                     <label class="flex items-start gap-3 p-4 border border-slate-200 rounded-xl cursor-pointer
                                   hover:border-amber-300 hover:bg-amber-50/50 transition-colors has-[:checked]:border-amber-400 has-[:checked]:bg-amber-50">
                         <input type="radio" name="patient_option" value="<?= $opt ?>"
+                               <?= $opt === 1 ? 'checked' : '' ?>
                                class="mt-0.5 w-4 h-4 text-amber-500 border-slate-300 focus:ring-amber-400 flex-shrink-0">
                         <div class="text-sm text-slate-700">
                             <span class="font-bold">OPTION <?= $opt ?>.</span> <?= h(substr($text, strpos($text, ' ')+1)) ?>
@@ -847,6 +1101,7 @@ If secondary insurance is available will bill 20% to secondary insurance.</texta
                     <label class="flex items-center gap-2 px-4 py-3 border border-slate-200 rounded-xl cursor-pointer text-sm font-medium
                                   hover:border-indigo-300 hover:bg-indigo-50 has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50 transition-colors">
                         <input type="radio" name="auth_type" value="<?= $val ?>"
+                               <?= $val === 'both' ? 'checked' : '' ?>
                                class="w-4 h-4 text-indigo-700 border-slate-300 focus:ring-indigo-500">
                         <?= h($lbl) ?>
                     </label>
@@ -873,6 +1128,7 @@ If secondary insurance is available will bill 20% to secondary insurance.</texta
                     <label class="flex items-center gap-2.5 px-4 py-3 border border-slate-200 rounded-xl cursor-pointer text-sm
                                   hover:border-indigo-300 hover:bg-indigo-50 has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50 transition-colors">
                         <input type="checkbox" name="record_types[]" value="<?= h($key) ?>"
+                               <?= $key === 'all' ? 'checked' : '' ?>
                                class="w-4 h-4 text-indigo-700 border-slate-300 rounded focus:ring-indigo-500">
                         <?= $label ?>
                     </label>
@@ -887,7 +1143,7 @@ If secondary insurance is available will bill 20% to secondary insurance.</texta
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-slate-600 mb-1.5">Records to</label>
-                        <input type="date" name="records_to" value="<?= date('Y-m-d') ?>"
+                        <input type="date" name="records_to" value=""
                                class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-slate-50
                                       focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent transition focus:bg-white">
                     </div>
@@ -945,7 +1201,7 @@ If secondary insurance is available will bill 20% to secondary insurance.</texta
             <!-- Recipients -->
             <div>
                 <label class="block text-sm font-bold text-slate-700 mb-2">Disclose To / Obtain From</label>
-                <?php for ($i = 1; $i <= 2; $i++): ?>
+                <?php for ($i = 1; $i <= 1; $i++): ?>
                 <div class="border border-slate-200 rounded-xl p-4 mb-3">
                     <p class="text-xs font-bold text-slate-500 uppercase mb-3">Entry <?= $i ?></p>
                     <div class="grid grid-cols-1 gap-3">
@@ -1056,60 +1312,6 @@ If secondary insurance is available will bill 20% to secondary insurance.</texta
             <!-- Patient + MA signatures via standard sig_block -->
             <?php include __DIR__ . '/../includes/sig_block.php'; ?>
 
-            <!-- Provider Signature Block -->
-            <div class="bg-white border-2 border-violet-100 rounded-2xl overflow-hidden mt-4">
-                <div class="bg-gradient-to-r from-violet-600 to-violet-500 px-5 py-3 flex items-center gap-2">
-                    <i class="bi bi-person-check-fill text-white"></i>
-                    <span class="text-white font-semibold text-sm">Provider / Physician Signature</span>
-                    <?php if ($_provSavedSig): ?>
-                    <span class="ml-auto inline-flex items-center gap-1 text-xs bg-white/20 text-white rounded-full px-2.5 py-0.5">
-                        <i class="bi bi-lightning-charge-fill"></i> Auto-fill on
-                    </span>
-                    <?php endif; ?>
-                </div>
-                <div class="p-5">
-                    <div id="providerSigAlert" class="hidden flex items-center gap-3 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm mb-4">
-                        <i class="bi bi-exclamation-circle text-lg flex-shrink-0"></i>
-                        Provider signature is required before submitting.
-                    </div>
-                    <?php if ($_provSavedSig): ?>
-                    <div id="provSavedBanner" class="flex items-center gap-3 bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-2.5 rounded-xl text-sm mb-3">
-                        <i class="bi bi-check-circle-fill shrink-0"></i>
-                        <span class="flex-1">Using your <strong>saved signature</strong>. <a href="<?= BASE_URL ?>/profile.php#savedSigSection" class="underline hover:text-emerald-900 font-semibold" target="_blank">Update in Profile</a></span>
-                        <button type="button" id="useManualProvSig" class="text-xs font-semibold bg-emerald-100 hover:bg-emerald-200 px-3 py-1 rounded-lg transition-colors">Sign manually</button>
-                    </div>
-                    <?php endif; ?>
-                    <div class="mb-4">
-                        <div>
-                            <label class="block text-sm font-semibold text-slate-700 mb-1.5">Provider Name (Print)</label>
-                            <input type="text" name="provider_print_name"
-                                   class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm
-                                          focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent bg-slate-50">
-                        </div>
-                    </div>
-                    <div id="provSigPadArea" <?= $_provSavedSig ? 'class="hidden"' : '' ?>>
-                        <label class="block text-sm font-semibold text-slate-700 mb-2">Provider sign below
-                            <span class="text-slate-400 font-normal text-xs ml-1">(attending physician / nurse practitioner)</span>
-                        </label>
-                        <div class="sig-wrapper border-2 border-dashed border-slate-300 rounded-2xl focus-within:border-violet-400 transition-colors" id="providerSigWrapper">
-                            <canvas id="providerSigPad"></canvas>
-                            <div class="sig-placeholder">Provider sign here</div>
-                        </div>
-                        <div class="mt-3 flex items-center gap-2">
-                            <button type="button" id="clearProviderSig"
-                                    class="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-xl transition-colors">
-                                <i class="bi bi-eraser"></i> Clear
-                            </button>
-                            <span class="text-xs text-slate-400">Provider signature confirms medical supervision and authorization</span>
-                        </div>
-                    </div>
-                    <input type="hidden" name="provider_signature" id="providerSigData" form="mainForm">
-                    <?php if ($_provSavedSig): ?>
-                    <script>window._pdProvSavedSig = <?= json_encode($_provSavedSig) ?>;</script>
-                    <?php endif; ?>
-                </div>
-            </div>
-
         </div><!-- /step 8 -->
 
         <?php
@@ -1141,19 +1343,31 @@ document.addEventListener('DOMContentLoaded', function () {
     var mvRegular   = document.getElementById('mvRegularState');
     var mvActive    = document.getElementById('mvActiveState');
     var mvReason    = document.getElementById('mvReasonText');
+    var mvVitals    = document.getElementById('mvVitalsBanner');
+    var VITAL_NAMES = ['bp', 'pulse', 'o2sat'];
 
     function enterMissedMode() {
         window._pdMissedVisit = true;
         if (mvRegular) mvRegular.classList.add('hidden');
         if (mvActive)  mvActive.classList.remove('hidden');
+        if (mvVitals)  mvVitals.style.display = 'flex';
         if (mvReason)  mvReason.setAttribute('required', '');
+        VITAL_NAMES.forEach(function (n) {
+            var el = document.querySelector('input[name="' + n + '"]');
+            if (el) el.removeAttribute('required');
+        });
     }
 
     function exitMissedMode() {
         window._pdMissedVisit = false;
         if (mvActive)  mvActive.classList.add('hidden');
         if (mvRegular) mvRegular.classList.remove('hidden');
+        if (mvVitals)  mvVitals.style.display = 'none';
         if (mvReason)  { mvReason.value = ''; mvReason.removeAttribute('required'); }
+        VITAL_NAMES.forEach(function (n) {
+            var el = document.querySelector('input[name="' + n + '"]');
+            if (el) el.setAttribute('required', '');
+        });
     }
 
     if (mvToggleBtn) mvToggleBtn.addEventListener('click', enterMissedMode);
@@ -1445,26 +1659,70 @@ document.addEventListener('DOMContentLoaded', function () {
         document.head.appendChild(s);
     }
 
+    // Preload PDF.js silently so it's cached before user picks a file
+    if (!window.pdfjsLib) {
+        var _preS = document.createElement('script');
+        _preS.src = PDFJS_URL;
+        _preS.onload = function () {
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc = WORKER_URL;
+        };
+        document.head.appendChild(_preS);
+    }
+
+    var loadModal  = document.getElementById('pdfLoadModal');
+    var loadStatus = document.getElementById('pdfLoadStatus');
+    var loadBar    = document.getElementById('pdfLoadBar');
+
+    function showLoadModal(msg, pct) {
+        if (loadModal)  loadModal.classList.remove('hidden');
+        if (loadStatus) loadStatus.textContent = msg;
+        if (loadBar)    loadBar.style.width = (pct || 0) + '%';
+    }
+    function updateLoad(msg, pct) {
+        if (loadStatus) loadStatus.textContent = msg;
+        if (loadBar)    loadBar.style.width = (pct || 0) + '%';
+    }
+    function hideLoadModal() {
+        if (loadModal) loadModal.classList.add('hidden');
+    }
+
     fileEl.addEventListener('change', function () {
         if (!this.files || !this.files[0]) return;
         if (this.files[0].type !== 'application/pdf') { alert('Please select a PDF file.'); return; }
+        showLoadModal('Reading file…', 10);
         var reader = new FileReader();
         reader.onload = function (e) {
             var buf = e.target.result;
-            if (window.pdfjsLib) { openPdf(buf); }
-            else { loadScript(PDFJS_URL, function () { window.pdfjsLib.GlobalWorkerOptions.workerSrc = WORKER_URL; openPdf(buf); }); }
+            updateLoad('Loading PDF renderer…', 35);
+            if (window.pdfjsLib) {
+                updateLoad('Opening document…', 60);
+                openPdf(buf);
+            } else {
+                loadScript(PDFJS_URL, function () {
+                    window.pdfjsLib.GlobalWorkerOptions.workerSrc = WORKER_URL;
+                    updateLoad('Opening document…', 60);
+                    openPdf(buf);
+                });
+            }
         };
         reader.readAsArrayBuffer(this.files[0]);
     });
 
     function openPdf(buffer) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = WORKER_URL;
+        var _timeout = setTimeout(function () {
+            hideLoadModal();
+            alert('PDF is taking too long to load. Try a smaller file or re-upload.');
+        }, 15000);
         pdfjsLib.getDocument({ data: buffer }).promise.then(function (doc) {
+            clearTimeout(_timeout);
             pdfDoc = doc; curPage = 1; pageDrawings = {};
             totPagesEl.textContent = doc.numPages;
             if (limitMsg) limitMsg.classList.toggle('hidden', doc.numPages <= MAX_PAGES);
+            updateLoad('Rendering page 1\u2026', 85);
             panel.classList.remove('hidden');
             renderPage(1);
-        }).catch(function (err) { alert('Could not open PDF: ' + (err.message || err)); });
+        }).catch(function (err) { clearTimeout(_timeout); hideLoadModal(); alert('Could not open PDF: ' + (err.message || err)); });
     }
 
     function renderPage(num) {
@@ -1499,6 +1757,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 curPageEl.textContent = num;
                 prevBtn.disabled = num <= 1;
                 nextBtn.disabled = num >= pdfDoc.numPages;
+                if (num === 1) { updateLoad('Done', 100); setTimeout(hideLoadModal, 400); }
             });
         });
     }

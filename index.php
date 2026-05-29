@@ -92,10 +92,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $__avQ->execute([(int)$user['id']]);
                         $__av = $__avQ->fetch(PDO::FETCH_ASSOC);
                         if ($__av) {
-                            $redirect = BASE_URL . '/forms/vital_cs.php'
-                                      . '?patient_id=' . (int)$__av['patient_id']
-                                      . '&visit_id='   . (int)$__av['id']
-                                      . '&sched_visit_type=' . urlencode($__av['visit_type'] ?? 'routine');
+                            $__vt    = strtolower(trim($__av['visit_type'] ?? 'routine'));
+                            $__vsub  = $__av['visit_subtype'] ?? '';
+                            $__qbase = '?patient_id=' . (int)$__av['patient_id']
+                                     . '&visit_id='   . (int)$__av['id']
+                                     . '&sched_visit_type=' . urlencode($__av['visit_type'] ?? 'routine');
+                            if (str_contains($__vt, 'new')) {
+                                $__npType = ($__vsub === 'primary_care') ? 'primary_care' : 'wound_care';
+                                $redirect = BASE_URL . '/forms/new_patient_pocket.php' . $__qbase . '&np_type=' . $__npType;
+                            } else {
+                                $redirect = BASE_URL . '/forms/vital_cs.php' . $__qbase;
+                            }
                         }
                     } catch (PDOException $e) { /* schedule table unavailable */ }
                 }

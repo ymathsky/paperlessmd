@@ -1186,6 +1186,16 @@ $extraJs = <<<JSBLOCK
         document.head.appendChild(s);
     }
 
+    // Preload PDF.js silently so it's cached before user picks a file
+    if (!window.pdfjsLib) {
+        var _preS = document.createElement('script');
+        _preS.src = PDFJS_URL;
+        _preS.onload = function () {
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc = WORKER_URL;
+        };
+        document.head.appendChild(_preS);
+    }
+
     fileEl.addEventListener('change', function () {
         if (!this.files || !this.files[0]) return;
         if (this.files[0].type !== 'application/pdf') { alert('Please select a PDF file.'); return; }
@@ -1205,7 +1215,12 @@ $extraJs = <<<JSBLOCK
     });
 
     function openPdf(buffer) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = WORKER_URL;
+        var _timeout = setTimeout(function () {
+            alert('PDF is taking too long to load. Try a smaller file or re-upload.');
+        }, 15000);
         pdfjsLib.getDocument({ data: buffer }).promise.then(function (doc) {
+            clearTimeout(_timeout);
             pdfDoc       = doc;
             curPage      = 1;
             pageDrawings = {};
@@ -1214,6 +1229,7 @@ $extraJs = <<<JSBLOCK
             panel.classList.remove('hidden');
             renderPage(1);
         }).catch(function (err) {
+            clearTimeout(_timeout);
             alert('Could not open PDF: ' + (err.message || err));
         });
     }
