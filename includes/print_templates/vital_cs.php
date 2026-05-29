@@ -138,16 +138,16 @@ $vtOptions = ['New', 'Follow Up', 'Sick', 'Post Hospital F/U'];
     <!-- Vitals Grid -->
     <table class="bwc-vitals-table">
         <tr>
-            <td><strong>BP:</strong><br><?= $bp ?><?php if ($_src('bp')): ?><br><small><?= $_src('bp') ?></small><?php endif; ?></td>
-            <td><strong>PULSE:</strong><br><?= $pulse ?><?php if ($_src('pulse')): ?><br><small><?= $_src('pulse') ?></small><?php endif; ?></td>
-            <td><strong>TEMP:</strong><br><?= $temp ?><?php if ($_src('temp')): ?><br><small><?= $_src('temp') ?></small><?php endif; ?></td>
-            <td><strong>O2SAT:</strong><br><?= $o2sat ?><?php if ($_src('o2sat')): ?><br><small><?= $_src('o2sat') ?></small><?php endif; ?></td>
+            <td><strong>BP:</strong><br><?= $bp ?><?php if ($bp !== '' && $_src('bp')): ?><br><small><?= $_src('bp') ?></small><?php endif; ?></td>
+            <td><strong>PULSE:</strong><br><?= $pulse ?><?php if ($pulse !== '' && $_src('pulse')): ?><br><small><?= $_src('pulse') ?></small><?php endif; ?></td>
+            <td><strong>TEMP:</strong><br><?= $temp ?><?php if ($temp !== '' && $_src('temp')): ?><br><small><?= $_src('temp') ?></small><?php endif; ?></td>
+            <td><strong>O2SAT:</strong><br><?= $o2sat ?><?php if ($o2sat !== '' && $_src('o2sat')): ?><br><small><?= $_src('o2sat') ?></small><?php endif; ?></td>
         </tr>
         <tr>
-            <td><strong>GLUCOSE:</strong><br><?= $glucose ?><?php if ($_src('glucose')): ?><br><small><?= $_src('glucose') ?></small><?php endif; ?></td>
-            <td><strong>HEIGHT:</strong><br><?= $height ?><?php if ($_src('height')): ?><br><small><?= $_src('height') ?></small><?php endif; ?></td>
-            <td><strong>WEIGHT:</strong><br><?= $weight ?><?php if ($_src('weight')): ?><br><small><?= $_src('weight') ?></small><?php endif; ?></td>
-            <td><strong>RESP:</strong><br><?= $resp ?><?php if ($_src('resp')): ?><br><small><?= $_src('resp') ?></small><?php endif; ?></td>
+            <td><strong>GLUCOSE:</strong><br><?= $glucose ?><?php if ($glucose !== '' && $_src('glucose')): ?><br><small><?= $_src('glucose') ?></small><?php endif; ?></td>
+            <td><strong>HEIGHT:</strong><br><?= $height ?><?php if ($height !== '' && $_src('height')): ?><br><small><?= $_src('height') ?></small><?php endif; ?></td>
+            <td><strong>WEIGHT:</strong><br><?= $weight ?><?php if ($weight !== '' && $_src('weight')): ?><br><small><?= $_src('weight') ?></small><?php endif; ?></td>
+            <td><strong>RESP:</strong><br><?= $resp ?><?php if ($resp !== '' && $_src('resp')): ?><br><small><?= $_src('resp') ?></small><?php endif; ?></td>
         </tr>
         <tr>
             <td colspan="4" style="min-height:52pt;"><strong>Chief Complaint | Notes:</strong><br><?= nl2br($chiefComplaint) ?></td>
