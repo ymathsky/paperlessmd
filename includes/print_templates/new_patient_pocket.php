@@ -34,6 +34,26 @@ $raceList = $fd['race'] ?? [];
 if (!is_array($raceList)) $raceList = array_filter(explode(',', (string)$raceList));
 $raceStr  = implode(', ', array_map('h', $raceList));
 
+// Medications — try indexed fields first, then fall back to med_list_json
+$_nppMeds = [];
+$_medMax  = max(6, min(20, (int)($fd['med_count'] ?? 0)));
+for ($i = 1; $i <= $_medMax; $i++) {
+    $_mn = trim($fd["med_name_$i"] ?? '');
+    $_mt = trim($fd["med_type_$i"] ?? '');
+    if ($_mn === '' && $_mt === '') continue;
+    $_nppMeds[] = ['type' => $fd["med_type_$i"] ?? '', 'name' => $_mn, 'freq' => $fd["med_freq_$i"] ?? ''];
+}
+if (empty($_nppMeds) && !empty($fd['med_list_json'])) {
+    $_mjArr = json_decode($fd['med_list_json'], true);
+    if (is_array($_mjArr)) {
+        foreach ($_mjArr as $_mj) {
+            $_mn = trim($_mj['name'] ?? '');
+            if ($_mn === '') continue;
+            $_nppMeds[] = ['type' => $_mj['type'] ?? '', 'name' => $_mn, 'freq' => $_mj['freq'] ?? ''];
+        }
+    }
+}
+
 $selectedRecords  = is_array($fd['record_types'] ?? null) ? $fd['record_types']  : [];
 $selectedPurposes = is_array($fd['purposes']     ?? null) ? $fd['purposes']      : [];
 $recordTypeLabels = [
@@ -249,17 +269,13 @@ function nppFooter(string $formTitle, string $ptName, string $sigDate, string $c
         <th style="padding:2pt 4pt;text-align:left;border:.5pt solid #c7d2fe;font-size:7.5pt;color:#3730a3;width:22%;">Frequency</th>
     </tr></thead>
     <tbody>
-        <?php for ($i = 1; $i <= 6; $i++):
-            $mname = $fd["med_name_$i"] ?? '';
-            $mtype = $fd["med_type_$i"] ?? '';
-            $mfreq = $fd["med_freq_$i"] ?? '';
-            if (trim($mname) === '' && trim($mtype) === '') continue; ?>
-        <tr style="<?= $i % 2 === 0 ? 'background:#f8fafc;' : '' ?>">
-            <td style="padding:2pt 4pt;border:.5pt solid #e2e8f0;"><?= h($mtype) ?></td>
-            <td style="padding:2pt 4pt;border:.5pt solid #e2e8f0;"><?= h($mname) ?></td>
-            <td style="padding:2pt 4pt;border:.5pt solid #e2e8f0;"><?= h($mfreq) ?></td>
+        <?php foreach ($_nppMeds as $_mi => $_med): ?>
+        <tr style="<?= $_mi % 2 !== 0 ? 'background:#f8fafc;' : '' ?>">
+            <td style="padding:2pt 4pt;border:.5pt solid #e2e8f0;"><?= h($_med['type']) ?></td>
+            <td style="padding:2pt 4pt;border:.5pt solid #e2e8f0;"><?= h($_med['name']) ?></td>
+            <td style="padding:2pt 4pt;border:.5pt solid #e2e8f0;"><?= h($_med['freq']) ?></td>
         </tr>
-        <?php endfor; ?>
+        <?php endforeach; ?>
     </tbody>
 </table>
 
