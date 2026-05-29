@@ -135,8 +135,24 @@ include __DIR__ . '/includes/header.php';
     <?php endif; ?>
 </div>
 
-<!-- ── Analytics ─────────────────────────────────────────── -->
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-6">
+<!-- ── Mobile compact summary (hidden on sm+) ──────────────── -->
+<div class="patient-stats-mobile flex flex-wrap gap-2 mb-4">
+<?php foreach ($companies as $coName => $coCfg):
+    $row = $analytics[$coName];
+    $c   = $colorMap[$coCfg['color']];
+?>
+    <div class="flex items-center gap-2 bg-white rounded-xl border border-slate-100 shadow-sm px-3 py-2">
+        <div class="w-6 h-6 rounded-lg <?= $c['icon'] ?> grid place-items-center text-white flex-shrink-0" style="font-size:10px;">
+            <i class="bi <?= $coCfg['icon'] ?>"></i>
+        </div>
+        <span class="text-xs font-semibold text-slate-700"><?= $coCfg['label'] ?></span>
+        <span class="text-xs font-bold <?= $c['stat'] ?>"><?= $row['active'] ?> active</span>
+    </div>
+<?php endforeach; ?>
+</div>
+
+<!-- ── Analytics (hidden on mobile) ─────────────────────────── -->
+<div class="patient-stats-grid grid grid-cols-1 lg:grid-cols-2 gap-5 mb-6">
 <?php
 $colorMap = [
     'blue' => ['card'=>'border-blue-200 bg-blue-50/40',  'title'=>'text-blue-800',  'icon'=>'bg-blue-600',  'badge_active'=>'bg-blue-100 text-blue-700',   'badge_inactive'=>'bg-amber-100 text-amber-700',   'badge_dis'=>'bg-red-100 text-red-700',   'stat'=>'text-blue-700',  'bar'=>'bg-blue-500',  'pending'=>'bg-amber-100 text-amber-700', 'photos'=>'bg-violet-100 text-violet-700'],

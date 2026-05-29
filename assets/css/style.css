@@ -1219,6 +1219,10 @@ html.dark [role="switch"] > span                   { background-color: #f1f5f9 !
 /* ── Missing Tailwind responsive utilities ── */
 @media (min-width: 640px) { .sm\:hidden { display: none !important; } }
 
+/* ── Patients page responsive analytics ── */
+@media (max-width: 639px) { .patient-stats-grid   { display: none !important; } }
+@media (min-width: 640px) { .patient-stats-mobile { display: none !important; } }
+
 /* ── Custom scrollbar ── */
 html.dark ::-webkit-scrollbar { width: 6px; height: 6px; }
 html.dark ::-webkit-scrollbar-track { background: #0f172a; }
