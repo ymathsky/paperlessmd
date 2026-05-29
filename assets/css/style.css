@@ -1216,6 +1216,9 @@ html.dark [role="switch"]                          { background-color: #475569 !
 html.dark [role="switch"][aria-checked="true"]     { background-color: #0ea5e9 !important; }
 html.dark [role="switch"] > span                   { background-color: #f1f5f9 !important; }
 
+/* ── Missing Tailwind responsive utilities ── */
+@media (min-width: 640px) { .sm\:hidden { display: none !important; } }
+
 /* ── Custom scrollbar ── */
 html.dark ::-webkit-scrollbar { width: 6px; height: 6px; }
 html.dark ::-webkit-scrollbar-track { background: #0f172a; }
