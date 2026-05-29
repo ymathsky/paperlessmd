@@ -136,6 +136,12 @@ include __DIR__ . '/includes/header.php';
 </div>
 
 <!-- ── Mobile compact summary (hidden on sm+) ──────────────── -->
+<?php
+$colorMap = [
+    'blue' => ['card'=>'border-blue-200 bg-blue-50/40',  'title'=>'text-blue-800',  'icon'=>'bg-blue-600',  'badge_active'=>'bg-blue-100 text-blue-700',   'badge_inactive'=>'bg-amber-100 text-amber-700',   'badge_dis'=>'bg-red-100 text-red-700',   'stat'=>'text-blue-700',  'bar'=>'bg-blue-500',  'pending'=>'bg-amber-100 text-amber-700', 'photos'=>'bg-violet-100 text-violet-700'],
+    'teal' => ['card'=>'border-teal-200 bg-teal-50/40',  'title'=>'text-teal-800',  'icon'=>'bg-teal-600',  'badge_active'=>'bg-teal-100 text-teal-700',   'badge_inactive'=>'bg-amber-100 text-amber-700',   'badge_dis'=>'bg-red-100 text-red-700',   'stat'=>'text-teal-700',  'bar'=>'bg-teal-500',  'pending'=>'bg-amber-100 text-amber-700', 'photos'=>'bg-violet-100 text-violet-700'],
+];
+?>
 <div class="patient-stats-mobile flex flex-wrap gap-2 mb-4">
 <?php foreach ($companies as $coName => $coCfg):
     $row = $analytics[$coName];
