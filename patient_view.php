@@ -183,11 +183,11 @@ try {
     if ($lvfRow) {
         $lvfData = json_decode($lvfRow['form_data'], true) ?? [];
         $lastVitals = [
-            'bp'       => trim(($lvfData['bp_systolic'] ?? '') . ($lvfData['bp_systolic'] ? '/' . ($lvfData['bp_diastolic'] ?? '') : '')),
-            'hr'       => trim($lvfData['heart_rate'] ?? ''),
-            'temp'     => trim($lvfData['temperature'] ?? ''),
+            'bp'       => ($lvfData['bp'] ?? '') ?: trim(($lvfData['bp_systolic'] ?? '') . (!empty($lvfData['bp_systolic']) ? '/' . ($lvfData['bp_diastolic'] ?? '') : '')),
+            'hr'       => trim($lvfData['heart_rate'] ?? $lvfData['pulse'] ?? ''),
+            'temp'     => trim($lvfData['temperature'] ?? $lvfData['temp'] ?? ''),
             'weight'   => trim($lvfData['weight'] ?? ''),
-            'o2'       => trim($lvfData['o2_sat'] ?? ''),
+            'o2'       => trim($lvfData['o2_sat'] ?? $lvfData['o2sat'] ?? ''),
             'date'     => $lvfRow['created_at'],
         ];
     }
