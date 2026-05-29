@@ -97,7 +97,7 @@ if ($_qnVisitId > 0) {
         class="fixed right-5 w-14 h-14 flex items-center justify-center
                bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-full shadow-xl
                transition-all duration-200 no-print"
-        style="bottom:248px;z-index:7700;">
+        style="bottom:324px;z-index:7700;">
     <i class="bi bi-chat-dots-fill text-xl"></i>
     <span id="msgBadge"
           class="absolute -top-1 -right-1 hidden min-w-[18px] h-[18px] px-1 bg-red-500 text-white
