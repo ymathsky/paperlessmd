@@ -4,21 +4,53 @@
 if (empty($_SESSION['user_id'])) return;
 ?>
 <style>
-@keyframes pulse-ring {
-    0%   { transform: scale(1);   opacity: .7; }
-    70%  { transform: scale(1.55); opacity: 0; }
-    100% { transform: scale(1.55); opacity: 0; }
+/* ── Incoming call bar entrance ── */
+@keyframes call-slide-down {
+    from { opacity: 0; transform: translateX(-50%) translateY(-28px) scale(.95); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0)      scale(1);  }
 }
+#incomingCallBar:not(.hidden) {
+    animation: call-slide-down .32s cubic-bezier(.34,1.56,.64,1) both;
+}
+/* ── Pulse rings around avatar ── */
+@keyframes call-ring-pulse {
+    0%   { transform: scale(1);    opacity: .65; }
+    80%  { transform: scale(1.75); opacity: 0;   }
+    100% { transform: scale(1.75); opacity: 0;   }
+}
+.call-pulse { position: relative; }
 .call-pulse::before,
 .call-pulse::after {
     content: '';
     position: absolute;
-    inset: -6px;
+    inset: -8px;
     border-radius: 50%;
-    background: rgba(52,211,153,.4);
-    animation: pulse-ring 1.8s ease-out infinite;
+    background: rgba(52,211,153,.45);
+    animation: call-ring-pulse 2s ease-out infinite;
+    pointer-events: none;
 }
-.call-pulse::after { animation-delay: .9s; }
+.call-pulse::after { animation-delay: 1s; }
+/* ── Ringing phone shake ── */
+@keyframes phone-ring {
+    0%,100% { transform: rotate(0deg); }
+    10%      { transform: rotate(-18deg); }
+    20%      { transform: rotate(16deg); }
+    30%      { transform: rotate(-14deg); }
+    40%      { transform: rotate(12deg); }
+    50%      { transform: rotate(0deg); }
+}
+.phone-ring-icon { animation: phone-ring 1.1s ease-in-out infinite; display: inline-block; transform-origin: top center; }
+/* ── Card glow ── */
+@keyframes card-glow {
+    0%,100% { box-shadow: 0 0 0 0 rgba(52,211,153,0), 0 20px 60px rgba(0,0,0,.55); }
+    50%      { box-shadow: 0 0 0 6px rgba(52,211,153,.18), 0 20px 60px rgba(0,0,0,.55); }
+}
+#incomingCallCard { animation: card-glow 2s ease-in-out infinite; }
+/* ── Button hover scale ── */
+#incomingCallBar button { transition: transform .15s, filter .15s, background .15s; }
+#incomingCallBar button:hover { transform: scale(1.04); }
+#incomingCallBar button:active { transform: scale(.97); }
+/* ── Video call modal ── */
 #vcControls { transition: opacity .3s, transform .3s; }
 #vcControls.hidden-controls { opacity: 0; pointer-events: none; transform: translateY(20px); }
 #localVideo { cursor: move; user-select: none; }
@@ -28,27 +60,44 @@ if (empty($_SESSION['user_id'])) return;
 
 <!-- Incoming Call Notification -->
 <div id="incomingCallBar" class="hidden fixed no-print"
-     style="top:24px;left:50%;transform:translateX(-50%);width:360px;max-width:calc(100vw - 32px);filter:drop-shadow(0 8px 32px rgba(0,0,0,.35));z-index:9998">
-    <div class="bg-white/95 backdrop-blur rounded-2xl overflow-hidden border border-white/60">
-        <!-- Green top bar -->
-        <div class="bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-2 flex items-center gap-2">
-            <i class="bi bi-camera-video-fill text-white text-sm"></i>
-            <span class="text-white text-xs font-semibold tracking-wide uppercase">Incoming Video Call</span>
+     style="top:24px;left:50%;transform:translateX(-50%);width:400px;max-width:calc(100vw - 24px);z-index:9998">
+    <div id="incomingCallCard" class="rounded-2xl overflow-hidden border border-white/10"
+         style="background:linear-gradient(160deg,#0f1f2e 0%,#0d2a1f 100%);backdrop-filter:blur(16px)">
+
+        <!-- Header strip -->
+        <div class="flex items-center gap-2.5 px-4 pt-3.5 pb-2">
+            <span class="phone-ring-icon text-emerald-400 text-lg leading-none"><i class="bi bi-telephone-fill"></i></span>
+            <span class="text-emerald-300 text-xs font-bold tracking-widest uppercase">Incoming Video Call</span>
         </div>
-        <div class="px-4 py-4 flex items-center gap-4">
+
+        <!-- Divider -->
+        <div class="mx-4 h-px bg-white/10 mb-3"></div>
+
+        <!-- Caller info -->
+        <div class="px-4 pb-4 flex items-center gap-5">
             <div class="relative shrink-0">
-                <div class="call-pulse w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center font-bold text-emerald-700 text-xl relative" id="callerAvatar">?</div>
+                <div class="call-pulse w-16 h-16 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center font-bold text-white text-2xl shadow-lg" id="callerAvatar">?</div>
             </div>
             <div class="flex-1 min-w-0">
-                <div class="font-bold text-slate-800 text-base truncate" id="callerName">Incoming call</div>
-                <div class="text-xs text-slate-500 mt-0.5">Wants to start a video call</div>
+                <div class="font-bold text-white text-lg leading-tight truncate" id="callerName">Incoming call</div>
+                <div class="flex items-center gap-1.5 mt-1">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span class="text-slate-400 text-xs">Wants to start a video call</span>
+                </div>
             </div>
         </div>
-        <div class="px-4 pb-4 flex gap-3">
-            <button onclick="rejectCall()" class="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 font-semibold text-sm transition">
-                <i class="bi bi-telephone-x-fill"></i> Decline
+
+        <!-- Buttons -->
+        <div class="px-4 pb-4 grid grid-cols-2 gap-3">
+            <button onclick="rejectCall()"
+                    class="flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm text-white"
+                    style="background:rgba(239,68,68,.25);border:1px solid rgba(239,68,68,.4)">
+                <i class="bi bi-telephone-x-fill text-red-400"></i>
+                <span class="text-red-300">Decline</span>
             </button>
-            <button onclick="acceptCall()" class="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm transition shadow">
+            <button onclick="acceptCall()"
+                    class="flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm text-white"
+                    style="background:linear-gradient(135deg,#10b981,#059669);box-shadow:0 4px 18px rgba(16,185,129,.4)">
                 <i class="bi bi-camera-video-fill"></i> Accept
             </button>
         </div>
