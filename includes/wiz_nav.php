@@ -174,11 +174,20 @@ $endVisitId  ??= 0;
         var card  = document.getElementById('endVisitModalCard');
 
         // Stamp current time in the app timezone
-        var timeStr = currentTzHHMM();
+        var timeStr = currentTzHHMM(); // HH:MM (24h) for DB storage
         var timeOut = document.querySelector('input[name="time_out"]');
         if (timeOut) timeOut.value = timeStr;
+
+        // Display in 12-hour format
+        var tz = (window._pdTimezone && window._pdTimezone !== '') ? window._pdTimezone : undefined;
+        var dispStr = timeStr;
+        try {
+            dispStr = new Intl.DateTimeFormat('en-US', {
+                timeZone: tz, hour: 'numeric', minute: '2-digit', hour12: true
+            }).format(new Date());
+        } catch (e) {}
         var disp = document.getElementById('evTimeDisplay');
-        if (disp) disp.textContent = timeStr;
+        if (disp) disp.textContent = dispStr;
 
         // Pre-fill F/U from hidden inputs if present (vital_cs etc.)
         var fuW = document.getElementById('fuWeeksHidden');
