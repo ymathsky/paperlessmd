@@ -10,9 +10,23 @@ include __DIR__ . '/includes/header.php';
 
 $releases = [
     [
+        'version' => 'v3.5',
+        'date'    => 'May 29, 2026',
+        'label'   => 'Latest',
+        'color'   => 'emerald',
+        'items'   => [
+            ['icon' => 'bi-folder2-open',          'tag' => 'New',     'tag_color' => 'blue',  'title' => 'MA All Forms Page',                            'desc' => 'Medical Assistants now have a dedicated "All Forms" page accessible from the sidebar. It lists every submitted form for their assigned patients — filterable by form type, date, and status — giving MAs a single place to review all documentation without navigating patient by patient.'],
+            ['icon' => 'bi-arrow-repeat',          'tag' => 'Improve', 'tag_color' => 'teal',  'title' => 'Wound Photo Gallery Auto-Refreshes After Upload', 'desc' => 'The All Photos gallery inside the Add Wound Photo panel now reloads automatically after a photo is saved. The new image appears instantly without needing to close and reopen the panel.'],
+            ['icon' => 'bi-pen-fill',              'tag' => 'Improve', 'tag_color' => 'teal',  'title' => 'Provider Signature on All New Patient Packet Forms', 'desc' => 'All six forms in the New Patient Packet now include a provider signature block, ensuring complete provider sign-off is captured across the entire intake packet.'],
+            ['icon' => 'bi-file-earmark-text-fill','tag' => 'Improve', 'tag_color' => 'teal',  'title' => 'New Patient Pocket: Vitals & Meds Parity',      'desc' => 'The New Patient Pocket form now matches the Visit Consent form for vitals entry and medication reconciliation. PDF preloading is faster, and ABN and PHI consent defaults are pre-selected for a smoother intake workflow.'],
+            ['icon' => 'bi-list-check',            'tag' => 'Fix',     'tag_color' => 'amber', 'title' => 'Medications Always Display on Printed Documents', 'desc' => 'Print templates now fall back to the med_list_json field when indexed medication fields are absent from older submissions, so medication lists print correctly on all historical and new documents.'],
+            ['icon' => 'bi-x-circle',              'tag' => 'Fix',     'tag_color' => 'amber', 'title' => 'Send to Practice Fusion Button Removed',        'desc' => 'The "Send to Practice Fusion" button has been removed from the signed document view to streamline the page and reduce confusion for staff who do not use the Practice Fusion integration.'],
+        ],
+    ],
+    [
         'version' => 'v3.4',
         'date'    => 'May 28, 2026',
-        'label'   => 'Latest',
+        'label'   => null,
         'color'   => 'emerald',
         'items'   => [
             ['icon' => 'bi-bell-fill',             'tag' => 'New',     'tag_color' => 'blue',  'title' => 'Push Notifications',                           'desc' => 'Staff now receive real-time push notifications on their device for new messages, visit assignments, and morning route reminders — even when the app is in the background.'],
