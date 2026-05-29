@@ -90,6 +90,95 @@ if ($_qnVisitId > 0) {
 }
 ?>
 
+<!-- ── Messaging floating trigger ─────────────────────────────── -->
+<button id="msgFloatBtn"
+        onclick="msgOpenPanel()"
+        title="Messages"
+        class="fixed right-5 w-14 h-14 flex items-center justify-center
+               bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-full shadow-xl
+               transition-all duration-200 no-print"
+        style="bottom:248px;z-index:7700;">
+    <i class="bi bi-chat-dots-fill text-xl"></i>
+    <span id="msgBadge"
+          class="absolute -top-1 -right-1 hidden min-w-[18px] h-[18px] px-1 bg-red-500 text-white
+                 text-[9px] font-bold rounded-full flex items-center justify-center leading-none"></span>
+</button>
+
+<!-- Messaging overlay -->
+<div id="msgOverlay"
+     class="fixed inset-0 hidden no-print"
+     style="z-index:7710;background:rgba(0,0,0,0.45);pointer-events:none;"></div>
+
+<!-- Messaging slide-up panel -->
+<div id="msgPanel"
+     class="fixed bottom-0 bg-white rounded-t-2xl shadow-2xl no-print"
+     style="left:50%;width:min(100vw,520px);transform:translateX(-50%) translateY(100%);
+            transition:transform 0.3s ease-out;z-index:7720;display:flex;flex-direction:column;max-height:88dvh;">
+
+    <!-- Chat list view -->
+    <div id="msgViewList" style="display:flex;flex-direction:column;flex:1 1 auto;min-height:0;overflow:hidden;">
+        <div class="bg-white rounded-t-2xl px-5 pt-3 pb-3 border-b border-slate-100 flex-shrink-0">
+            <div class="mx-auto w-8 h-1 bg-slate-300 rounded-full mb-2"></div>
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-sm font-bold text-slate-800"><i class="bi bi-chat-dots-fill text-blue-600 mr-1.5"></i>Messages</h3>
+                    <p class="text-xs text-slate-400">Chat with your team</p>
+                </div>
+                <button onclick="msgClosePanel()"
+                        class="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100
+                               hover:bg-slate-200 text-slate-500 transition-colors">
+                    <i class="bi bi-x-lg text-sm"></i>
+                </button>
+            </div>
+        </div>
+        <div id="msgChatList" class="overflow-y-auto px-2 py-2" style="flex:1 1 auto;">
+            <div class="flex items-center justify-center py-8 text-slate-400 text-sm">
+                <i class="bi bi-arrow-repeat animate-spin mr-2"></i> Loading&hellip;
+            </div>
+        </div>
+    </div>
+
+    <!-- Thread view -->
+    <div id="msgViewThread" style="display:none;flex-direction:column;flex:1 1 auto;min-height:0;">
+        <div class="bg-white rounded-t-2xl px-4 pt-3 pb-3 border-b border-slate-100 flex-shrink-0">
+            <div class="mx-auto w-8 h-1 bg-slate-300 rounded-full mb-2"></div>
+            <div class="flex items-center gap-2">
+                <button onclick="msgBackToList()"
+                        class="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100
+                               hover:bg-slate-200 text-slate-600 transition-colors flex-shrink-0">
+                    <i class="bi bi-arrow-left text-sm"></i>
+                </button>
+                <div id="msgThreadAvatar"
+                     class="w-8 h-8 rounded-full flex items-center justify-center
+                            font-bold text-xs flex-shrink-0"
+                     style="background:#dbeafe;color:#2563eb;">?</div>
+                <p class="flex-1 text-sm font-bold text-slate-800 truncate" id="msgThreadName">Chat</p>
+                <button onclick="msgClosePanel()"
+                        class="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100
+                               hover:bg-slate-200 text-slate-500 transition-colors flex-shrink-0">
+                    <i class="bi bi-x-lg text-sm"></i>
+                </button>
+            </div>
+        </div>
+        <div id="msgHistory"
+             class="overflow-y-auto px-4 py-3"
+             style="flex:1 1 auto;scroll-behavior:smooth;"></div>
+        <div class="flex-shrink-0 px-3 py-3 border-t border-slate-100 flex items-end gap-2 bg-white">
+            <textarea id="msgComposeBody"
+                      rows="1"
+                      placeholder="Type a message&hellip;"
+                      class="flex-1 px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white resize-none
+                             focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent"
+                      style="min-height:38px;max-height:100px;"></textarea>
+            <button type="button" onclick="msgSend()"
+                    class="w-10 h-10 flex-shrink-0 flex items-center justify-center
+                           bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl transition-all">
+                <i class="bi bi-send-fill text-sm"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
 <!-- ── Quick Notes floating trigger (above camera) ──────────────── -->
 <button id="qnFloatBtn"
         onclick="qnOpenPanel()"
@@ -1257,5 +1346,207 @@ if ($_qnVisitId > 0) {
         .catch(function(){});
     };
 
+})();
+</script>
+
+<script>
+(function () {
+    var _api   = <?= json_encode(BASE_URL . '/api/messages.php') ?>;
+    var _myId  = <?= (int)($_SESSION['user_id'] ?? 0) ?>;
+    var _panel = document.getElementById('msgPanel');
+    var _ov    = document.getElementById('msgOverlay');
+    var _listV = document.getElementById('msgViewList');
+    var _thrV  = document.getElementById('msgViewThread');
+    var _hist  = document.getElementById('msgHistory');
+    var _clist = document.getElementById('msgChatList');
+    var _badge = document.getElementById('msgBadge');
+
+    var _aid = '', _aname = '', _lastId = 0;
+    var _fetching = false, _wasBot = true, _prevU = -1, _timer = null;
+
+    // ── Open / close ──────────────────────────────────────────────
+    window.msgOpenPanel = function () {
+        _panel.style.transform = 'translateX(-50%) translateY(0)';
+        _ov.classList.remove('hidden'); _ov.style.pointerEvents = 'auto';
+        document.body.style.overflow = 'hidden';
+        _aid = ''; _lastId = 0;
+        _listV.style.display = 'flex'; _thrV.style.display = 'none';
+        _doSync();
+        _timer = setInterval(_doSync, 8000);
+        setTimeout(function () { document.addEventListener('click', _out); }, 50);
+    };
+    window.msgClosePanel = function () {
+        _panel.style.transform = 'translateX(-50%) translateY(100%)';
+        _ov.classList.add('hidden'); _ov.style.pointerEvents = 'none';
+        document.body.style.overflow = '';
+        clearInterval(_timer); _timer = null;
+        document.removeEventListener('click', _out);
+    };
+    function _out(e) {
+        var fb = document.getElementById('msgFloatBtn');
+        if (_panel.contains(e.target) || (fb && fb.contains(e.target))) return;
+        msgClosePanel();
+    }
+    _ov.addEventListener('click', window.msgClosePanel);
+
+    // ── Sync ──────────────────────────────────────────────────────
+    function _doSync() {
+        if (_fetching) return;
+        _fetching = true;
+        fetch(_api + '?action=sync&active_chat=' + encodeURIComponent(_aid) + '&last_msg_id=' + _lastId)
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            if (!d.ok) return;
+            _rl(d.chats || []);
+            if (_aid && d.messages && d.messages.length) {
+                _rm(d.messages, _lastId > 0);
+            } else if (_aid && _lastId === 0 && (!d.messages || !d.messages.length)) {
+                _hist.innerHTML = '<div style="text-align:center;padding:24px;color:#94a3b8;font-size:13px;">No messages yet \u2014 say hi!</div>';
+            }
+        })
+        .catch(function () {})
+        .finally(function () { _fetching = false; });
+    }
+
+    // ── Render chat list ──────────────────────────────────────────
+    function _rl(chats) {
+        var total = chats.reduce(function (s, c) { return s + (c.unreads | 0); }, 0);
+        _badge.textContent = total > 99 ? '99+' : total;
+        _badge.classList.toggle('hidden', total === 0);
+        if (_prevU >= 0 && total > _prevU) _chime();
+        _prevU = total;
+        if (_aid) return; // in thread view — don't re-render list
+        var h = '';
+        chats.forEach(function (c) {
+            var ini = c.name.substring(0, 2).toUpperCase();
+            var ts  = c.latest_time ? _fmt(c.latest_time.replace(' ', 'T')) : '';
+            var pre = c.latest_body || 'No messages yet';
+            if (pre.length > 42) pre = pre.substring(0, 42) + '\u2026';
+            var unr = c.unreads > 0
+                ? '<span style="min-width:18px;height:18px;padding:0 5px;background:#2563eb;color:#fff;font-size:10px;font-weight:700;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">' + c.unreads + '</span>'
+                : '';
+            var av = c.id === 'all'
+                ? '<div style="width:40px;height:40px;background:#dbeafe;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="bi bi-megaphone-fill" style="color:#2563eb;font-size:14px;"></i></div>'
+                : '<div style="width:40px;height:40px;background:#e2e8f0;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#475569;flex-shrink:0;">' + ini + '</div>';
+            var sid = String(c.id).replace(/'/g, "\\'");
+            var sn  = _e(c.name).replace(/'/g, "\\'");
+            h += '<button type="button" onclick="msgOpenChat(\'' + sid + '\',\'' + sn + '\')"'
+                + ' style="width:100%;display:flex;align-items:center;gap:12px;padding:10px 8px;border-radius:12px;border:none;background:transparent;cursor:pointer;text-align:left;transition:background .15s;"'
+                + ' onmouseenter="this.style.background=\'#f8fafc\'" onmouseleave="this.style.background=\'transparent\'">'
+                + av
+                + '<div style="flex:1;min-width:0;">'
+                + '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:4px;margin-bottom:2px;">'
+                + '<span style="font-weight:700;font-size:13px;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + _e(c.name) + '</span>'
+                + '<span style="font-size:10px;color:#94a3b8;white-space:nowrap;flex-shrink:0;">' + ts + '</span>'
+                + '</div><div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">'
+                + '<span style="font-size:12px;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + _e(pre) + '</span>'
+                + unr + '</div></div></button>';
+        });
+        _clist.innerHTML = h || '<div style="text-align:center;padding:32px;color:#94a3b8;font-size:13px;">No conversations yet.</div>';
+    }
+
+    // ── Open chat thread ──────────────────────────────────────────
+    window.msgOpenChat = function (id, name) {
+        _aid = id; _aname = name; _lastId = 0; _wasBot = true;
+        _hist.innerHTML = '<div style="text-align:center;padding:24px;color:#94a3b8;font-size:13px;"><i class="bi bi-arrow-repeat animate-spin"></i></div>';
+        document.getElementById('msgThreadName').textContent = name;
+        var av = document.getElementById('msgThreadAvatar');
+        av.style.background = '#dbeafe'; av.style.color = '#2563eb';
+        av.innerHTML = id === 'all' ? '<i class="bi bi-megaphone-fill" style="font-size:13px;"></i>' : name.substring(0, 2).toUpperCase();
+        _listV.style.display = 'none'; _thrV.style.display = 'flex';
+        _fetching = false; _doSync();
+        setTimeout(function () { var t = document.getElementById('msgComposeBody'); if (t) t.focus(); }, 200);
+    };
+    window.msgBackToList = function () {
+        _aid = ''; _lastId = 0;
+        _thrV.style.display = 'none'; _listV.style.display = 'flex';
+        _fetching = false; _doSync();
+    };
+
+    // ── Render messages ───────────────────────────────────────────
+    function _rm(msgs, append) {
+        if (!append) _hist.innerHTML = '';
+        msgs.forEach(function (m) {
+            var me  = String(m.from_user_id) === String(_myId);
+            var del = !!m.deleted_at;
+            var bod = del ? '<em style="opacity:.6;font-size:13px;">Message deleted</em>' : _e(m.body || '').replace(/\n/g, '<br>');
+            var tim = _fmt(m.created_at.replace(' ', 'T'));
+            var who = (!me && m.from_name && _aid === 'all')
+                ? '<div style="font-size:11px;color:#64748b;font-weight:600;margin-bottom:2px;">' + _e(m.from_name) + '</div>' : '';
+            var d = document.createElement('div');
+            d.style.cssText = 'display:flex;flex-direction:column;align-items:' + (me ? 'flex-end' : 'flex-start') + ';margin-bottom:8px;';
+            d.innerHTML = who
+                + '<div style="max-width:80%;padding:9px 13px;border-radius:' + (me ? '16px 16px 4px 16px' : '16px 16px 16px 4px') + ';'
+                + 'background:' + (me ? '#2563eb' : '#fff') + ';color:' + (me ? '#fff' : '#1e293b') + ';'
+                + (me ? '' : 'border:1px solid #e2e8f0;') + 'box-shadow:0 1px 2px rgba(0,0,0,.06);word-break:break-word;">'
+                + '<div style="font-size:13px;line-height:1.5;">' + bod + '</div>'
+                + '<div style="font-size:10px;margin-top:3px;' + (me ? 'color:rgba(255,255,255,.65);text-align:right;' : 'color:#94a3b8;') + '">' + tim + '</div>'
+                + '</div>';
+            _hist.appendChild(d);
+            _lastId = Math.max(_lastId, parseInt(m.id));
+        });
+        if (_wasBot || !append) _hist.scrollTop = _hist.scrollHeight;
+    }
+    _hist.addEventListener('scroll', function () {
+        _wasBot = _hist.scrollHeight - _hist.scrollTop - _hist.clientHeight < 30;
+    });
+
+    // ── Send ──────────────────────────────────────────────────────
+    window.msgSend = function () {
+        var ta = document.getElementById('msgComposeBody');
+        var body = ta.value.trim();
+        if (!body || !_aid) return;
+        ta.value = ''; ta.style.height = 'auto';
+        var fd = new FormData();
+        fd.append('action', 'send'); fd.append('to', _aid); fd.append('body', body);
+        fetch(_api, { method: 'POST', body: fd })
+        .then(function (r) { return r.json(); })
+        .then(function (d) { if (d.ok) { _fetching = false; _doSync(); } })
+        .catch(function () {});
+    };
+    var _ta = document.getElementById('msgComposeBody');
+    if (_ta) {
+        _ta.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); msgSend(); }
+        });
+        _ta.addEventListener('input', function () { this.style.height = 'auto'; this.style.height = this.scrollHeight + 'px'; });
+    }
+
+    // ── Background badge refresh (30 s, even when panel is closed) ─
+    setInterval(function () {
+        if (_timer) return; // panel open — already polling
+        fetch(_api + '?action=sync&active_chat=&last_msg_id=0')
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            if (!d.ok || !d.chats) return;
+            var tot = d.chats.reduce(function (s, c) { return s + (c.unreads | 0); }, 0);
+            _badge.textContent = tot > 99 ? '99+' : tot;
+            _badge.classList.toggle('hidden', tot === 0);
+            if (_prevU >= 0 && tot > _prevU) _chime();
+            _prevU = tot;
+        }).catch(function () {});
+    }, 30000);
+
+    // ── Helpers ───────────────────────────────────────────────────
+    function _e(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    function _fmt(d) {
+        var dt = new Date(d), now = new Date();
+        var today = now.getDate() === dt.getDate() && now.getMonth() === dt.getMonth() && now.getFullYear() === dt.getFullYear();
+        if (today) return dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        if ((now - dt) < 604800000) return dt.toLocaleDateString([], { weekday: 'short' }) + ' ' + dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        return dt.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    }
+    function _chime() {
+        try {
+            var ctx = new (window.AudioContext || window.webkitAudioContext)();
+            [880, 1100].forEach(function (f, i) {
+                var o = ctx.createOscillator(), g = ctx.createGain();
+                o.connect(g); g.connect(ctx.destination); o.type = 'sine'; o.frequency.value = f;
+                var t = ctx.currentTime + i * 0.11;
+                g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.18, t + .01); g.gain.exponentialRampToValueAtTime(.001, t + .22);
+                o.start(t); o.stop(t + .25);
+            });
+        } catch(e) {}
+    }
 })();
 </script>
