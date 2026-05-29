@@ -52,6 +52,7 @@ if ($providerFilter !== '') {
         FROM `schedule` sc
         JOIN patients p ON p.id = sc.patient_id
         WHERE sc.visit_date = ? AND sc.provider_name = ?
+          AND sc.status NOT IN ('completed','done')
         ORDER BY sc.visit_order ASC, sc.visit_time ASC
         LIMIT 6
     ");
@@ -66,6 +67,7 @@ if ($providerFilter !== '') {
         FROM `schedule` sc
         JOIN patients p ON p.id = sc.patient_id
         WHERE sc.visit_date = ?
+          AND sc.status NOT IN ('completed','done')
         ORDER BY sc.visit_order ASC, sc.visit_time ASC
         LIMIT 6
     ");
@@ -79,6 +81,7 @@ if ($providerFilter !== '') {
         FROM `schedule` sc
         JOIN patients p ON p.id = sc.patient_id
         WHERE sc.visit_date = ? AND sc.ma_id = ?
+          AND sc.status NOT IN ('completed','done')
         ORDER BY sc.visit_order ASC, sc.visit_time ASC
         LIMIT 6
     ");
@@ -87,13 +90,13 @@ if ($providerFilter !== '') {
 $mySchedule = $myScheduleStmt->fetchAll();
 
 if ($providerFilter !== '') {
-    $scCountStmt = $pdo->prepare("SELECT COUNT(*) FROM `schedule` WHERE visit_date=? AND provider_name=?");
+    $scCountStmt = $pdo->prepare("SELECT COUNT(*) FROM `schedule` WHERE visit_date=? AND provider_name=? AND status NOT IN ('completed','done')");
     $scCountStmt->execute([$today, $providerFilter]);
 } elseif (isAdmin()) {
-    $scCountStmt = $pdo->prepare("SELECT COUNT(*) FROM `schedule` WHERE visit_date=?");
+    $scCountStmt = $pdo->prepare("SELECT COUNT(*) FROM `schedule` WHERE visit_date=? AND status NOT IN ('completed','done')");
     $scCountStmt->execute([$today]);
 } else {
-    $scCountStmt = $pdo->prepare("SELECT COUNT(*) FROM `schedule` WHERE visit_date=? AND ma_id=?");
+    $scCountStmt = $pdo->prepare("SELECT COUNT(*) FROM `schedule` WHERE visit_date=? AND ma_id=? AND status NOT IN ('completed','done')");
     $scCountStmt->execute([$today, $_SESSION['user_id']]);
 }
 $scheduleTotalToday = (int)$scCountStmt->fetchColumn();
@@ -641,6 +644,7 @@ include __DIR__ . '/includes/header.php';
     ?>
     <div class="divide-y divide-slate-50">
         <?php foreach ($mySchedule as $idx => $sv):
+            if ($sv['status'] === 'completed' || $sv['status'] === 'done') continue;
             $sc = $scStatusColors[$sv['status']] ?? $scStatusColors['pending'];
         ?>
         <div class="flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50 transition-colors">
