@@ -224,13 +224,6 @@ include __DIR__ . '/includes/header.php';
                    font-semibold rounded-xl transition-all shadow-sm text-sm">
         <i class="bi bi-printer-fill"></i> Print
     </button>
-    <?php if ($doc['status'] === 'signed'): ?>
-    <a href="<?= BASE_URL ?>/push_to_pf.php?form_id=<?= $doc['id'] ?>"
-       class="inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white
-              font-semibold rounded-xl transition-all shadow-sm text-sm">
-        <i class="bi bi-cloud-upload-fill"></i> Send to Practice Fusion
-    </a>
-    <?php endif; ?>
     <a href="<?= BASE_URL ?>/patient_view.php?id=<?= $doc['patient_id'] ?>"
        class="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-slate-200 text-slate-700
               hover:bg-slate-50 font-semibold rounded-xl transition-all text-sm">
