@@ -384,35 +384,50 @@ Explanation to include while speaking:
 ## Scene 8 - End Visit + Follow Up (8:55-9:55)
 
 On screen:
-1. Click End Visit in form footer or schedule card.
-2. Confirm modal.
-3. Show redirect to View Document.
-4. Return to schedule showing Completed.
+1. Scroll to the bottom of the submitted form and locate the End Visit button in the footer action bar.
+2. Click End Visit. A confirmation modal appears — point it out on screen.
+3. Click Confirm in the modal.
+4. Show the page redirect to View Document with the completed form open.
+5. Navigate back to Schedule and show the visit card now displays Completed status in green.
+6. Point to the time-out timestamp displayed on the completed visit card.
 
 Voiceover:
-"The MA ends the visit with one tap. Time out is recorded, status changes to Completed, and the generated document can be reviewed immediately."
+"Once the form is submitted and signatures are captured, the MA clicks End Visit at the bottom of the document. A short confirmation appears — tap Confirm. The system records the time out, closes the visit, and takes the MA directly to the completed document so it can be reviewed immediately before moving to the next patient."
 
 Extended voiceover option:
-"End Visit finalizes timing and closes the loop operationally. The visit is no longer left in-progress, and the completed document is instantly reviewable for quality check before moving to the next patient."
+"End Visit is the final action in the visit workflow, and it does three things at once. It stamps the official time out so the visit duration is accurately tracked for compliance and billing. It changes the visit status from En Route to Completed so the schedule reflects reality for the entire team. And it opens the generated document immediately so the MA can do a quick quality check — catching a missing field or unclear note before leaving the patient's location."
 
 Explanation to include while speaking:
-1. Explain that clear completion status keeps schedule data accurate for the whole team.
-2. Mention that immediate document review catches small issues before they become rework.
+1. Point out that End Visit is only active after the form has been submitted — it will not appear or will be disabled if the form is still in draft.
+2. Explain that the confirmation modal is a safeguard: it prevents accidental taps from closing an active visit before documentation is truly complete.
+3. Clarify that skipping End Visit leaves the visit stuck in En Route on the schedule, which creates confusion for schedulers and admins monitoring the day's progress.
+4. Mention that the time-out timestamp is system-generated and cannot be edited afterward, so accuracy depends on tapping End Visit at the actual conclusion of care — not from the parking lot or back at the office.
+5. Emphasize that the redirect to View Document is intentional: it gives the MA one final opportunity to confirm everything is present before the chart is handed off to the provider for countersignature.
+
+### Where to Find End Visit
+
+End Visit can be accessed from two locations depending on where the MA is in the workflow:
+
+1. **Form footer** — After the form is submitted, an End Visit button appears in the action bar at the bottom of the View Document page. This is the standard location.
+2. **Schedule card** — If the MA returns to the Schedule page while the visit is still in En Route status, an End Visit option is also available on the visit card itself. This is useful if the MA submitted the form but navigated away before ending the visit.
+
+Both options perform the same action. The form footer location is preferred because it keeps the MA in the document context for the final quality review.
 
 ### Save Draft and End Visit - Function Voiceover Script
 
 Use this insert to explain the difference between Save Draft and End Visit buttons.
 
 Voiceover:
-"Save Draft stores your in-progress work without closing the visit, so you can safely resume later if the visit is interrupted. End Visit is the final workflow action: it records time out, updates visit status to Completed, and redirects you to the generated document for final review."
+"There are two important action buttons in the visit workflow. Save Draft and End Visit. Save Draft keeps your work protected without closing anything — use it any time documentation is interrupted or incomplete. End Visit is the final step: it records time out, marks the visit Completed on the schedule, and opens the generated document so the MA can do a last review."
 
 Extended voiceover option:
-"Think of Save Draft as a protection step during active documentation, and End Visit as the completion step after documentation and signatures are done. Using both correctly prevents data loss, avoids duplicate work, and keeps schedule status reliable for the entire care team."
+"Think of Save Draft as a pause button and End Visit as the close button. Save Draft at any point to protect work in progress. End Visit only when the form is fully submitted and all signatures are captured. Using them in the right order prevents data loss, keeps schedule status accurate, and gives providers a clean chart to countersign without follow-up questions."
 
 Explanation to include while speaking:
-1. Use Save Draft when documentation is incomplete or interrupted.
-2. Use End Visit only after required sections and signatures are complete.
-3. Confirm Completed status on Schedule after End Visit.
+1. Use Save Draft any time the visit is interrupted — stepping away, unstable connection, or partial documentation.
+2. Use End Visit only after all required sections, medications, wound entries, and signatures are complete and the form has been submitted successfully.
+3. Confirm Completed status on Schedule after End Visit to verify the action registered correctly.
+4. If the schedule card still shows En Route after tapping End Visit, refresh the page — the status update is real-time but may need a moment on slower connections.
 
 ---
 
