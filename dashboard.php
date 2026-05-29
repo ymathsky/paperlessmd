@@ -1841,7 +1841,7 @@ async function dashStartVisit(visitId, patientId, visitType, visitSubtype, btn) 
     fetch(window._pdBase + '/api/schedule_update.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ csrf: window._pdCsrf, id: visitId, action: 'status', status: 'en_route' })
+        body: JSON.stringify({ csrf: window._pdCsrf, id: visitId, action: 'status', status: 'en_route', started_at: new Date().toISOString() })
     })
     .then(r => r.json())
     .then(data => {

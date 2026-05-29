@@ -48,17 +48,12 @@ if ($action === 'status') {
         exit;
     }
 
-    // MAs may only update visits assigned to them
     $_apiRole = $_SESSION['role'] ?? '';
     $_apiUid  = (int)($_SESSION['user_id'] ?? 0);
-    if ($_apiRole === 'ma' && (int)$visit['ma_id'] !== $_apiUid) {
-        http_response_code(403);
-        echo json_encode(['ok' => false, 'error' => 'Not authorized for this visit']);
-        exit;
-    }
 
     $autoCompleted = null;
     if ($status === 'en_route') {
+        // Auto-complete any other visit this user has open
         $openStmt = $pdo->prepare("SELECT sc.id, sc.patient_id, CONCAT(p.first_name, ' ', p.last_name) AS patient_name
                                    FROM `schedule` sc
                                    JOIN patients p ON p.id = sc.patient_id
@@ -67,7 +62,7 @@ if ($action === 'status') {
                                      AND sc.id <> ?
                                    ORDER BY COALESCE(sc.visit_started_at, sc.updated_at, sc.visit_date) DESC, sc.id DESC
                                    LIMIT 1");
-        $openStmt->execute([(int)$visit['ma_id'], $id]);
+        $openStmt->execute([$_apiUid, $id]);
         $openVisit = $openStmt->fetch(PDO::FETCH_ASSOC);
 
         if ($openVisit) {
@@ -85,13 +80,40 @@ if ($action === 'status') {
         }
     }
 
-    // Stamp visit_started_at the first time a visit moves to en_route
-    // Stamp visit_ended_at the first time a visit moves to completed
-    $startedStamp = ($status === 'en_route')   ? ', visit_started_at = COALESCE(visit_started_at, NOW())' : '';
+    // Validate optional client-side started_at timestamp (ISO 8601, within ±10 min of now)
+    $clientStartedAt = null;
+    if ($status === 'en_route' && !empty($body['started_at'])) {
+        $parsed = DateTime::createFromFormat(DateTime::ATOM, $body['started_at']);
+        if (!$parsed) {
+            $parsed = DateTime::createFromFormat('Y-m-d\TH:i:s.u\Z', $body['started_at']);
+        }
+        if (!$parsed) {
+            $parsed = DateTime::createFromFormat('Y-m-d\TH:i:s\Z', $body['started_at']);
+        }
+        if ($parsed) {
+            $diffSec = abs(time() - $parsed->getTimestamp());
+            if ($diffSec <= 600) { // accept if within 10 minutes
+                $clientStartedAt = $parsed->format('Y-m-d H:i:s');
+            }
+        }
+    }
+
+    // Stamp visit_started_at (prefer client timestamp), visit_ended_at, and overwrite ma_id on start
+    $maStamp      = ($status === 'en_route')   ? ', ma_id = ?' : '';
+    $startedStamp = ($status === 'en_route')   ? ', visit_started_at = COALESCE(visit_started_at, ' . ($clientStartedAt ? '?' : 'NOW()') . ')' : '';
     $endedStamp   = ($status === 'completed')  ? ', visit_ended_at   = COALESCE(visit_ended_at,   NOW())' : '';
 
-    $stmt = $pdo->prepare("UPDATE `schedule` SET status=?" . $startedStamp . $endedStamp . " WHERE id=?");
-    $stmt->execute([$status, $id]);
+    $updateParams = [$status];
+    if ($status === 'en_route') {
+        $updateParams[] = $_apiUid; // ma_id
+        if ($clientStartedAt) {
+            $updateParams[] = $clientStartedAt; // visit_started_at
+        }
+    }
+    $updateParams[] = $id;
+
+    $stmt = $pdo->prepare("UPDATE `schedule` SET status=?" . $maStamp . $startedStamp . $endedStamp . " WHERE id=?");
+    $stmt->execute($updateParams);
 
     $redirectDocumentId = 0;
     if ($status === 'completed' && $formSubmissionId > 0) {

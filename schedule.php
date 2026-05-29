@@ -1360,7 +1360,7 @@ async function startVisit(visitId, patientId, visitType, visitSubtype, btn) {
     fetch(BASE + '/api/schedule_update.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ csrf: CSRF, id: visitId, action: 'status', status: 'en_route' })
+        body: JSON.stringify({ csrf: CSRF, id: visitId, action: 'status', status: 'en_route', started_at: new Date().toISOString() })
     })
     .then(r => r.json())
     .then(data => {
