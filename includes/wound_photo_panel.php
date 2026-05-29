@@ -435,7 +435,7 @@ if ($_qnVisitId > 0) {
                         <p class="text-sm font-bold text-slate-800">All Wound Photos</p>
                         <p class="text-xs text-slate-500">Browse every photo saved for this patient.</p>
                     </div>
-                    <span class="text-[10px] font-bold px-2 py-1 rounded-full bg-white text-slate-500 border border-slate-200">
+                    <span id="wpAllPhotosCount" class="text-[10px] font-bold px-2 py-1 rounded-full bg-white text-slate-500 border border-slate-200">
                         <?= count($_wpAllPhotos) ?> total
                     </span>
                 </div>
@@ -448,7 +448,7 @@ if ($_qnVisitId > 0) {
                 </div>
             </div>
             <?php if (!empty($_wpAllPhotos)): ?>
-            <div class="grid grid-cols-3 gap-2 max-h-[42dvh] overflow-y-auto pr-1">
+            <div id="wpAllPhotosGrid" class="grid grid-cols-3 gap-2 max-h-[42dvh] overflow-y-auto pr-1">
                 <?php foreach ($_wpAllPhotos as $_ai => $_ap): ?>
                 <button type="button" onclick="wpShowGalleryPhoto(<?= $_ai ?>)"
                         class="relative rounded-xl overflow-hidden border border-slate-200 bg-slate-100 aspect-square hover:border-violet-400 transition-colors">
@@ -466,8 +466,12 @@ if ($_qnVisitId > 0) {
                 </button>
                 <?php endforeach; ?>
             </div>
+            <div id="wpAllPhotosEmpty" class="hidden rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">
+                No wound photos have been saved for this patient yet.
+            </div>
             <?php else: ?>
-            <div class="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">
+            <div id="wpAllPhotosGrid" class="hidden grid grid-cols-3 gap-2 max-h-[42dvh] overflow-y-auto pr-1"></div>
+            <div id="wpAllPhotosEmpty" class="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-500">
                 No wound photos have been saved for this patient yet.
             </div>
             <?php endif; ?>
@@ -687,6 +691,38 @@ if ($_qnVisitId > 0) {
         date.textContent = d.taken_at ? ('Saved ' + d.taken_at) : 'Saved photo';
         wrap.classList.remove('hidden');
     };
+
+    function _wpEsc(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function wpRenderGalleryGrid() {
+        var grid     = document.getElementById('wpAllPhotosGrid');
+        var empty    = document.getElementById('wpAllPhotosEmpty');
+        var countEl  = document.getElementById('wpAllPhotosCount');
+        if (!grid || !empty) return;
+        if (countEl) countEl.textContent = _wpAllPhotos.length + ' total';
+        if (!_wpAllPhotos.length) {
+            grid.classList.add('hidden');
+            empty.classList.remove('hidden');
+            return;
+        }
+        empty.classList.add('hidden');
+        grid.classList.remove('hidden');
+        grid.innerHTML = '';
+        for (var i = 0; i < _wpAllPhotos.length; i++) {
+            var p   = _wpAllPhotos[i];
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.onclick = (function(idx){ return function(){ wpShowGalleryPhoto(idx); }; })(i);
+            btn.className = 'relative rounded-xl overflow-hidden border border-slate-200 bg-slate-100 aspect-square hover:border-violet-400 transition-colors';
+            var dateStr = p.taken_at ? p.taken_at.substr(5).replace('-','/') : '';
+            btn.innerHTML = '<img src="' + _wpEsc(p.photo_url) + '" alt="Patient wound photo ' + (i+1) + '" class="w-full h-full object-cover">'
+                + (dateStr ? '<span class="absolute top-1.5 left-1.5 text-[7px] font-bold text-white bg-black/50 rounded px-1">' + _wpEsc(dateStr) + '</span>' : '')
+                + (p.wound_location ? '<span class="absolute bottom-0 left-0 right-0 text-[8px] font-bold text-white text-center bg-black/55 px-1 py-0.5 truncate">' + _wpEsc(p.wound_location) + '</span>' : '');
+            grid.appendChild(btn);
+        }
+    }
 
     window.wpClosePanel = function () {
         panel.style.transform = 'translateX(-50%) translateY(100%)';
@@ -1104,6 +1140,14 @@ if ($_qnVisitId > 0) {
                 + (loc ? '<span class="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[9px] text-center px-1 py-0.5 truncate">' + loc + '</span>' : '');
             grid.prepend(thumb);
             document.getElementById('wpSavedWrap').classList.remove('hidden');
+            // Update "All Photos" gallery in real time
+            var _today = new Date();
+            var _takenAt = _today.getFullYear() + '-'
+                + String(_today.getMonth()+1).padStart(2,'0') + '-'
+                + String(_today.getDate()).padStart(2,'0');
+            _wpAllPhotos.unshift({ photo_url: data.url, wound_location: loc, taken_at: _takenAt });
+            _wpGalleryIndex = -1;
+            wpRenderGalleryGrid();
             // Reset state immediately — location/note stay pre-filled for the next shot
             currentBlob = null; currentFile = null;
             lastPhotoId = data.id || 0;
