@@ -981,11 +981,38 @@ window._pdCsrf = '<?= htmlspecialchars(csrfToken(), ENT_QUOTES, 'UTF-8') ?>';
         body.innerHTML = html;
     }
 
+    /* Notification chime for new messages/alerts on non-messages pages */
+    var _prevNotifTotal = -1;
+    function _playNotifChime() {
+        if (localStorage.getItem('msgChimeMuted') === '1') return;
+        try {
+            var ctx = new (window.AudioContext || window.webkitAudioContext)();
+            [880, 1100].forEach(function(freq, i) {
+                var osc = ctx.createOscillator();
+                var gain = ctx.createGain();
+                osc.connect(gain); gain.connect(ctx.destination);
+                osc.type = 'sine'; osc.frequency.value = freq;
+                var t = ctx.currentTime + i * 0.11;
+                gain.gain.setValueAtTime(0, t);
+                gain.gain.linearRampToValueAtTime(0.22, t + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+                osc.start(t); osc.stop(t + 0.25);
+            });
+        } catch(e) {}
+    }
+
     /* Initial badge + 60s polling */
     function refreshBadge() {
         fetch((window._pdBase || '') + '/api/notifications.php')
             .then(function (r) { return r.json(); })
-            .then(function (d) { setBadge(d.total); })
+            .then(function (d) {
+                setBadge(d.total);
+                // Chime on new notifications — skip on messages.php (handled there)
+                if (_prevNotifTotal >= 0 && d.total > _prevNotifTotal && !document.getElementById('composeBody')) {
+                    _playNotifChime();
+                }
+                _prevNotifTotal = d.total;
+            })
             .catch(function () {});
     }
     refreshBadge();

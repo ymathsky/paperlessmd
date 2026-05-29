@@ -163,6 +163,42 @@ if (empty($_SESSION['user_id'])) return;
     let callTimerInterval = null;
     let callStartTime = null;
 
+    // ── Ringtone ──────────────────────────────────────────────────────────
+    let _ringCtx = null;
+    let _ringTimer = null;
+
+    function _playRingBurst() {
+        try {
+            if (!_ringCtx) _ringCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (_ringCtx.state === 'suspended') _ringCtx.resume();
+            // Classic two-tone phone ring: 480 Hz + 440 Hz, two short bursts
+            [[480, 0], [440, 0], [480, 0.5], [440, 0.5]].forEach(([freq, delay]) => {
+                const osc  = _ringCtx.createOscillator();
+                const gain = _ringCtx.createGain();
+                osc.connect(gain);
+                gain.connect(_ringCtx.destination);
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                const t = _ringCtx.currentTime + delay;
+                gain.gain.setValueAtTime(0, t);
+                gain.gain.linearRampToValueAtTime(0.28, t + 0.02);
+                gain.gain.setValueAtTime(0.28, t + 0.38);
+                gain.gain.linearRampToValueAtTime(0, t + 0.42);
+                osc.start(t);
+                osc.stop(t + 0.45);
+            });
+        } catch(e) {}
+    }
+
+    function startRingtone() {
+        _playRingBurst();
+        _ringTimer = setInterval(_playRingBurst, 3200);
+    }
+
+    function stopRingtone() {
+        if (_ringTimer) { clearInterval(_ringTimer); _ringTimer = null; }
+    }
+
     // ── Media helpers ──────────────────────────────────────────────────────
     async function requestMedia() {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -386,10 +422,12 @@ if (empty($_SESSION['user_id'])) return;
         const peerInitials = peerName.substring(0,2).toUpperCase();
 
         document.getElementById('incomingCallBar').classList.add('hidden');
+        stopRingtone();
 
         localStream = await requestMedia();
         if (!localStream) {
             document.getElementById('incomingCallBar').classList.remove('hidden');
+            startRingtone();
             return;
         }
         document.getElementById('localVideo').srcObject = localStream;
@@ -437,6 +475,7 @@ if (empty($_SESSION['user_id'])) return;
     };
 
     window.rejectCall = async function() {
+        stopRingtone();
         if (incomingOffer) {
             await sendSignal('end', {}, parseInt(incomingOffer.from_user_id));
             incomingOffer = null;
@@ -479,6 +518,7 @@ if (empty($_SESSION['user_id'])) return;
                 document.getElementById('callerName').textContent = data.offer.from_name;
                 document.getElementById('callerAvatar').textContent = data.offer.from_name.substring(0,2).toUpperCase();
                 document.getElementById('incomingCallBar').classList.remove('hidden');
+                startRingtone();
             } catch(e) {}
         }, 2000);
     }
