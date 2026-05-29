@@ -1176,6 +1176,28 @@ html.dark .profile-hero .bg-white\/10 { background-color: rgba(255,255,255,0.1) 
 /* ── Notification drawer ── */
 html.dark #notifDrawer { background-color: #1e293b !important; border-color: #334155 !important; }
 
+/* ── Messaging floating panel theme variables ── */
+#msgPanel {
+    --msg-name: #1e293b;
+    --msg-preview: #64748b;
+    --msg-ts: #94a3b8;
+    --msg-bubble-bg: #f1f5f9;
+    --msg-bubble-color: #1e293b;
+    --msg-bubble-border: #e2e8f0;
+    --msg-av-bg: #e2e8f0;
+    --msg-av-color: #475569;
+}
+html.dark #msgPanel {
+    --msg-name: #f1f5f9;
+    --msg-preview: #94a3b8;
+    --msg-ts: #64748b;
+    --msg-bubble-bg: #283549;
+    --msg-bubble-color: #e2e8f0;
+    --msg-bubble-border: #475569;
+    --msg-av-bg: #334155;
+    --msg-av-color: #94a3b8;
+}
+
 /* ── Messages chat ── */
 html.dark .bubble-them {
     background-color: #283549 !important;

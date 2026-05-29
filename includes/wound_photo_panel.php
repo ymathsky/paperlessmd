@@ -1427,22 +1427,22 @@ if ($_qnVisitId > 0) {
                 : '';
             var av = c.id === 'all'
                 ? '<div style="width:40px;height:40px;background:#dbeafe;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;"><i class="bi bi-megaphone-fill" style="color:#2563eb;font-size:14px;"></i></div>'
-                : '<div style="width:40px;height:40px;background:#e2e8f0;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:#475569;flex-shrink:0;">' + ini + '</div>';
+                : '<div style="width:40px;height:40px;background:var(--msg-av-bg);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:var(--msg-av-color);flex-shrink:0;">' + ini + '</div>';
             var sid = String(c.id).replace(/'/g, "\\'");
             var sn  = _e(c.name).replace(/'/g, "\\'");
             h += '<button type="button" onclick="msgOpenChat(\'' + sid + '\',\'' + sn + '\')"'
                 + ' style="width:100%;display:flex;align-items:center;gap:12px;padding:10px 8px;border-radius:12px;border:none;background:transparent;cursor:pointer;text-align:left;transition:background .15s;"'
-                + ' onmouseenter="this.style.background=\'#f8fafc\'" onmouseleave="this.style.background=\'transparent\'">'
+                + ' onmouseenter="this.style.background=\'rgba(100,116,139,.12)\'" onmouseleave="this.style.background=\'transparent\'">'
                 + av
                 + '<div style="flex:1;min-width:0;">'
                 + '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:4px;margin-bottom:2px;">'
-                + '<span style="font-weight:700;font-size:13px;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + _e(c.name) + '</span>'
-                + '<span style="font-size:10px;color:#94a3b8;white-space:nowrap;flex-shrink:0;">' + ts + '</span>'
+                + '<span style="font-weight:700;font-size:13px;color:var(--msg-name);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + _e(c.name) + '</span>'
+                + '<span style="font-size:10px;color:var(--msg-ts);white-space:nowrap;flex-shrink:0;">' + ts + '</span>'
                 + '</div><div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">'
-                + '<span style="font-size:12px;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + _e(pre) + '</span>'
+                + '<span style="font-size:12px;color:var(--msg-preview);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + _e(pre) + '</span>'
                 + unr + '</div></div></button>';
         });
-        _clist.innerHTML = h || '<div style="text-align:center;padding:32px;color:#94a3b8;font-size:13px;">No conversations yet.</div>';
+        _clist.innerHTML = h || '<div style="text-align:center;padding:32px;color:var(--msg-ts);font-size:13px;">No conversations yet.</div>';
     }
 
     // ── Open chat thread ──────────────────────────────────────────
@@ -1472,15 +1472,15 @@ if ($_qnVisitId > 0) {
             var bod = del ? '<em style="opacity:.6;font-size:13px;">Message deleted</em>' : _e(m.body || '').replace(/\n/g, '<br>');
             var tim = _fmt(m.created_at.replace(' ', 'T'));
             var who = (!me && m.from_name && _aid === 'all')
-                ? '<div style="font-size:11px;color:#64748b;font-weight:600;margin-bottom:2px;">' + _e(m.from_name) + '</div>' : '';
+                ? '<div style="font-size:11px;color:var(--msg-preview);font-weight:600;margin-bottom:2px;">' + _e(m.from_name) + '</div>' : '';
             var d = document.createElement('div');
             d.style.cssText = 'display:flex;flex-direction:column;align-items:' + (me ? 'flex-end' : 'flex-start') + ';margin-bottom:8px;';
             d.innerHTML = who
                 + '<div style="max-width:80%;padding:9px 13px;border-radius:' + (me ? '16px 16px 4px 16px' : '16px 16px 16px 4px') + ';'
-                + 'background:' + (me ? '#2563eb' : '#fff') + ';color:' + (me ? '#fff' : '#1e293b') + ';'
-                + (me ? '' : 'border:1px solid #e2e8f0;') + 'box-shadow:0 1px 2px rgba(0,0,0,.06);word-break:break-word;">'
+                + 'background:' + (me ? '#2563eb' : 'var(--msg-bubble-bg)') + ';color:' + (me ? '#fff' : 'var(--msg-bubble-color)') + ';'
+                + (me ? '' : 'border:1px solid var(--msg-bubble-border);') + 'box-shadow:0 1px 2px rgba(0,0,0,.06);word-break:break-word;">'
                 + '<div style="font-size:13px;line-height:1.5;">' + bod + '</div>'
-                + '<div style="font-size:10px;margin-top:3px;' + (me ? 'color:rgba(255,255,255,.65);text-align:right;' : 'color:#94a3b8;') + '">' + tim + '</div>'
+                + '<div style="font-size:10px;margin-top:3px;' + (me ? 'color:rgba(255,255,255,.65);text-align:right;' : 'color:var(--msg-ts);') + '">' + tim + '</div>'
                 + '</div>';
             _hist.appendChild(d);
             _lastId = Math.max(_lastId, parseInt(m.id));
