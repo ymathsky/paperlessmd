@@ -175,7 +175,7 @@ document.addEventListener('keydown', function (e) {
 </button>
 <script>
 (function () {
-    var IDS  = ['wpFloatBtn', 'qnFloatBtn', 'rxPadFloatBtn'];
+    var IDS  = ['wpFloatBtn', 'qnFloatBtn', 'rxPadFloatBtn', 'msgFloatBtn'];
     var KEY  = 'floatMenuHidden';
     var hidden = localStorage.getItem(KEY) === '1';
 
