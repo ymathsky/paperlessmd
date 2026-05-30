@@ -121,8 +121,9 @@ if (!empty($_SESSION['user_id'])) {
         $navItems = [
             ['href' => '/dashboard.php', 'key' => 'dashboard', 'icon' => 'bi-speedometer2',    'label' => 'Dashboard'],
             ['href' => '/patients.php',  'key' => 'patients',  'icon' => 'bi-people-fill',     'label' => 'Patients'],
-            ['href' => '/schedule.php',  'key' => 'schedule',  'icon' => 'bi-calendar3',       'label' => 'Schedule',   'billingHide' => true],
-            ['href' => '/esign_queue.php','key'=> 'esign',     'icon' => 'bi-pen-fill',        'label' => 'Sign Queue', 'billingHide' => true, 'maHide' => true, 'badge' => $_esignCount, 'badgeCls' => 'bg-violet-500'],
+            ['href' => '/schedule.php',      'key' => 'schedule',      'icon' => 'bi-calendar3',           'label' => 'Schedule',       'billingHide' => true],
+            ['href' => '/daily_summary.php', 'key' => 'daily_summary', 'icon' => 'bi-bar-chart-line-fill', 'label' => 'Daily Summary',  'billingHide' => true],
+            ['href' => '/esign_queue.php',   'key' => 'esign',         'icon' => 'bi-pen-fill',            'label' => 'Sign Queue',     'billingHide' => true, 'maHide' => true, 'badge' => $_esignCount, 'badgeCls' => 'bg-violet-500'],
             ['href' => '/messages.php',  'key' => 'messages',  'icon' => 'bi-chat-dots-fill',  'label' => 'Messages',   'badge' => $_unreadMessages, 'badgeCls' => 'bg-emerald-500'],
             ['href' => '/whats_new.php', 'key' => 'whats_new', 'icon' => 'bi-rocket-takeoff-fill', 'label' => "What's New"],
         ];
@@ -263,8 +264,34 @@ if (!empty($_SESSION['user_id'])) {
         </button>
     </div>
 </aside>
-<?php if (!empty($_GET['visit_id'])): ?>
-<!-- Visit-lock toast -->
+<?php
+// ── Active-visit tracking & navigation control ──────────────────────────
+if (!empty($_GET['visit_id'])):
+    $_avId        = (int)$_GET['visit_id'];
+    $_avPatientId = (int)($_GET['patient_id'] ?? 0);
+    $_avName      = '';
+    if ($_avPatientId) {
+        try {
+            $_avStmt = $pdo->prepare("SELECT first_name, last_name FROM patients WHERE id = ? LIMIT 1");
+            $_avStmt->execute([$_avPatientId]);
+            $_avRow  = $_avStmt->fetch(PDO::FETCH_ASSOC);
+            if ($_avRow) $_avName = trim(($_avRow['first_name'] ?? '') . ' ' . ($_avRow['last_name'] ?? ''));
+        } catch (PDOException $e) {}
+    }
+    $_avType = $_GET['sched_visit_type'] ?? '';
+?>
+<script>
+/* Save active visit so the floating chip knows where to send the MA back */
+sessionStorage.setItem('pdActiveVisit', JSON.stringify({
+    visitId:     <?= $_avId ?>,
+    patientId:   <?= $_avPatientId ?>,
+    patientName: <?= json_encode($_avName) ?>,
+    visitType:   <?= json_encode($_avType) ?>,
+    formUrl:     window.location.href
+}));
+</script>
+<?php if (($_SESSION['role'] ?? '') !== 'ma'): ?>
+<!-- Visit-lock toast (non-MA roles) -->
 <div id="visitLockToast"
      class="hidden fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999]
             bg-amber-500 text-white px-5 py-3 rounded-xl shadow-2xl
@@ -281,22 +308,16 @@ if (!empty($_SESSION['user_id'])) {
         clearTimeout(t._hide);
         t._hide = setTimeout(function () { t.classList.add('hidden'); }, 3000);
     }
-
-// Block sidebar link clicks + notifications + show toast
-        document.addEventListener('click', function (e) {
-            var link  = e.target.closest('#sidebar a');
-            var notif = e.target.closest('[data-notif-trigger]');
-            if (link || notif) { e.preventDefault(); e.stopImmediatePropagation(); showLockToast(); }
+    document.addEventListener('click', function (e) {
+        var link  = e.target.closest('#sidebar a');
+        var notif = e.target.closest('[data-notif-trigger]');
+        if (link || notif) { e.preventDefault(); e.stopImmediatePropagation(); showLockToast(); }
     }, true);
-
-    // Trap back / forward buttons
     history.pushState(null, '', location.href);
     window.addEventListener('popstate', function () {
         history.pushState(null, '', location.href);
         showLockToast();
     });
-
-    // Warn on tab close, refresh, or manual URL change (skip when submitting a form)
     window.addEventListener('beforeunload', function (e) {
         if (window._pdSubmitting) return;
         e.preventDefault();
@@ -305,6 +326,148 @@ if (!empty($_SESSION['user_id'])) {
 })();
 </script>
 <?php endif; ?>
+<?php endif; ?>
+
+<!-- ── Floating Return-to-Visit chip (MA) ─────────────────────────────── -->
+<style>
+@keyframes avc-slide-in {
+    from { opacity: 0; transform: translateX(20px) scale(.94); }
+    to   { opacity: 1; transform: translateX(0)    scale(1);   }
+}
+#activeVisitChip:not(.hidden) { animation: avc-slide-in .35s cubic-bezier(.34,1.56,.64,1) both; }
+#activeVisitChip { cursor: grab; user-select: none; }
+#activeVisitChip.dragging { cursor: grabbing; transition: none !important; opacity: .92; }
+/* Force text colours regardless of dark-mode overrides */
+#activeVisitChip #avcAvatar,
+#activeVisitChip #avcName          { color: #ffffff !important; }
+#activeVisitChip .avc-label,
+#activeVisitChip .avc-return-label { color: #6ee7b7 !important; } /* emerald-300 */
+#activeVisitChip .avc-arrow        { color: #34d399 !important; } /* emerald-400 */
+</style>
+<div id="activeVisitChip" class="hidden fixed top-4 right-6 no-print" style="z-index:2147483647">
+    <button id="avcBtn"
+            class="flex items-center gap-4 pl-4 pr-5 py-3.5 rounded-2xl text-white font-semibold shadow-2xl"
+            style="background:linear-gradient(135deg,#0f1f2e 0%,#0d2a1f 100%);
+                   border:1px solid rgba(52,211,153,.35);
+                   box-shadow:0 12px 40px rgba(0,0,0,.55),0 0 0 1px rgba(52,211,153,.15)">
+        <!-- drag handle hint -->
+        <span class="flex-none text-white/30 text-xs leading-none pr-1" style="cursor:grab">
+            <i class="bi bi-grip-vertical"></i>
+        </span>
+        <!-- pulsing live dot -->
+        <span class="relative flex-none w-3 h-3">
+            <span class="absolute inset-0 rounded-full bg-emerald-400 animate-ping opacity-50"></span>
+            <span class="relative block w-3 h-3 rounded-full bg-emerald-400"></span>
+        </span>
+        <!-- initials avatar -->
+        <span id="avcAvatar"
+              class="w-11 h-11 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500
+                     flex items-center justify-center font-bold text-sm text-white flex-none shadow-md">?</span>
+        <!-- text -->
+        <span class="flex flex-col leading-tight text-left">
+            <span class="avc-label text-[11px] font-bold tracking-widest uppercase mb-0.5">Active Visit</span>
+            <span id="avcName" class="text-base font-bold max-w-[200px] truncate">Patient</span>
+        </span>
+        <!-- return label + arrow -->
+        <span class="avc-return-label flex items-center gap-1.5 ml-1 text-sm font-semibold border-l border-white/10 pl-4">
+            Return <i class="avc-arrow bi bi-arrow-right-circle-fill text-xl"></i>
+        </span>
+    </button>
+</div>
+<script>
+(function () {
+    var _raw = sessionStorage.getItem('pdActiveVisit');
+    if (!_raw) return;
+    var _v; try { _v = JSON.parse(_raw); } catch (e) { return; }
+
+    /* Already on this exact visit form? No chip needed. */
+    var _cur = <?= (int)($_GET['visit_id'] ?? 0) ?>;
+    if (_cur && _cur === _v.visitId) return;
+
+    /* Verify visit is still en_route before showing */
+    fetch((window._pdBase || '') + '/api/visit_check.php?id=' + _v.visitId)
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            if (!d.active) { sessionStorage.removeItem('pdActiveVisit'); return; }
+            var chip  = document.getElementById('activeVisitChip');
+            var avEl  = document.getElementById('avcAvatar');
+            var nmEl  = document.getElementById('avcName');
+            var btn   = document.getElementById('avcBtn');
+            if (!chip || !avEl || !nmEl || !btn) return;
+            var initials = (_v.patientName || '?').split(' ').filter(Boolean)
+                               .map(function (w) { return w[0]; }).join('').slice(0, 2).toUpperCase();
+            avEl.textContent = initials;
+            nmEl.textContent = _v.patientName || 'Patient';
+
+            /* ── Restore saved position ── */
+            var _pos = null;
+            try { _pos = JSON.parse(localStorage.getItem('pdAvcPos')); } catch(e){}
+            if (_pos && typeof _pos.top === 'number' && typeof _pos.left === 'number') {
+                chip.style.top    = Math.max(0, Math.min(_pos.top,  window.innerHeight - 80)) + 'px';
+                chip.style.right  = 'auto';
+                chip.style.left   = Math.max(0, Math.min(_pos.left, window.innerWidth  - 80)) + 'px';
+            }
+            chip.classList.remove('hidden');
+
+            /* ── Drag logic ── */
+            var _dragging = false, _startX, _startY, _origLeft, _origTop, _moved;
+
+            function _getLeft() {
+                var r = chip.getBoundingClientRect();
+                return r.left;
+            }
+            function _getTop() {
+                var r = chip.getBoundingClientRect();
+                return r.top;
+            }
+
+            function onDown(ex, ey) {
+                _dragging = true;
+                _moved    = false;
+                _startX   = ex;
+                _startY   = ey;
+                _origLeft = _getLeft();
+                _origTop  = _getTop();
+                chip.classList.add('dragging');
+            }
+            function onMove(ex, ey) {
+                if (!_dragging) return;
+                var dx = ex - _startX, dy = ey - _startY;
+                if (Math.abs(dx) > 4 || Math.abs(dy) > 4) _moved = true;
+                var newLeft = Math.max(0, Math.min(_origLeft + dx, window.innerWidth  - chip.offsetWidth));
+                var newTop  = Math.max(0, Math.min(_origTop  + dy, window.innerHeight - chip.offsetHeight));
+                chip.style.left  = newLeft + 'px';
+                chip.style.top   = newTop  + 'px';
+                chip.style.right = 'auto';
+            }
+            function onUp(ex, ey) {
+                if (!_dragging) return;
+                _dragging = false;
+                chip.classList.remove('dragging');
+                onMove(ex, ey);
+                /* Save position */
+                try { localStorage.setItem('pdAvcPos', JSON.stringify({ left: _getLeft(), top: _getTop() })); } catch(e){}
+            }
+
+            /* Mouse */
+            chip.addEventListener('mousedown',  function(e) { onDown(e.clientX, e.clientY); e.preventDefault(); });
+            document.addEventListener('mousemove', function(e) { onMove(e.clientX, e.clientY); });
+            document.addEventListener('mouseup',   function(e) { onUp(e.clientX,   e.clientY); });
+
+            /* Touch */
+            chip.addEventListener('touchstart', function(e) { var t=e.touches[0]; onDown(t.clientX, t.clientY); }, { passive: true });
+            document.addEventListener('touchmove',  function(e) { if(_dragging){ var t=e.touches[0]; onMove(t.clientX, t.clientY); e.preventDefault(); } }, { passive: false });
+            document.addEventListener('touchend',   function(e) { var t=e.changedTouches[0]; onUp(t.clientX, t.clientY); });
+
+            /* Click only fires if not dragged */
+            btn.addEventListener('click', function(e) {
+                if (_moved) { e.preventDefault(); e.stopImmediatePropagation(); _moved = false; return; }
+                window.location.href = _v.formUrl;
+            });
+        })
+        .catch(function () {});
+})();
+</script>
 
 <!-- Mobile top bar (hamburger + brand) — visible only on small screens -->
 <header class="md:hidden no-print fixed inset-x-0 top-0 z-40 h-14

@@ -211,12 +211,19 @@ if (in_array($formType, ['vital_cs', 'new_patient_pocket', 'new_patient_pocket_p
 require_once __DIR__ . '/../includes/audit.php';
 auditLog($pdo, 'form_create', 'form', (int)$newId, $formType, 'patient_id=' . $patientId);
 
-// ── Mark scheduled visit as completed ─────────────────────────────────────
+// ── Mark scheduled visit as completed or missed ───────────────────────────
 if ($status === 'signed' && $visitId > 0) {
-    $pdo->prepare(
-        "UPDATE `schedule` SET status = 'completed', visit_ended_at = NOW()
-         WHERE id = ? AND patient_id = ? AND status != 'completed'"
-    )->execute([$visitId, $patientId]);
+    if ($isMissedVisit) {
+        $pdo->prepare(
+            "UPDATE `schedule` SET status = 'missed', visit_ended_at = NOW()
+             WHERE id = ? AND patient_id = ? AND status NOT IN ('completed','missed')"
+        )->execute([$visitId, $patientId]);
+    } else {
+        $pdo->prepare(
+            "UPDATE `schedule` SET status = 'completed', visit_ended_at = NOW()
+             WHERE id = ? AND patient_id = ? AND status != 'completed'"
+        )->execute([$visitId, $patientId]);
+    }
 }
 
 
@@ -235,6 +242,10 @@ if ($formType === 'vital_cs' && $status === 'draft') {
 }
 
 // ── Signed: redirect browser immediately; email + reconciliation run after ─
+if ($isMissedVisit) {
+    header('Location: ' . BASE_URL . '/schedule.php');
+    exit;
+}
 header('Location: ' . BASE_URL . '/view_document.php?id=' . $newId);
 if (function_exists('fastcgi_finish_request')) {
     // PHP-FPM: flush the redirect to the client now so the browser navigates

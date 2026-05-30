@@ -316,9 +316,11 @@ $formMeta = [
     'il_disclosure'      => ['label' => 'IL Disclosure Auth.',       'icon' => 'bi-file-earmark-text',   'bg' => 'bg-slate-100',   'text' => 'text-slate-600'],
 ];
 
-include __DIR__ . '/includes/header.php';
+// Partial route widget reload — only re-render the route card (no page chrome)
+$isRoutePartial = !empty($_GET['_partial']) && $_GET['_partial'] === 'route';
+if (!$isRoutePartial) include __DIR__ . '/includes/header.php';
 ?>
-
+<?php if (!$isRoutePartial): ?>
 <!-- Page Header -->
 <div class="mb-7">
     <h2 class="text-2xl font-extrabold text-slate-800"><?= $greeting ?>, <?= h($firstName) ?> 👋</h2>
@@ -328,10 +330,11 @@ include __DIR__ . '/includes/header.php';
 <div class="flex gap-6 items-start">
 <!-- ═══════════════ LEFT / MAIN COLUMN ═══════════════════════════════════ -->
 <div class="flex-1 min-w-0">
+<?php endif; ?>
 
 <!-- ── Today's Route ── TOP of main column ─────────────────────────── -->
 <?php if (canAccessClinical()): ?>
-<div class="bg-white rounded-2xl shadow-sm mb-7 <?= $scheduleTotalToday > 0 ? 'border-2 border-indigo-200 shadow-indigo-50' : 'border border-slate-100' ?>" style="overflow:visible">
+<div id="routeWidget" class="bg-white rounded-2xl shadow-sm mb-7 <?= $scheduleTotalToday > 0 ? 'border-2 border-indigo-200 shadow-indigo-50' : 'border border-slate-100' ?>" style="overflow:visible">
 
     <!-- Header -->
     <div class="px-5 py-4 flex items-center gap-3 <?= $scheduleTotalToday > 0 ? 'bg-gradient-to-r from-indigo-600 to-violet-600' : 'bg-slate-50 border-b border-slate-100' ?>">
@@ -739,8 +742,56 @@ include __DIR__ . '/includes/header.php';
     </div>
     <?php endif; ?>
     <?php endif; ?>
-</div>
+</div><!-- /routeWidget -->
+<?php if ($isRoutePartial) exit; ?>
 <?php endif; // canAccessClinical schedule widget ?>
+
+<script>
+// Intercept provider filter links — update route widget without page reload
+(function () {
+    document.addEventListener('click', function (e) {
+        var link = e.target.closest('a[href]');
+        if (!link) return;
+        var href = link.getAttribute('href');
+        if (!href || href.indexOf('filter_provider') === -1) return;
+        e.preventDefault();
+        if (typeof closePvDropdown === 'function') closePvDropdown();
+        // Build partial URL: ?_partial=route&filter_provider=...
+        var qs = href.startsWith('?') ? href.slice(1) : (href.indexOf('?') !== -1 ? href.split('?')[1] : '');
+        var partialUrl = '?_partial=route' + (qs ? '&' + qs : '');
+        var widget = document.getElementById('routeWidget');
+        if (widget) { widget.style.opacity = '0.5'; widget.style.pointerEvents = 'none'; }
+        fetch(partialUrl, { credentials: 'same-origin' })
+            .then(function (r) { return r.text(); })
+            .then(function (html) {
+                // Remove old teleported dropdown before replacing widget
+                var oldDd = document.getElementById('pvDropdown');
+                if (oldDd) oldDd.remove();
+                var w = document.getElementById('routeWidget');
+                if (w) {
+                    w.insertAdjacentHTML('afterend', html);
+                    w.remove();
+                }
+                // Re-execute inline scripts (dropdown init + teleport)
+                var nw = document.getElementById('routeWidget');
+                if (nw) {
+                    nw.style.opacity = '';
+                    nw.style.pointerEvents = '';
+                    nw.querySelectorAll('script').forEach(function (s) {
+                        var ns = document.createElement('script');
+                        ns.textContent = s.textContent;
+                        document.body.appendChild(ns);
+                        document.body.removeChild(ns);
+                    });
+                }
+            })
+            .catch(function () {
+                var w = document.getElementById('routeWidget');
+                if (w) { w.style.opacity = ''; w.style.pointerEvents = ''; }
+            });
+    });
+}());
+</script>
 
 <!-- ── Today's Schedule Alert Banner ─────────────────────────────────── -->
 <?php if (!isBilling()): ?>
@@ -1810,7 +1861,7 @@ endif;
 async function dashStartVisit(visitId, patientId, visitType, visitSubtype, btn) {
     const ok = await pdConfirm({
         message:      'Start this visit?',
-        subtext:      'You will not be able to navigate to any other page until the visit is ended.',
+        subtext:      'You can navigate freely during the visit — a floating chip will appear on every page so you can return here quickly.',
         confirmLabel: 'Start Visit',
         confirmIcon:  'bi bi-play-fill',
         confirmStyle: 'background:linear-gradient(135deg,#2563eb,#0ea5e9);',

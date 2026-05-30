@@ -15,6 +15,9 @@ if (!$patient) { header('Location: ' . BASE_URL . '/patients.php'); exit; }
 
 auditLog($pdo, 'patient_view', 'patient', $id, $patient['first_name'] . ' ' . $patient['last_name']);
 
+// Staff for edit drawer MA/provider selects
+$maStaff = $pdo->query("SELECT id, full_name, role FROM staff WHERE active=1 ORDER BY full_name")->fetchAll();
+
 $pageTitle = $patient['first_name'] . ' ' . $patient['last_name'];
 $activeNav = 'patients';
 $activeTab = $_GET['tab'] ?? 'forms';
@@ -1300,7 +1303,7 @@ function completeVisit(visitId) {
                 <?php endif; ?>
             </div>
             <div>
-                <h2 class="text-xl font-extrabold text-slate-800 flex items-center gap-2 flex-wrap">
+                <h2 id="ptNameDisplay" class="text-xl font-extrabold text-slate-800 flex items-center gap-2 flex-wrap">
                     <?= h($patient['first_name'] . ' ' . $patient['last_name']) ?>
                     <?php
                     $ptStMap = [
@@ -1315,23 +1318,23 @@ function completeVisit(visitId) {
                         <?= ucfirst($ptStatus) ?>
                     </span>
                 </h2>
-                <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-sm text-slate-500">
+                <div id="ptSubInfo" class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-sm text-slate-500">
                     <?php if ($patient['dob']):
                         $ptAge = (int)(new DateTime($patient['dob']))->diff(new DateTime('today'))->y;
                     ?>
-                    <span><i class="bi bi-calendar3 mr-1"></i><?= date('M j, Y', strtotime($patient['dob'])) ?> &middot; <strong class="text-slate-700"><?= $ptAge ?> yrs</strong></span>
+                    <span id="ptDobDisplay"><i class="bi bi-calendar3 mr-1"></i><?= date('M j, Y', strtotime($patient['dob'])) ?> &middot; <strong class="text-slate-700"><?= $ptAge ?> yrs</strong></span>
                     <?php endif; ?>
                     <?php if ($patient['phone']): ?>
-                    <span><i class="bi bi-telephone mr-1"></i><?= h($patient['phone']) ?></span>
+                    <span id="ptPhoneDisplay"><i class="bi bi-telephone mr-1"></i><?= h($patient['phone']) ?></span>
                     <?php endif; ?>
                     <?php if ($patient['company'] && $patient['company'] !== 'Beyond Wound Care Inc.'): ?>
                     <span class="text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md"><i class="bi bi-building mr-1"></i><?= h($patient['company']) ?></span>
                     <?php endif; ?>
                     <?php if ($patient['insurance']): ?>
-                    <span><i class="bi bi-shield-plus mr-1"></i><?= h($patient['insurance']) ?></span>
+                    <span id="ptInsDisplay"><i class="bi bi-shield-plus mr-1"></i><?= h($patient['insurance']) ?></span>
                     <?php endif; ?>
                     <?php if (!empty($patient['assigned_ma_name'])): ?>
-                    <span class="text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md"><i class="bi bi-person-badge mr-1"></i><?= h($patient['assigned_ma_name']) ?></span>
+                    <span id="ptMaBadge" class="text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md"><i class="bi bi-person-badge mr-1"></i><?= h($patient['assigned_ma_name']) ?></span>
                     <?php endif; ?>
                 </div>
             </div>
@@ -1350,11 +1353,11 @@ function completeVisit(visitId) {
                       bg-blue-50 hover:bg-blue-100 rounded-xl transition-colors">
                 <i class="bi bi-clock-history"></i> Timeline
             </a>
-            <a href="<?= BASE_URL ?>/patient_edit.php?id=<?= $id ?>"
+            <button id="ptEditBtn" onclick="openPtEditDrawer()"
                class="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-slate-700
                       bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">
                 <i class="bi bi-pencil-fill"></i> Edit
-            </a>
+            </button>
             <?php endif; ?>
             <?php if (!empty($forms)): ?>
             <a href="<?= BASE_URL ?>/push_to_pf.php?patient_id=<?= $id ?>"
@@ -1368,7 +1371,7 @@ function completeVisit(visitId) {
 
     </div><!-- /p-5 -->
     <?php if ($patient['address'] || $patient['pcp'] || $patient['email'] || !empty($patient['race']) || !empty($patient['insurance_id']) || !empty($patient['pharmacy_name'])): ?>
-    <div class="px-5 pb-4 pt-0 border-t border-slate-50 flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-slate-500">
+    <div id="ptInfoBar" class="px-5 pb-4 pt-0 border-t border-slate-50 flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-slate-500">
         <?php if ($patient['email']): ?><span style="word-break:break-all"><i class="bi bi-envelope mr-1"></i><?= h($patient['email']) ?></span><?php endif; ?>
         <?php if ($patient['address']): ?><span><i class="bi bi-geo-alt mr-1"></i><?= h($patient['address']) ?></span><?php endif; ?>
         <?php if ($patient['pcp']): ?><span><i class="bi bi-person-badge mr-1"></i>PCP: <?= h($patient['pcp']) ?></span><?php endif; ?>
@@ -4913,6 +4916,472 @@ $cnCsrf    = csrfToken();
                 HAS_PHOTO = false;
             });
         });
+    }
+})();
+</script>
+<?php endif; ?>
+
+<!-- ── Patient Edit Drawer ──────────────────────────────────────────────────── -->
+<?php if (canAccessClinical()): ?>
+<!-- Backdrop -->
+<div id="ptEditBackdrop"
+     class="fixed inset-0 bg-black/40 z-[9998] hidden"
+     onclick="closePtEditDrawer()"></div>
+
+<!-- Slide-in drawer -->
+<div id="ptEditDrawer"
+     class="fixed top-0 right-0 h-full w-full sm:w-[480px] bg-white shadow-2xl z-[9999]
+            flex flex-col translate-x-full transition-transform duration-300 ease-in-out overflow-hidden">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between px-5 py-4 bg-gradient-to-r from-blue-600 to-blue-700 flex-shrink-0">
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 bg-white/20 rounded-xl grid place-items-center">
+                <i class="bi bi-pencil-fill text-white"></i>
+            </div>
+            <div>
+                <p class="text-white font-bold text-sm">Edit Patient</p>
+                <p class="text-blue-200 text-xs" id="ptEditDrawerSubtitle"><?= h($patient['first_name'] . ' ' . $patient['last_name']) ?></p>
+            </div>
+        </div>
+        <button onclick="closePtEditDrawer()" class="text-white/70 hover:text-white transition p-1.5 rounded-lg hover:bg-white/10">
+            <i class="bi bi-x-lg text-lg"></i>
+        </button>
+    </div>
+
+    <!-- Error bar -->
+    <div id="ptEditErr" class="hidden mx-5 mt-4 flex items-center gap-2 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm flex-shrink-0">
+        <i class="bi bi-exclamation-circle-fill"></i>
+        <span id="ptEditErrMsg"></span>
+    </div>
+
+    <!-- Body (scrollable) -->
+    <div class="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+
+        <!-- Name -->
+        <div class="grid grid-cols-2 gap-3">
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">First Name <span class="text-red-400">*</span></label>
+                <input type="text" id="pef_first_name" value="<?= h($patient['first_name']) ?>"
+                       class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition" required>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Last Name <span class="text-red-400">*</span></label>
+                <input type="text" id="pef_last_name" value="<?= h($patient['last_name']) ?>"
+                       class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition" required>
+            </div>
+        </div>
+
+        <!-- DOB / Phone -->
+        <div class="grid grid-cols-2 gap-3">
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Date of Birth</label>
+                <input type="date" id="pef_dob" value="<?= h($patient['dob'] ?? '') ?>"
+                       class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Phone</label>
+                <input type="tel" id="pef_phone" value="<?= h($patient['phone'] ?? '') ?>"
+                       class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition">
+            </div>
+        </div>
+
+        <!-- Email -->
+        <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Email Address</label>
+            <input type="email" id="pef_email" value="<?= h($patient['email'] ?? '') ?>"
+                   class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition">
+        </div>
+
+        <!-- Address -->
+        <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Address</label>
+            <input type="text" id="pef_address" value="<?= h($patient['address'] ?? '') ?>"
+                   class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition">
+        </div>
+
+        <!-- Insurance -->
+        <div class="grid grid-cols-2 gap-3">
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Insurance</label>
+                <input type="text" id="pef_insurance" value="<?= h($patient['insurance'] ?? '') ?>"
+                       class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Member ID</label>
+                <input type="text" id="pef_insurance_id" value="<?= h($patient['insurance_id'] ?? '') ?>"
+                       class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition">
+            </div>
+        </div>
+
+        <!-- Race / PCP -->
+        <div class="grid grid-cols-2 gap-3">
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Race / Ethnicity</label>
+                <select id="pef_race"
+                        class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition">
+                    <option value="">— Select —</option>
+                    <?php foreach ([
+                        'American Indian or Alaska Native','Asian','Black or African American',
+                        'Hispanic or Latino','Native Hawaiian or Other Pacific Islander',
+                        'White / Caucasian','Two or More Races','Other','Unknown / Declined to State',
+                    ] as $r): ?>
+                    <option value="<?= h($r) ?>" <?= ($patient['race'] ?? '') === $r ? 'selected' : '' ?>><?= h($r) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">PCP</label>
+                <input type="text" id="pef_pcp" value="<?= h($patient['pcp'] ?? '') ?>"
+                       class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition">
+            </div>
+        </div>
+
+        <!-- Pharmacy -->
+        <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+            <p class="text-xs font-bold text-slate-600"><i class="bi bi-prescription2 text-emerald-500 mr-1"></i> Pharmacy</p>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">Name</label>
+                    <input type="text" id="pef_pharmacy_name" value="<?= h($patient['pharmacy_name'] ?? '') ?>"
+                           class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1">Phone</label>
+                    <input type="tel" id="pef_pharmacy_phone" value="<?= h($patient['pharmacy_phone'] ?? '') ?>"
+                           class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-500 mb-1">Address</label>
+                <input type="text" id="pef_pharmacy_address" value="<?= h($patient['pharmacy_address'] ?? '') ?>"
+                       class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
+            </div>
+        </div>
+
+        <!-- Status -->
+        <div class="grid grid-cols-2 gap-3">
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Status</label>
+                <select id="pef_status"
+                        onchange="document.getElementById('pef_discharge_wrap').classList.toggle('hidden', this.value !== 'discharged')"
+                        class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition">
+                    <option value="active"     <?= ($patient['status'] ?? 'active') === 'active'     ? 'selected' : '' ?>>Active</option>
+                    <option value="inactive"   <?= ($patient['status'] ?? 'active') === 'inactive'   ? 'selected' : '' ?>>Inactive</option>
+                    <option value="discharged" <?= ($patient['status'] ?? 'active') === 'discharged' ? 'selected' : '' ?>>Discharged</option>
+                </select>
+            </div>
+            <div id="pef_discharge_wrap" class="<?= ($patient['status'] ?? 'active') !== 'discharged' ? 'hidden' : '' ?>">
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Discharge Date</label>
+                <input type="date" id="pef_discharged_at" value="<?= h($patient['discharged_at'] ?? '') ?>"
+                       class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-red-400 focus:border-transparent focus:bg-white transition">
+            </div>
+        </div>
+
+        <?php if (isAdmin()): ?>
+        <!-- Provider / MA (admin only) -->
+        <div class="grid grid-cols-2 gap-3">
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1"><i class="bi bi-person-video3 mr-1"></i>Provider</label>
+                <select id="pef_assigned_provider"
+                        class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition">
+                    <option value="">— Unassigned —</option>
+                    <?php foreach ($maStaff as $sf): if ($sf['role'] !== 'provider' && $sf['role'] !== 'admin') continue; ?>
+                    <option value="<?= h($sf['full_name']) ?>" <?= ($patient['assigned_provider'] ?? '') === $sf['full_name'] ? 'selected' : '' ?>><?= h($sf['full_name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1"><i class="bi bi-person-badge mr-1"></i>Assigned MA</label>
+                <select id="pef_assigned_ma"
+                        class="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white transition">
+                    <option value="">— Unassigned —</option>
+                    <?php foreach ($maStaff as $sf): ?>
+                    <option value="<?= $sf['id'] ?>" <?= ((int)($patient['assigned_ma'] ?? 0) === (int)$sf['id']) ? 'selected' : '' ?>><?= h($sf['full_name']) ?> (<?= h($sf['role']) ?>)</option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+        </div>
+        <?php endif; ?>
+
+        <!-- Insurance Card Photos -->
+        <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+            <p class="text-xs font-bold text-slate-600"><i class="bi bi-credit-card-2-front text-blue-500 mr-1"></i> Insurance Card Photos</p>
+            <div class="grid grid-cols-2 gap-3">
+                <?php foreach ([
+                    ['insurance_photo',      'Front of Card', 'pefInsFront', 'pefInsFrontThumb'],
+                    ['insurance_photo_back', 'Back of Card',  'pefInsBack',  'pefInsBackThumb'],
+                ] as [$field, $label, $inputId, $thumbId]): ?>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-500 mb-1"><?= $label ?></label>
+                    <?php if (!empty($patient[$field])): ?>
+                    <div class="mb-1.5 flex items-center gap-2">
+                        <img src="<?= h($patient[$field]) ?>" class="h-12 rounded-lg border border-slate-200 object-cover">
+                        <label class="text-xs text-red-400 hover:text-red-600 cursor-pointer flex items-center gap-1">
+                            <input type="checkbox" id="pef_remove_<?= $field ?>" class="sr-only pef-remove-photo" data-field="<?= $field ?>">
+                            <i class="bi bi-trash"></i> Remove
+                        </label>
+                    </div>
+                    <?php endif; ?>
+                    <input type="hidden" id="<?= $inputId ?>Data" value="">
+                    <label class="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 cursor-pointer hover:bg-blue-50 hover:border-blue-300 transition-colors">
+                        <i class="bi bi-camera text-blue-500"></i> <?= !empty($patient[$field]) ? 'Replace' : 'Upload' ?>
+                        <input type="file" accept="image/*" class="sr-only pef-photo-input" data-target="<?= $inputId ?>Data" data-thumb="<?= $thumbId ?>">
+                    </label>
+                    <img id="<?= $thumbId ?>" src="" class="hidden h-10 mt-1.5 rounded-lg border border-slate-200 object-cover">
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+
+        <!-- SSS / Gov ID -->
+        <div class="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+            <p class="text-xs font-bold text-slate-600"><i class="bi bi-person-vcard text-indigo-500 mr-1"></i> SSS / Government ID</p>
+            <?php if (!empty($patient['sss_photo'])): ?>
+            <div class="flex items-center gap-2">
+                <img src="<?= h($patient['sss_photo']) ?>" class="h-12 rounded-lg border border-slate-200 object-cover">
+                <label class="text-xs text-red-400 hover:text-red-600 cursor-pointer flex items-center gap-1">
+                    <input type="checkbox" id="pef_remove_sss_photo" class="sr-only pef-remove-photo" data-field="sss_photo">
+                    <i class="bi bi-trash"></i> Remove
+                </label>
+            </div>
+            <?php endif; ?>
+            <input type="hidden" id="pefSssData" value="">
+            <label class="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 cursor-pointer hover:bg-indigo-50 hover:border-indigo-300 transition-colors">
+                <i class="bi bi-camera text-indigo-500"></i> <?= !empty($patient['sss_photo']) ? 'Replace' : 'Upload' ?>
+                <input type="file" accept="image/*" class="sr-only pef-photo-input" data-target="pefSssData" data-thumb="pefSssThumb">
+            </label>
+            <img id="pefSssThumb" src="" class="hidden h-10 mt-1.5 rounded-lg border border-slate-200 object-cover">
+        </div>
+
+    </div><!-- /body -->
+
+    <!-- Footer buttons -->
+    <div class="flex gap-3 px-5 py-4 border-t border-slate-100 bg-white flex-shrink-0">
+        <button id="ptEditSaveBtn" onclick="savePtEdit()"
+                class="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 active:scale-95
+                       text-white font-semibold px-5 py-2.5 rounded-xl transition-all shadow-sm">
+            <i class="bi bi-check-circle-fill"></i> Save Changes
+        </button>
+        <button onclick="closePtEditDrawer()"
+                class="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors">
+            Cancel
+        </button>
+    </div>
+</div>
+
+<script>
+(function () {
+    const PATIENT_ID = <?= $id ?>;
+    const CSRF       = <?= json_encode(csrfToken()) ?>;
+    const BASE       = '<?= BASE_URL ?>';
+
+    // ── Drawer open/close ────────────────────────────────────────────────────
+    window.openPtEditDrawer = function () {
+        document.getElementById('ptEditDrawer').classList.remove('translate-x-full');
+        document.getElementById('ptEditBackdrop').classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+        // Hide error bar
+        document.getElementById('ptEditErr').classList.add('hidden');
+    };
+
+    window.closePtEditDrawer = function () {
+        document.getElementById('ptEditDrawer').classList.add('translate-x-full');
+        document.getElementById('ptEditBackdrop').classList.add('hidden');
+        document.body.style.overflow = '';
+    };
+
+    // Close on Escape
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closePtEditDrawer();
+    });
+
+    // ── Photo file inputs ────────────────────────────────────────────────────
+    document.querySelectorAll('.pef-photo-input').forEach(function (input) {
+        input.addEventListener('change', function () {
+            var file = input.files[0];
+            if (!file || !file.type.startsWith('image/')) return;
+            if (file.size > 8 * 1024 * 1024) { alert('Image must be under 8 MB.'); input.value = ''; return; }
+            var reader = new FileReader();
+            reader.onload = function (e) {
+                var targetInput = document.getElementById(input.dataset.target);
+                var thumb       = document.getElementById(input.dataset.thumb);
+                if (targetInput) targetInput.value = e.target.result;
+                if (thumb) { thumb.src = e.target.result; thumb.classList.remove('hidden'); }
+            };
+            reader.readAsDataURL(file);
+        });
+    });
+
+    // Visual feedback for photo removal checkboxes
+    document.querySelectorAll('.pef-remove-photo').forEach(function (cb) {
+        cb.addEventListener('change', function () {
+            var img = cb.closest('div').querySelector('img');
+            if (img) img.style.opacity = cb.checked ? '0.3' : '1';
+        });
+    });
+
+    // ── Save ─────────────────────────────────────────────────────────────────
+    window.savePtEdit = async function () {
+        var errBar = document.getElementById('ptEditErr');
+        var errMsg = document.getElementById('ptEditErrMsg');
+        var saveBtn = document.getElementById('ptEditSaveBtn');
+
+        errBar.classList.add('hidden');
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<i class="bi bi-hourglass-split animate-spin"></i> Saving…';
+
+        var payload = {
+            csrf: CSRF,
+            patient_id: PATIENT_ID,
+            first_name: document.getElementById('pef_first_name').value.trim(),
+            last_name:  document.getElementById('pef_last_name').value.trim(),
+            dob:        document.getElementById('pef_dob').value,
+            phone:      document.getElementById('pef_phone').value.trim(),
+            email:      document.getElementById('pef_email').value.trim(),
+            address:    document.getElementById('pef_address').value.trim(),
+            insurance:  document.getElementById('pef_insurance').value.trim(),
+            insurance_id:        document.getElementById('pef_insurance_id').value.trim(),
+            race:                document.getElementById('pef_race').value,
+            pcp:                 document.getElementById('pef_pcp').value.trim(),
+            pharmacy_name:       document.getElementById('pef_pharmacy_name').value.trim(),
+            pharmacy_phone:      document.getElementById('pef_pharmacy_phone').value.trim(),
+            pharmacy_address:    document.getElementById('pef_pharmacy_address').value.trim(),
+            status:              document.getElementById('pef_status').value,
+            discharged_at:       document.getElementById('pef_discharged_at') ? document.getElementById('pef_discharged_at').value : '',
+            // Photos
+            insurance_photo:      document.getElementById('pefInsFrontData') ? document.getElementById('pefInsFrontData').value : '',
+            insurance_photo_back: document.getElementById('pefInsBackData')  ? document.getElementById('pefInsBackData').value  : '',
+            sss_photo:            document.getElementById('pefSssData')       ? document.getElementById('pefSssData').value       : '',
+        };
+
+        // Removal flags
+        document.querySelectorAll('.pef-remove-photo:checked').forEach(function (cb) {
+            payload['remove_' + cb.dataset.field] = true;
+        });
+
+        // Admin-only fields
+        var provEl = document.getElementById('pef_assigned_provider');
+        var maEl   = document.getElementById('pef_assigned_ma');
+        if (provEl) payload.assigned_provider = provEl.value;
+        if (maEl)   payload.assigned_ma       = maEl.value;
+
+        try {
+            var res  = await fetch(BASE + '/api/patient_update.php', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload),
+            });
+            var data = await res.json();
+            if (!data.ok) {
+                errMsg.textContent = data.error || 'Save failed.';
+                errBar.classList.remove('hidden');
+                return;
+            }
+            var pt = data.patient;
+            updatePtDisplay(pt);
+            closePtEditDrawer();
+            // Show toast
+            showPtToast('Patient updated successfully!');
+        } catch (e) {
+            errMsg.textContent = 'Network error — please try again.';
+            errBar.classList.remove('hidden');
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="bi bi-check-circle-fill"></i> Save Changes';
+        }
+    };
+
+    // ── Update visible patient info ──────────────────────────────────────────
+    function updatePtDisplay(pt) {
+        // Name heading
+        var nameEl = document.getElementById('ptNameDisplay');
+        if (nameEl) {
+            var badge = nameEl.querySelector('.pt-status-badge');
+            nameEl.childNodes[0].textContent = (pt.first_name + ' ' + pt.last_name + ' ');
+            if (badge) {
+                var stMap = {active:'bg-emerald-100 text-emerald-700', inactive:'bg-amber-100 text-amber-700', discharged:'bg-red-100 text-red-700'};
+                badge.className = 'pt-status-badge text-xs font-semibold px-2.5 py-0.5 rounded-full ' + (stMap[pt.status] || stMap.active);
+                badge.textContent = pt.status.charAt(0).toUpperCase() + pt.status.slice(1);
+            }
+        }
+
+        // Sub-info line (dob/age, phone, insurance, MA)
+        var subInfo = document.getElementById('ptSubInfo');
+        if (subInfo) {
+            var parts = [];
+            if (pt.dob) {
+                var born = new Date(pt.dob + 'T00:00:00');
+                var today = new Date();
+                var age = today.getFullYear() - born.getFullYear() - (today < new Date(today.getFullYear(), born.getMonth(), born.getDate()) ? 1 : 0);
+                var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                parts.push('<span id="ptDobDisplay"><i class="bi bi-calendar3 mr-1"></i>' + months[born.getMonth()] + ' ' + born.getDate() + ', ' + born.getFullYear() + ' &middot; <strong class="text-slate-700">' + age + ' yrs</strong></span>');
+            }
+            if (pt.phone) parts.push('<span id="ptPhoneDisplay"><i class="bi bi-telephone mr-1"></i>' + escHtml(pt.phone) + '</span>');
+            if (pt.insurance) parts.push('<span id="ptInsDisplay"><i class="bi bi-shield-plus mr-1"></i>' + escHtml(pt.insurance) + '</span>');
+            if (pt.assigned_ma_name) parts.push('<span id="ptMaBadge" class="text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md"><i class="bi bi-person-badge mr-1"></i>' + escHtml(pt.assigned_ma_name) + '</span>');
+            subInfo.innerHTML = parts.join('');
+        }
+
+        // Page title
+        document.title = pt.first_name + ' ' + pt.last_name;
+
+        // Breadcrumb name
+        var bc = document.querySelector('nav .text-slate-700.font-semibold.truncate');
+        if (bc) bc.textContent = pt.first_name + ' ' + pt.last_name;
+
+        // Drawer subtitle
+        var sub = document.getElementById('ptEditDrawerSubtitle');
+        if (sub) sub.textContent = pt.first_name + ' ' + pt.last_name;
+
+        // Info bar (email, address, pcp, race, insurance_id, pharmacy)
+        var infoBar = document.getElementById('ptInfoBar');
+        if (infoBar) {
+            var items = [];
+            if (pt.email) items.push('<span style="word-break:break-all"><i class="bi bi-envelope mr-1"></i>' + escHtml(pt.email) + '</span>');
+            if (pt.address) items.push('<span><i class="bi bi-geo-alt mr-1"></i>' + escHtml(pt.address) + '</span>');
+            if (pt.pcp) items.push('<span><i class="bi bi-person-badge mr-1"></i>PCP: ' + escHtml(pt.pcp) + '</span>');
+            if (pt.race) items.push('<span><i class="bi bi-people mr-1"></i>' + escHtml(pt.race) + '</span>');
+            if (pt.insurance_id) items.push('<span><i class="bi bi-credit-card mr-1"></i>ID: ' + escHtml(pt.insurance_id) + '</span>');
+            if (pt.pharmacy_name) {
+                var phStr = escHtml(pt.pharmacy_name);
+                if (pt.pharmacy_phone) phStr += ' &middot; ' + escHtml(pt.pharmacy_phone);
+                items.push('<span><i class="bi bi-prescription2 mr-1 text-emerald-500"></i>' + phStr + '</span>');
+            }
+            if (pt.discharged_at && pt.status === 'discharged') {
+                var d = new Date(pt.discharged_at + 'T00:00:00');
+                var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                items.push('<span class="text-red-500"><i class="bi bi-calendar-x mr-1"></i>Discharged: ' + months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear() + '</span>');
+            }
+            infoBar.innerHTML = items.join('');
+            infoBar.classList.toggle('hidden', items.length === 0);
+        }
+
+        // Update drawer input values so re-opening shows new data
+        var flds = ['first_name','last_name','dob','phone','email','address','insurance','insurance_id','pcp','pharmacy_name','pharmacy_phone','pharmacy_address'];
+        flds.forEach(function (f) {
+            var el = document.getElementById('pef_' + f);
+            if (el) el.value = pt[f] || '';
+        });
+        var raceEl = document.getElementById('pef_race');
+        if (raceEl) raceEl.value = pt.race || '';
+        var stEl = document.getElementById('pef_status');
+        if (stEl) { stEl.value = pt.status || 'active'; document.getElementById('pef_discharge_wrap').classList.toggle('hidden', pt.status !== 'discharged'); }
+        var daEl = document.getElementById('pef_discharged_at');
+        if (daEl) daEl.value = pt.discharged_at || '';
+    }
+
+    function escHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function showPtToast(msg) {
+        var t = document.createElement('div');
+        t.className = 'fixed top-20 right-4 z-[99999] flex items-center gap-3 bg-emerald-600 text-white px-5 py-3.5 rounded-2xl shadow-2xl text-sm font-semibold transition-all';
+        t.innerHTML = '<i class="bi bi-check-circle-fill text-lg"></i>' + msg;
+        document.body.appendChild(t);
+        setTimeout(function () { t.style.opacity = '0'; t.style.transition = 'opacity 0.4s'; setTimeout(function () { t.remove(); }, 450); }, 2500);
     }
 })();
 </script>

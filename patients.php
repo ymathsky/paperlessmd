@@ -120,6 +120,12 @@ foreach ($companies as $name => $_) {
 
 include __DIR__ . '/includes/header.php';
 ?>
+<style>
+.patient-row:hover                  { background-color: #f8fafc; }   /* slate-50 */
+.dark .patient-row:hover            { background-color: #1e40af; }   /* blue-800 */
+.patient-row:hover .patient-name    { color: #0f172a !important; }   /* slate-900 */
+.dark .patient-row:hover .patient-name { color: #ffffff !important; }
+</style>
 
 <!-- Header -->
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
@@ -302,7 +308,7 @@ foreach ($companies as $coName => $coCfg):
             $ptAge2 = $p['dob'] ? (int)(new DateTime($p['dob']))->diff(new DateTime('today'))->y : null;
         ?>
         <a href="<?= BASE_URL ?>/patient_view.php?id=<?= $p['id'] ?>"
-           class="flex items-center gap-3 px-4 py-3.5 hover:bg-slate-50 active:bg-slate-100 transition-colors">
+           class="patient-row flex items-center gap-3 px-4 py-3.5 active:bg-slate-100 transition-colors">
             <!-- Avatar -->
             <?php if (!empty($p['photo_url'])): ?>
             <img src="<?= h($p['photo_url']) ?>" alt="" class="w-11 h-11 rounded-xl object-cover flex-shrink-0 border border-slate-100 shadow-sm">
@@ -314,7 +320,7 @@ foreach ($companies as $coName => $coCfg):
             <!-- Info -->
             <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 flex-wrap">
-                    <span class="font-semibold text-slate-800 text-sm"><?= h($p['last_name'] . ', ' . $p['first_name']) ?></span>
+                    <span class="patient-name font-semibold text-slate-800 dark:text-slate-100 text-sm"><?= h($p['last_name'] . ', ' . $p['first_name']) ?></span>
                     <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold <?= $stCls2 ?>"><?= $stLabel2 ?></span>
                 </div>
                 <div class="flex items-center gap-x-3 gap-y-0.5 flex-wrap mt-0.5">

@@ -159,6 +159,31 @@ if ($viewAll && $view === 'day') {
 $counts = ['pending'=>0,'en_route'=>0,'completed'=>0,'missed'=>0];
 foreach ($visits as $v) $counts[$v['status']]++;
 
+// Fetch missed-visit reasons from form_submissions for any missed visit today
+$missedReasons = []; // [patient_id => reason string]
+$_missedPids = array_unique(array_column(
+    array_filter($visits, fn($v) => $v['status'] === 'missed'),
+    'patient_id'
+));
+if ($_missedPids) {
+    $_in = implode(',', array_fill(0, count($_missedPids), '?'));
+    $_mrStmt = $pdo->prepare(
+        "SELECT patient_id,
+                JSON_UNQUOTE(JSON_EXTRACT(form_data, '$.missed_visit_reason')) AS missed_reason
+         FROM form_submissions
+         WHERE patient_id IN ($_in) AND form_type = 'vital_cs'
+           AND DATE(created_at) = CURDATE()
+         ORDER BY created_at DESC"
+    );
+    $_mrStmt->execute($_missedPids);
+    foreach ($_mrStmt->fetchAll() as $_mr) {
+        $pid = (int)$_mr['patient_id'];
+        if (!isset($missedReasons[$pid]) && !empty($_mr['missed_reason'])) {
+            $missedReasons[$pid] = $_mr['missed_reason'];
+        }
+    }
+}
+
 // Route Map — ordered unique addresses from today's visits (for "Open Route Map" button)
 $routeAddresses = [];
 foreach ($visits as $rv) {
@@ -359,7 +384,7 @@ $statusDefs = [
 ];
 
 /** Renders one compact visit card. $showMaName=true → show MA; false → show Provider */
-$renderVisitCard = function(array $v, int $idx, bool $showMaName) use ($statusDefs, $_sbc, $_vtl): void {
+$renderVisitCard = function(array $v, int $idx, bool $showMaName) use ($statusDefs, $_sbc, $_vtl, $missedReasons): void {
     $sd      = $statusDefs[$v['status']];
     $addr    = $v['patient_address'] ? rawurlencode($v['patient_address']) : '';
     $mapsUrl = $addr ? 'https://www.google.com/maps/dir/?api=1&destination='.$addr : '#';
@@ -510,6 +535,15 @@ $renderVisitCard = function(array $v, int $idx, bool $showMaName) use ($statusDe
                         border:1px solid rgba(251,191,36,0.25);border-radius:12px;padding:10px 12px;margin-top:4px;margin-bottom:4px;">
                 <i class="bi bi-exclamation-triangle-fill" style="color:#fbbf24;font-size:13px;flex-shrink:0;margin-top:1px;"></i>
                 <span style="color:#fde68a;font-size:13px;font-weight:600;line-height:1.4;word-break:break-word;"><?= h($v['notes']) ?></span>
+            </div>
+            <?php endif; ?>
+
+            <!-- Missed visit reason -->
+            <?php if ($v['status'] === 'missed' && !empty($missedReasons[(int)$v['patient_id']])): ?>
+            <div style="display:flex;align-items:flex-start;gap:8px;background:rgba(239,68,68,0.1);
+                        border:1px solid rgba(239,68,68,0.25);border-radius:12px;padding:10px 12px;margin-top:4px;margin-bottom:4px;">
+                <i class="bi bi-calendar-x-fill" style="color:#f87171;font-size:13px;flex-shrink:0;margin-top:1px;"></i>
+                <span style="color:#fca5a5;font-size:13px;font-weight:600;line-height:1.4;word-break:break-word;"><?= h($missedReasons[(int)$v['patient_id']]) ?></span>
             </div>
             <?php endif; ?>
 

@@ -378,23 +378,25 @@ include __DIR__ . '/../includes/header.php';
                     foreach ($vitals as $v):
                         $prefilled = pv($prev, $v['name']);
                     ?>
-                    <div class="vital-card border <?= $prefilled ? 'border-amber-300' : 'border-slate-200' ?> rounded-xl p-3">
-                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">
-                            <?= $v['label'] ?><?= $v['req'] ? ' <span class="text-red-400">*</span>' : '' ?>
-                            <?php if ($prefilled): ?><span class="ml-1 text-amber-400" title="Pre-filled"><i class="bi bi-arrow-counterclockwise"></i></span><?php endif; ?>
-                        </label>
-                        <input type="text" name="<?= $v['name'] ?>" value="<?= $prefilled ?>"
-                               <?= $v['req'] ? 'required data-label="' . $v['label'] . '"' : '' ?>
-                               data-voice-numbers-only="1"
-                               class="w-full bg-transparent text-sm font-semibold text-slate-800 border-0 border-b border-slate-300 pb-1
-                                      focus:outline-none focus:border-indigo-400 transition"
-                               placeholder="<?= $v['placeholder'] ?>">
-                        <div class="flex flex-col gap-1 mt-2.5">
-                            <label class="vital-src flex items-center justify-center gap-1 py-1 px-2 border-2 border-slate-200 rounded-lg cursor-pointer text-xs font-semibold transition-all">
+                    <div class="vital-card border <?= $prefilled ? 'border-amber-300' : 'border-slate-200' ?> rounded-xl overflow-hidden">
+                        <div class="px-4 pt-4 pb-3">
+                            <label class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+                                <?= $v['label'] ?><?= $v['req'] ? '&thinsp;<span class="text-red-400">*</span>' : '' ?>
+                                <?php if ($prefilled): ?><span class="ml-1 text-amber-400" title="Pre-filled"><i class="bi bi-arrow-counterclockwise"></i></span><?php endif; ?>
+                            </label>
+                            <input type="text" name="<?= $v['name'] ?>" value="<?= $prefilled ?>"
+                                   <?= $v['req'] ? 'required data-label="' . $v['label'] . '"' : '' ?>
+                                   data-voice-numbers-only="1"
+                                   class="w-full bg-transparent text-2xl font-bold text-slate-800 border-0 border-b border-slate-200 pb-2
+                                          focus:outline-none focus:border-indigo-400 transition"
+                                   placeholder="<?= $v['placeholder'] ?>">
+                        </div>
+                        <div class="flex">
+                            <label class="vital-src flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold cursor-pointer transition-all">
                                 <input type="radio" name="<?= $v['name'] ?>_source" value="checked" checked class="sr-only">
                                 <i class="bi bi-check2"></i> Checked
                             </label>
-                            <label class="vital-src vital-pp flex items-center justify-center gap-1 py-1 px-2 border-2 border-slate-200 rounded-lg cursor-pointer text-xs font-semibold transition-all">
+                            <label class="vital-src vital-pp flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold cursor-pointer transition-all">
                                 <input type="radio" name="<?= $v['name'] ?>_source" value="per_patient" class="sr-only">
                                 <i class="bi bi-person"></i> Per patient
                             </label>

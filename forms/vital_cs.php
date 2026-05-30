@@ -402,6 +402,13 @@ include __DIR__ . '/../includes/header.php';
                                      focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent
                                      transition resize-none"
                               placeholder="e.g. Patient not home, Patient cancelled appointment…"><?= h(pv($prev, 'missed_visit_reason')) ?></textarea>
+                    <button type="button" id="mvConfirmBtn"
+                            class="w-full flex items-center justify-center gap-2 px-4 py-3
+                                   bg-amber-500 hover:bg-amber-600 active:bg-amber-700
+                                   text-white font-semibold rounded-xl transition-all text-sm shadow-sm">
+                        <i class="bi bi-calendar-x-fill"></i>
+                        Confirm Missed Visit &amp; Return to Schedule
+                    </button>
                 </div>
             </div>
 
@@ -429,7 +436,7 @@ include __DIR__ . '/../includes/header.php';
                     Missed Visit &mdash; vital signs are optional. Fill what you know or skip this step.
                 </div>
 
-                <div class="vitals-quick-grid grid grid-cols-2 gap-3 pt-1">
+                <div class="vitals-quick-grid grid grid-cols-2 gap-4 pt-1">
                     <?php
                     $vitals = [
                         ['name'=>'bp',      'label'=>'BP',       'placeholder'=>'120/80',      'req'=>true],
@@ -444,23 +451,25 @@ include __DIR__ . '/../includes/header.php';
                     foreach ($vitals as $v):
                         $prefilled = pv($prev, $v['name']);
                     ?>
-                    <div class="vital-card border <?= $prefilled ? 'border-amber-300' : 'border-slate-200' ?> rounded-xl p-3">
-                        <label class="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">
-                            <?= $v['label'] ?><?= $v['req'] ? ' <span class="text-red-400">*</span>' : '' ?>
-                            <?php if ($prefilled): ?><span class="ml-1 text-amber-400" title="Pre-filled"><i class="bi bi-arrow-counterclockwise"></i></span><?php endif; ?>
-                        </label>
-                        <input type="text" name="<?= $v['name'] ?>" value="<?= $prefilled ?>"
-                               <?= $v['req'] ? 'required data-label="' . $v['label'] . '"' : '' ?>
-                               data-voice-numbers-only="1"
-                               class="w-full bg-transparent text-sm font-semibold text-slate-800 border-0 border-b border-slate-300 pb-1
-                                      focus:outline-none focus:border-red-400 transition"
-                               placeholder="<?= $v['placeholder'] ?>">
-                        <div class="flex flex-col gap-1 mt-2.5">
-                            <label class="vital-src flex items-center justify-center gap-1 py-1 px-2 border-2 border-slate-200 rounded-lg cursor-pointer text-xs font-semibold transition-all">
+                    <div class="vital-card border <?= $prefilled ? 'border-amber-300' : 'border-slate-200' ?> rounded-xl overflow-hidden">
+                        <div class="px-4 pt-4 pb-3">
+                            <label class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">
+                                <?= $v['label'] ?><?= $v['req'] ? '&thinsp;<span class="text-red-400">*</span>' : '' ?>
+                                <?php if ($prefilled): ?><span class="ml-1 text-amber-400" title="Pre-filled"><i class="bi bi-arrow-counterclockwise"></i></span><?php endif; ?>
+                            </label>
+                            <input type="text" name="<?= $v['name'] ?>" value="<?= $prefilled ?>"
+                                   <?= $v['req'] ? 'required data-label="' . $v['label'] . '"' : '' ?>
+                                   data-voice-numbers-only="1"
+                                   class="w-full bg-transparent text-2xl font-bold text-slate-800 border-0 border-b border-slate-200 pb-2
+                                          focus:outline-none focus:border-red-400 transition"
+                                   placeholder="<?= $v['placeholder'] ?>">
+                        </div>
+                        <div class="flex">
+                            <label class="vital-src flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold cursor-pointer transition-all">
                                 <input type="radio" name="<?= $v['name'] ?>_source" value="checked" checked class="sr-only">
                                 <i class="bi bi-check2"></i> Checked
                             </label>
-                            <label class="vital-src vital-pp flex items-center justify-center gap-1 py-1 px-2 border-2 border-slate-200 rounded-lg cursor-pointer text-xs font-semibold transition-all">
+                            <label class="vital-src vital-pp flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-semibold cursor-pointer transition-all">
                                 <input type="radio" name="<?= $v['name'] ?>_source" value="per_patient" class="sr-only">
                                 <i class="bi bi-person"></i> Per patient
                             </label>
@@ -1461,14 +1470,15 @@ function toggleAllergySeverity(inputId, selectId) {
 <script>
 /* ── Missed Visit Mode ──────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', function () {
-    var mvToggleBtn = document.getElementById('mvToggleBtn');
-    var mvCancelBtn = document.getElementById('mvCancelBtn');
-    var mvRegular   = document.getElementById('mvRegularState');
-    var mvActive    = document.getElementById('mvActiveState');
-    var mvReason    = document.getElementById('mvReasonText');
-    var mvVitals    = document.getElementById('mvVitalsBanner');
-    var mvSign      = document.getElementById('mvSignBanner');
-    var VITAL_NAMES = ['bp', 'pulse', 'o2sat'];
+    var mvToggleBtn  = document.getElementById('mvToggleBtn');
+    var mvCancelBtn  = document.getElementById('mvCancelBtn');
+    var mvConfirmBtn = document.getElementById('mvConfirmBtn');
+    var mvRegular    = document.getElementById('mvRegularState');
+    var mvActive     = document.getElementById('mvActiveState');
+    var mvReason     = document.getElementById('mvReasonText');
+    var mvVitals     = document.getElementById('mvVitalsBanner');
+    var mvSign       = document.getElementById('mvSignBanner');
+    var VITAL_NAMES  = ['bp', 'pulse', 'o2sat'];
 
     function enterMissedMode() {
         window._pdMissedVisit = true;
@@ -1497,6 +1507,31 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (mvToggleBtn) mvToggleBtn.addEventListener('click', enterMissedMode);
     if (mvCancelBtn) mvCancelBtn.addEventListener('click', exitMissedMode);
+
+    if (mvConfirmBtn) {
+        mvConfirmBtn.addEventListener('click', function () {
+            var reason = mvReason ? mvReason.value.trim() : '';
+            if (!reason) {
+                if (mvReason) {
+                    mvReason.classList.add('ring-2', 'ring-red-500', '!border-red-400');
+                    mvReason.focus();
+                    mvReason.addEventListener('input', function () {
+                        mvReason.classList.remove('ring-2', 'ring-red-500', '!border-red-400');
+                    }, { once: true });
+                }
+                return;
+            }
+            // Clear wizard draft so it doesn't linger after redirect
+            var formKey = (document.getElementById('wiz-form-key') || {}).value || location.pathname;
+            var sk = 'wiz_draft_' + formKey;
+            localStorage.removeItem(sk);
+            localStorage.removeItem(sk + '_step');
+            // Disable button to prevent double-submit
+            mvConfirmBtn.disabled = true;
+            mvConfirmBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving…';
+            document.getElementById('mainForm').submit();
+        });
+    }
 
     // Auto-enter missed mode if the form was pre-filled with a reason (PHP draft or localStorage restore)
     if (mvReason && mvReason.value.trim()) {
