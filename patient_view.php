@@ -294,7 +294,163 @@ if ($activeTab === 'meds') {
         });
     })();
 
-    // Add medication
+    // ── Drug autocomplete ──────────────────────────────────────────────────
+    (function () {
+        const nameIn  = document.getElementById('newMedName');
+        const acDrop  = document.getElementById('medAcDrop');
+        if (!nameIn || !acDrop) return;
+        let acTimer = null, acCtrl = null, acIdx = -1, acItems = [];
+
+        function renderDrop(items) {
+            acItems = items;
+            acIdx = -1;
+            if (!items.length) { acDrop.classList.add('hidden'); return; }
+            acDrop.innerHTML = items.map((d, i) =>
+                `<div class="ac-item px-4 py-2.5 cursor-pointer hover:bg-emerald-50 flex items-center gap-3 text-sm" data-i="${i}">
+                    <i class="bi bi-capsule text-emerald-500 text-xs shrink-0"></i>
+                    <span class="font-medium text-slate-700">${esc(d.name)}</span>
+                    ${d.category ? `<span class="ml-auto text-[10px] text-slate-400 shrink-0">${esc(d.category)}</span>` : ''}
+                </div>`
+            ).join('');
+            acDrop.classList.remove('hidden');
+        }
+
+        function selectItem(i) {
+            if (i < 0 || i >= acItems.length) return;
+            nameIn.value = acItems[i].name;
+            acDrop.classList.add('hidden');
+            document.getElementById('newMedFreq').focus();
+        }
+
+        nameIn.addEventListener('input', function () {
+            const q = this.value.trim();
+            clearTimeout(acTimer);
+            if (q.length < 2) { acDrop.classList.add('hidden'); return; }
+            if (acCtrl) acCtrl.abort();
+            acCtrl = new AbortController();
+            acTimer = setTimeout(async () => {
+                try {
+                    const r = await fetch(BASE + '/api/drug_search.php?q=' + encodeURIComponent(q), { signal: acCtrl.signal });
+                    const d = await r.json();
+                    renderDrop(d);
+                } catch(e) {}
+            }, 180);
+        });
+
+        nameIn.addEventListener('keydown', function (e) {
+            if (acDrop.classList.contains('hidden')) return;
+            const max = acItems.length;
+            if (e.key === 'ArrowDown') { e.preventDefault(); acIdx = Math.min(acIdx + 1, max - 1); highlightAc(); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); acIdx = Math.max(acIdx - 1, 0); highlightAc(); }
+            else if (e.key === 'Enter') { if (acIdx >= 0) { e.preventDefault(); selectItem(acIdx); } }
+            else if (e.key === 'Escape') { acDrop.classList.add('hidden'); }
+        });
+
+        function highlightAc() {
+            acDrop.querySelectorAll('.ac-item').forEach((el, i) => {
+                el.classList.toggle('bg-emerald-50', i === acIdx);
+                el.classList.toggle('text-emerald-800', i === acIdx);
+            });
+        }
+
+        acDrop.addEventListener('mousedown', function (e) {
+            const item = e.target.closest('.ac-item');
+            if (!item) return;
+            e.preventDefault();
+            selectItem(parseInt(item.dataset.i));
+        });
+
+        document.addEventListener('click', e => {
+            if (!nameIn.contains(e.target) && !acDrop.contains(e.target)) acDrop.classList.add('hidden');
+        });
+    })();
+
+    // ── Frequency pills ───────────────────────────────────────────────────────
+    (function () {
+        const pills   = document.querySelectorAll('.freq-pill');
+        const freqIn  = document.getElementById('newMedFreq');
+        const otherIn = document.getElementById('freqOtherInput');
+        if (!pills.length || !freqIn) return;
+        const ACTIVE   = 'bg-emerald-600 text-white shadow-sm';
+        const INACTIVE = 'bg-slate-100 text-slate-600 hover:bg-slate-200';
+        function setActive(val) {
+            pills.forEach(p => {
+                const on = p.dataset.freq === val;
+                p.className = p.className.replace(ACTIVE, '').replace(INACTIVE, '').trim();
+                p.className += ' ' + (on ? ACTIVE : INACTIVE);
+            });
+            freqIn.value = (val && val !== 'other') ? val : '';
+            if (otherIn) otherIn.classList.toggle('hidden', val !== 'other');
+            if (val === 'other' && otherIn) { otherIn.focus(); }
+        }
+        pills.forEach(p => p.addEventListener('click', () => {
+            const cur = p.dataset.freq;
+            const already = p.classList.contains('bg-emerald-600');
+            setActive(already ? '' : cur);
+        }));
+        if (otherIn) otherIn.addEventListener('input', () => { freqIn.value = otherIn.value.trim(); });
+    })();
+
+    // ── Recent med chips ──────────────────────────────────────────────────────
+    (function () {
+        const wrap = document.getElementById('recentMedChips');
+        const list = document.getElementById('recentMedList');
+        if (!wrap || !list) return;
+        fetch(BASE + '/api/meds.php?action=recent&patient_id=' + PID)
+            .then(r => r.json())
+            .then(d => {
+                if (!d.ok || !d.names || !d.names.length) return;
+                // Filter out meds already on this patient's active list
+                const existing = Array.from(document.querySelectorAll('.med-name-disp'))
+                    .map(el => el.textContent.trim().toLowerCase());
+                const filtered = d.names.filter(n => !existing.includes(n.toLowerCase()));
+                if (!filtered.length) return;
+                list.innerHTML = filtered.map(n =>
+                    `<button type="button" class="recent-chip inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-emerald-100 hover:text-emerald-800 text-slate-600 rounded-lg text-xs font-medium transition-colors" data-name="${esc(n)}">
+                        <i class="bi bi-clock-history text-[10px]"></i>${esc(n)}
+                    </button>`
+                ).join('');
+                wrap.classList.remove('hidden');
+                list.addEventListener('click', e => {
+                    const chip = e.target.closest('.recent-chip');
+                    if (!chip) return;
+                    document.getElementById('newMedName').value = chip.dataset.name;
+                    document.getElementById('newMedFreq').focus();
+                    document.getElementById('medAcDrop')?.classList.add('hidden');
+                });
+            }).catch(() => {});
+    })();
+
+    // ── Bulk template add ─────────────────────────────────────────────────────
+    (function () {
+        const toggleBtn  = document.getElementById('toggleTemplateBtn');
+        const section    = document.getElementById('templateSection');
+        const chev       = document.getElementById('templateChev');
+        const addSelBtn  = document.getElementById('addTemplateSelectedBtn');
+        if (!toggleBtn || !section) return;
+        toggleBtn.addEventListener('click', () => {
+            const hidden = section.classList.toggle('hidden');
+            if (chev) chev.style.transform = hidden ? '' : 'rotate(180deg)';
+        });
+        if (addSelBtn) {
+            addSelBtn.addEventListener('click', async () => {
+                const checked = Array.from(section.querySelectorAll('input[type=checkbox]:checked'));
+                if (!checked.length) { pdToast('Select at least one medication.', 'info'); return; }
+                addSelBtn.disabled = true;
+                addSelBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Adding…';
+                let added = 0;
+                for (const cb of checked) {
+                    const res = await medApi({action: 'add', med_name: cb.value, med_frequency: cb.dataset.freq || ''});
+                    if (res.ok) added++;
+                }
+                addSelBtn.disabled = false;
+                addSelBtn.innerHTML = '<i class="bi bi-check-lg"></i> Add Selected';
+                if (added) location.reload();
+            });
+        }
+    })();
+
+    // ── Add medication ────────────────────────────────────────────────────────
     const addBtn = document.getElementById('addMedBtn');
     const nameIn = document.getElementById('newMedName');
     const freqIn = document.getElementById('newMedFreq');
@@ -304,11 +460,24 @@ if ($activeTab === 'meds') {
             const name = nameIn.value.trim();
             const freq = freqIn.value.trim();
             errMsg.classList.add('hidden');
+            document.getElementById('medAcDrop')?.classList.add('hidden');
             if (!name) {
                 errMsg.textContent = 'Medication name is required.';
                 errMsg.classList.remove('hidden');
                 nameIn.focus();
                 return;
+            }
+            // Duplicate detection
+            const existing = Array.from(document.querySelectorAll('.med-name-disp'))
+                .map(el => el.textContent.trim().toLowerCase());
+            if (existing.some(n => n === name.toLowerCase())) {
+                if (!await pdConfirm({
+                    message: '"' + name + '" is already in the active list.',
+                    subtext: 'Add it again as a duplicate?',
+                    confirmLabel: 'Add Anyway',
+                    confirmIcon: 'bi bi-exclamation-triangle-fill',
+                    confirmStyle: 'background:#d97706;'
+                })) return;
             }
             addBtn.disabled = true;
             addBtn.innerHTML = '<i class="bi bi-hourglass-split"></i>';
@@ -319,9 +488,12 @@ if ($activeTab === 'meds') {
             else { errMsg.textContent = res.error || 'Error adding.'; errMsg.classList.remove('hidden'); }
         };
         addBtn.addEventListener('click', submit);
-        [nameIn, freqIn].forEach(el => el && el.addEventListener('keydown', e => {
+        nameIn && nameIn.addEventListener('keydown', e => {
+            if (e.key === 'Enter' && document.getElementById('medAcDrop')?.classList.contains('hidden')) { e.preventDefault(); submit(); }
+        });
+        freqIn && freqIn.addEventListener('keydown', e => {
             if (e.key === 'Enter') { e.preventDefault(); submit(); }
-        }));
+        });
     }
 
     // Active meds — event delegation
@@ -2246,7 +2418,7 @@ if (chkAllEl) chkAllEl.addEventListener('change', function () {
 
     <!-- Add medication card -->
     <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
-        <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center justify-between mb-4">
             <h4 class="text-sm font-bold text-slate-700 flex items-center gap-2">
                 <i class="bi bi-plus-circle-fill text-emerald-600"></i> Add Medication
             </h4>
@@ -2259,22 +2431,100 @@ if (chkAllEl) chkAllEl.addEventListener('change', function () {
             <input type="file" id="pfMedFileInput" accept="application/pdf,.pdf" style="display:none;">
         </div>
         <div id="pfMedStatus" style="display:none;padding:7px 12px;border-radius:8px;font-size:12px;margin-bottom:10px;"></div>
-        <div class="flex flex-col sm:flex-row gap-3">
-            <input id="newMedName" type="text"
-                   class="flex-[3] px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50
-                          focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition focus:bg-white"
-                   placeholder="Medication name &amp; dose (e.g. Metformin 500mg)" autocomplete="off">
-            <input id="newMedFreq" type="text"
-                   class="flex-[2] px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50
-                          focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition focus:bg-white"
-                   placeholder="Frequency (e.g. BID, QD)" autocomplete="off">
+
+        <!-- Recently used chips -->
+        <div id="recentMedChips" class="hidden mb-3">
+            <p class="text-xs text-slate-400 mb-1.5 flex items-center gap-1"><i class="bi bi-clock-history"></i> Recently used — click to fill</p>
+            <div id="recentMedList" class="flex flex-wrap gap-1.5"></div>
+        </div>
+
+        <!-- Name input with autocomplete -->
+        <div class="flex flex-col sm:flex-row gap-3 mb-3">
+            <div class="relative flex-[3]">
+                <input id="newMedName" type="text"
+                       class="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm bg-slate-50
+                              focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition focus:bg-white"
+                       placeholder="Medication name &amp; dose (e.g. Metformin 500mg)" autocomplete="off">
+                <div id="medAcDrop" class="hidden absolute z-50 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-52 overflow-y-auto divide-y divide-slate-50"></div>
+            </div>
             <button id="addMedBtn"
                     class="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-sm
-                           font-semibold rounded-xl transition-all shadow-sm flex items-center gap-2 whitespace-nowrap">
+                           font-semibold rounded-xl transition-all shadow-sm flex items-center gap-2 whitespace-nowrap sm:self-start">
                 <i class="bi bi-plus-lg"></i> Add
             </button>
         </div>
+
+        <!-- Frequency pill buttons -->
+        <div class="mb-1">
+            <p class="text-xs text-slate-400 mb-2">Frequency</p>
+            <div class="flex flex-wrap gap-1.5">
+                <?php foreach (['QD','BID','TID','QID','PRN','Weekly','Monthly'] as $fq): ?>
+                <button type="button" data-freq="<?= $fq ?>" class="freq-pill px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">
+                    <?= $fq ?>
+                </button>
+                <?php endforeach; ?>
+                <button type="button" data-freq="other" class="freq-pill px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all">
+                    Other…
+                </button>
+            </div>
+            <input type="text" id="freqOtherInput"
+                   class="hidden mt-2 px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white
+                          focus:outline-none focus:ring-2 focus:ring-emerald-400 w-full sm:w-64"
+                   placeholder="Enter frequency…">
+            <!-- hidden value carrier read by JS -->
+            <input type="hidden" id="newMedFreq">
+        </div>
+
         <p id="addMedErr" class="text-xs text-red-600 mt-2 hidden"></p>
+
+        <!-- Quick add templates (collapsible) -->
+        <div class="border-t border-slate-100 mt-4 pt-4">
+            <button id="toggleTemplateBtn" type="button"
+                    class="flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-slate-700 transition-colors">
+                <i class="bi bi-grid-3x3-gap-fill text-slate-400"></i>
+                Quick Add Common Medications
+                <i id="templateChev" class="bi bi-chevron-down text-[10px] transition-transform"></i>
+            </button>
+            <div id="templateSection" class="hidden mt-3">
+                <p class="text-xs text-slate-400 mb-2">Select medications to add in bulk</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 mb-3 max-h-48 overflow-y-auto pr-1">
+                    <?php
+                    $templates = [
+                        ['Aspirin 81mg',              'QD'],
+                        ['Metformin 500mg',           'BID'],
+                        ['Lisinopril 10mg',           'QD'],
+                        ['Amlodipine 5mg',            'QD'],
+                        ['Atorvastatin 40mg',         'QD'],
+                        ['Metoprolol Succinate 50mg', 'QD'],
+                        ['Furosemide 40mg',           'QD'],
+                        ['Pantoprazole 40mg',         'QD'],
+                        ['Gabapentin 300mg',          'TID'],
+                        ['Vitamin D3 2000 IU',        'QD'],
+                        ['Potassium Chloride 20mEq',  'QD'],
+                        ['Warfarin 5mg',              'QD'],
+                        ['Clopidogrel 75mg',          'QD'],
+                        ['Levothyroxine 50mcg',       'QD'],
+                        ['Acetaminophen 500mg',       'PRN'],
+                        ['Mupirocin 2% Ointment',     'BID'],
+                        ['Silver Sulfadiazine 1% Cream','BID'],
+                        ['Collagenase Santyl Ointment','QD'],
+                    ];
+                    foreach ($templates as [$tname, $tfreq]):
+                    ?>
+                    <label class="flex items-center gap-2 cursor-pointer group">
+                        <input type="checkbox" class="w-3.5 h-3.5 rounded accent-emerald-600"
+                               value="<?= h($tname) ?>" data-freq="<?= h($tfreq) ?>">
+                        <span class="text-xs text-slate-700 group-hover:text-slate-900"><?= h($tname) ?></span>
+                        <span class="text-[10px] text-slate-400 ml-auto"><?= h($tfreq) ?></span>
+                    </label>
+                    <?php endforeach; ?>
+                </div>
+                <button id="addTemplateSelectedBtn" type="button"
+                        class="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition-all shadow-sm">
+                    <i class="bi bi-check-lg"></i> Add Selected
+                </button>
+            </div>
+        </div>
     </div>
 
     <!-- Active medications -->

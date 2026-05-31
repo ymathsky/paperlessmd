@@ -45,6 +45,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         echo json_encode(['ok' => true, 'meds' => $lstStmt->fetchAll(PDO::FETCH_ASSOC)]);
         exit;
     }
+    // Return the 12 most-recently-added distinct med names by the current user (across all patients)
+    if ($action === 'recent') {
+        $stmt = $pdo->prepare("
+            SELECT DISTINCT med_name
+            FROM patient_medications
+            WHERE added_by = ?
+            ORDER BY added_at DESC
+            LIMIT 12
+        ");
+        $stmt->execute([$userId]);
+        echo json_encode(['ok' => true, 'names' => array_column($stmt->fetchAll(PDO::FETCH_ASSOC), 'med_name')]);
+        exit;
+    }
     http_response_code(400);
     echo json_encode(['ok' => false, 'error' => 'Invalid request']);
     exit;
