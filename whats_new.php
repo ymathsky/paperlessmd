@@ -10,9 +10,24 @@ include __DIR__ . '/includes/header.php';
 
 $releases = [
     [
+        'version' => 'v3.6',
+        'date'    => 'May 31, 2026',
+        'label'   => 'Latest',
+        'color'   => 'emerald',
+        'items'   => [
+            ['icon' => 'bi-person-badge-fill',        'tag' => 'New',     'tag_color' => 'blue',  'title' => 'PCC Role: Pre-Visit Encoding Access',            'desc' => 'Patient Care Coordinators (PCC) now have access to the All Forms page, can edit and countersign visit forms, and have a dedicated sidebar navigation link — enabling full pre-visit documentation support alongside Medical Assistants.'],
+            ['icon' => 'bi-capsule-pill',             'tag' => 'New',     'tag_color' => 'blue',  'title' => 'Live Drug Name Autocomplete',                    'desc' => 'Typing two or more characters in the medication name field now shows a live dropdown of matching drugs from the formulary. Results are sorted so exact-start matches appear first, and keyboard navigation (↑ ↓ Enter Esc) is fully supported.'],
+            ['icon' => 'bi-grid-3x3-gap-fill',        'tag' => 'New',     'tag_color' => 'blue',  'title' => 'Frequency Pill Buttons',                         'desc' => 'The free-text frequency field is replaced by one-tap pill buttons — QD, BID, TID, QID, PRN, Weekly, Monthly, and Other. Selecting "Other" reveals a text input for custom frequencies. This reduces typos and speeds up encoding.'],
+            ['icon' => 'bi-exclamation-triangle-fill','tag' => 'New',     'tag_color' => 'blue',  'title' => 'Duplicate Medication Detection',                 'desc' => 'Before a medication is saved, the system checks whether a matching name already exists in the active list. If a duplicate is found, a confirmation prompt asks whether to add it anyway — preventing accidental double entries.'],
+            ['icon' => 'bi-clock-history',            'tag' => 'New',     'tag_color' => 'blue',  'title' => 'Recently Used Medication Chips',                 'desc' => 'When the medications tab loads, clickable chips show the last 12 unique medications you personally entered across all patients (excluding meds already on this patient). Clicking a chip fills the name field instantly.'],
+            ['icon' => 'bi-list-check',               'tag' => 'New',     'tag_color' => 'blue',  'title' => 'Quick Add Common Medications',                   'desc' => 'A collapsible "Quick Add" panel lists 18 common medications with default frequencies. Staff can check multiple items and click "Add Selected" to bulk-add them all in one action — ideal for pre-visit encoding of chronic medication lists.'],
+            ['icon' => 'bi-lightning-charge-fill',    'tag' => 'Improve', 'tag_color' => 'teal',  'title' => 'Medication Add Is Now Instant — No Page Reload', 'desc' => 'Adding a medication no longer reloads the entire page. The new row appears immediately in the active list and the form resets, keeping the cursor in the name field so staff can continue entering medications without interruption.'],
+        ],
+    ],
+    [
         'version' => 'v3.5',
         'date'    => 'May 29, 2026',
-        'label'   => 'Latest',
+        'label'   => null,
         'color'   => 'emerald',
         'items'   => [
             ['icon' => 'bi-folder2-open',          'tag' => 'New',     'tag_color' => 'blue',  'title' => 'MA All Forms Page',                            'desc' => 'Medical Assistants now have a dedicated "All Forms" page accessible from the sidebar. It lists every submitted form for their assigned patients — filterable by form type, date, and status — giving MAs a single place to review all documentation without navigating patient by patient.'],
