@@ -228,9 +228,10 @@ if ($activeTab === 'meds') {
     ob_start(); ?>
 <script>
 (function () {
-    const PID  = <?= (int)$id ?>;
-    const BASE = <?= json_encode(BASE_URL) ?>;
-    const CSRF = <?= json_encode($csrfJs) ?>;
+    const PID   = <?= (int)$id ?>;
+    const BASE  = <?= json_encode(BASE_URL) ?>;
+    const CSRF  = <?= json_encode($csrfJs) ?>;
+    const UNAME = <?= json_encode($_SESSION['full_name'] ?? '') ?>;
 
     async function medApi(data) {
         const r = await fetch(BASE + '/api/meds.php', {
@@ -441,14 +442,98 @@ if ($activeTab === 'meds') {
                 let added = 0;
                 for (const cb of checked) {
                     const res = await medApi({action: 'add', med_name: cb.value, med_frequency: cb.dataset.freq || ''});
-                    if (res.ok) added++;
+                    if (res.ok) { appendMedRow(res.id, cb.value, cb.dataset.freq || ''); added++; }
                 }
                 addSelBtn.disabled = false;
                 addSelBtn.innerHTML = '<i class="bi bi-check-lg"></i> Add Selected';
-                if (added) location.reload();
+                checked.forEach(cb => { cb.checked = false; });
+                if (added) pdToast(added + ' medication' + (added > 1 ? 's' : '') + ' added.', 'success');
             });
         }
     })();
+
+    // ── appendMedRow — insert a new row into the active list without reload ──
+    function appendMedRow(id, name, freq) {
+        const container = document.getElementById('activeMedsContainer');
+        let list = document.getElementById('activeMedsList');
+
+        if (!list) {
+            // Remove empty-state placeholder
+            if (container) {
+                const empty = container.querySelector('.flex.flex-col.items-center.py-10');
+                if (empty) empty.remove();
+                // Create the list div
+                list = document.createElement('div');
+                list.id = 'activeMedsList';
+                container.appendChild(list);
+            } else {
+                location.reload(); return;
+            }
+        }
+
+        const today = new Date();
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        const dateStr = months[today.getMonth()] + ' ' + today.getDate() + ', ' + today.getFullYear();
+        const freqHtml = freq
+            ? `<span class="font-medium text-slate-500">${esc(freq)}</span>`
+            : '';
+        const byHtml = UNAME ? ` by ${esc(UNAME)}` : '';
+
+        const div = document.createElement('div');
+        div.className = 'med-row border-b border-slate-50 last:border-0';
+        div.dataset.medId = id;
+        div.innerHTML = `
+            <div class="view-mode flex items-center gap-3 px-5 py-3.5 hover:bg-slate-50/60 transition-colors">
+                <div class="w-8 h-8 bg-emerald-100 rounded-lg grid place-items-center flex-shrink-0">
+                    <i class="bi bi-capsule text-emerald-600 text-sm"></i>
+                </div>
+                <div class="min-w-0 flex-1">
+                    <p class="text-sm font-semibold text-slate-800 med-name-disp">${esc(name)}</p>
+                    <p class="text-xs text-slate-400 mt-0.5 flex flex-wrap items-center gap-x-3">
+                        ${freqHtml}
+                        <span>Added ${dateStr}${byHtml}</span>
+                    </p>
+                </div>
+                <div class="flex items-center gap-1 flex-shrink-0">
+                    <button class="edit-med-btn p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit">
+                        <i class="bi bi-pencil text-sm"></i>
+                    </button>
+                    <button class="history-btn p-2 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-colors" title="View history">
+                        <i class="bi bi-clock-history text-sm"></i>
+                    </button>
+                    <button class="dc-med-btn px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors" title="Discontinue">D/C</button>
+                </div>
+            </div>
+            <div class="edit-mode hidden px-5 py-3 bg-slate-50 border-t border-slate-100">
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <input type="text" class="edit-name flex-[3] px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white" value="${esc(name)}" placeholder="Medication name &amp; dose">
+                    <input type="text" class="edit-freq flex-[2] px-3 py-2 text-sm border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white" value="${esc(freq)}" placeholder="Frequency">
+                    <div class="flex gap-2">
+                        <button class="save-edit-btn px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition-colors">Save</button>
+                        <button class="cancel-edit-btn px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold rounded-xl transition-colors">Cancel</button>
+                    </div>
+                </div>
+            </div>
+            <div class="history-panel hidden px-5 py-3 bg-violet-50/40 border-t border-violet-100 text-xs">
+                <p class="text-slate-400 italic"><i class="bi bi-hourglass-split mr-1"></i>Loading history...</p>
+            </div>`;
+        list.appendChild(div);
+        div.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+    }
+
+    function resetMedForm() {
+        const n = document.getElementById('newMedName');
+        const f = document.getElementById('newMedFreq');
+        const o = document.getElementById('freqOtherInput');
+        if (n) n.value = '';
+        if (f) f.value = '';
+        if (o) { o.value = ''; o.classList.add('hidden'); }
+        document.querySelectorAll('.freq-pill').forEach(p => {
+            p.classList.remove('bg-emerald-600','text-white','shadow-sm');
+            p.classList.add('bg-slate-100','text-slate-600');
+        });
+        document.getElementById('medAcDrop')?.classList.add('hidden');
+    }
 
     // ── Add medication ────────────────────────────────────────────────────────
     const addBtn = document.getElementById('addMedBtn');
@@ -484,7 +569,7 @@ if ($activeTab === 'meds') {
             const res = await medApi({action: 'add', med_name: name, med_frequency: freq});
             addBtn.disabled = false;
             addBtn.innerHTML = '<i class="bi bi-plus-lg"></i> Add';
-            if (res.ok) { location.reload(); }
+            if (res.ok) { appendMedRow(res.id, name, freq); resetMedForm(); nameIn.focus(); }
             else { errMsg.textContent = res.error || 'Error adding.'; errMsg.classList.remove('hidden'); }
         };
         addBtn.addEventListener('click', submit);
@@ -2528,7 +2613,7 @@ if (chkAllEl) chkAllEl.addEventListener('change', function () {
     </div>
 
     <!-- Active medications -->
-    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+    <div id="activeMedsContainer" class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
         <div class="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-slate-50/70">
             <div class="flex items-center gap-2">
                 <span class="w-2 h-2 bg-emerald-500 rounded-full"></span>
