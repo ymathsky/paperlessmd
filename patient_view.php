@@ -358,7 +358,7 @@ if ($activeTab === 'meds') {
 
     // ── PDF Viewer modal helpers ──────────────────────────────────────────────
     var _pdfBlobUrl = null;
-    async function openPdfModal(url, name) {
+    window.openPdfModal = async function openPdfModal(url, name) {
         const modal    = document.getElementById('pdfViewerModal');
         const frame    = document.getElementById('pdfModalFrame');
         const title    = document.getElementById('pdfModalTitle');
@@ -385,8 +385,8 @@ if ($activeTab === 'meds') {
         } catch(e) {
             spinner.innerHTML = '<p class="text-white/60 text-sm px-6 text-center">Failed to load PDF.<br><a href="' + url + '&dl=1" class="underline text-blue-300 mt-1 inline-block">Download instead</a></p>';
         }
-    }
-    function closePdfModal() {
+    };
+    window.closePdfModal = function closePdfModal() {
         const modal   = document.getElementById('pdfViewerModal');
         const frame   = document.getElementById('pdfModalFrame');
         const spinner = document.getElementById('pdfModalSpinner');
@@ -396,7 +396,7 @@ if ($activeTab === 'meds') {
         if (spinner) { spinner.style.display = 'none'; }
         document.body.style.overflow = '';
         if (_pdfBlobUrl) { URL.revokeObjectURL(_pdfBlobUrl); _pdfBlobUrl = null; }
-    }
+    };
 
     // ── Drug autocomplete ──────────────────────────────────────────────────
     (function () {
