@@ -268,17 +268,16 @@ if ($activeTab === 'meds') {
                 const d = new Date(f.uploaded_at);
                 const dateStr = d.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
                 const byStr   = f.uploaded_by_name ? ' by ' + esc(f.uploaded_by_name) : '';
-                return `<div class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl" data-file-id="${f.id}">
+                return `<div class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl" data-file-id="${f.id}" data-url="${f.url}" data-name="${esc(f.original_name)}">
                     <i class="bi bi-file-earmark-pdf-fill text-red-500 text-xl flex-shrink-0"></i>
                     <div class="min-w-0 flex-1">
                         <p class="text-sm font-medium text-slate-700 truncate">${esc(f.original_name)}</p>
                         <p class="text-xs text-slate-400">${dateStr}${byStr}</p>
                     </div>
-                    <a href="${f.url}" target="_blank" rel="noopener"
-                       class="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="View">
+                    <button type="button" class="view-pdf-btn p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="View">
                         <i class="bi bi-eye text-sm"></i>
-                    </a>
-                    <a href="${f.url}" download
+                    </button>
+                    <a href="${f.url}" download="${esc(f.original_name)}"
                        class="p-2 text-slate-400 hover:bg-slate-100 rounded-lg transition-colors" title="Download">
                         <i class="bi bi-download text-sm"></i>
                     </a>
@@ -326,6 +325,15 @@ if ($activeTab === 'meds') {
             }
         });
 
+        // View handler
+        listEl.addEventListener('click', function (e) {
+            const viewBtn = e.target.closest('.view-pdf-btn');
+            if (!viewBtn) return;
+            const row  = viewBtn.closest('[data-file-id]');
+            if (!row)  return;
+            openPdfModal(row.dataset.url, row.dataset.name);
+        });
+
         // Delete handler
         listEl.addEventListener('click', async function (e) {
             const btn = e.target.closest('.del-pdf-btn');
@@ -346,6 +354,21 @@ if ($activeTab === 'meds') {
             }
         });
     })();
+
+    // ── PDF Viewer modal helpers ──────────────────────────────────────────────
+    function openPdfModal(url, name) {
+        document.getElementById('pdfModalTitle').textContent = name || 'Document';
+        document.getElementById('pdfModalFrame').src = url;
+        document.getElementById('pdfModalDownload').href = url;
+        document.getElementById('pdfModalDownload').download = name || 'document.pdf';
+        document.getElementById('pdfViewerModal').classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+    function closePdfModal() {
+        document.getElementById('pdfViewerModal').classList.add('hidden');
+        document.getElementById('pdfModalFrame').src = '';
+        document.body.style.overflow = '';
+    }
 
     // ── Drug autocomplete ──────────────────────────────────────────────────
     (function () {
@@ -1779,6 +1802,31 @@ function completeVisit(visitId) {
         </div>
     </div>
     <?php endif; ?>
+</div>
+
+<!-- ── PDF Viewer Modal ───────────────────────────────────────────────────── -->
+<div id="pdfViewerModal"
+     class="hidden fixed inset-0 z-[60] flex flex-col bg-black/80 backdrop-blur-sm no-print"
+     style="animation: none;">
+    <!-- Header bar -->
+    <div class="flex items-center gap-3 px-4 py-3 bg-slate-900/90 border-b border-white/10 flex-shrink-0">
+        <i class="bi bi-file-earmark-pdf-fill text-red-400 text-lg"></i>
+        <span id="pdfModalTitle" class="text-sm font-semibold text-white truncate flex-1"></span>
+        <a id="pdfModalDownload" href="#" download
+           class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-medium rounded-lg transition-colors">
+            <i class="bi bi-download"></i> Download
+        </a>
+        <button onclick="closePdfModal()"
+                class="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors ml-1" title="Close">
+            <i class="bi bi-x-lg text-sm"></i>
+        </button>
+    </div>
+    <!-- iframe viewer -->
+    <div class="flex-1 overflow-hidden relative">
+        <iframe id="pdfModalFrame" src="" class="w-full h-full border-0" style="background:#525659;"></iframe>
+    </div>
+    <!-- Tap outside overlay (behind header but clickable on sides) -->
+    <div class="absolute inset-0 -z-10" onclick="closePdfModal()"></div>
 </div>
 
 <!-- ── Document Viewer Modal ──────────────────────────────────────────────── -->
