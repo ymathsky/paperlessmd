@@ -357,18 +357,45 @@ if ($activeTab === 'meds') {
     })();
 
     // ── PDF Viewer modal helpers ──────────────────────────────────────────────
-    function openPdfModal(url, name) {
-        document.getElementById('pdfModalTitle').textContent = name || 'Document';
-        document.getElementById('pdfModalFrame').src = url;
-        document.getElementById('pdfModalDownload').href = url + '&dl=1';
-        document.getElementById('pdfModalDownload').download = name || 'document.pdf';
-        document.getElementById('pdfViewerModal').classList.remove('hidden');
+    var _pdfBlobUrl = null;
+    async function openPdfModal(url, name) {
+        const modal  = document.getElementById('pdfViewerModal');
+        const frame  = document.getElementById('pdfModalFrame');
+        const title  = document.getElementById('pdfModalTitle');
+        const dlBtn  = document.getElementById('pdfModalDownload');
+        title.textContent = name || 'Document';
+        dlBtn.href     = url + '&dl=1';
+        dlBtn.download = name || 'document.pdf';
+        frame.src = '';
+        // Show modal immediately with a loading indicator
+        frame.style.display = 'none';
+        document.getElementById('pdfModalSpinner').style.display = 'flex';
+        modal.classList.remove('hidden');
         document.body.style.overflow = 'hidden';
+        // Fetch as blob so browser always renders inline (never downloads)
+        try {
+            const resp = await fetch(url, {credentials: 'same-origin'});
+            if (!resp.ok) throw new Error('HTTP ' + resp.status);
+            const blob = await resp.blob();
+            if (_pdfBlobUrl) URL.revokeObjectURL(_pdfBlobUrl);
+            _pdfBlobUrl = URL.createObjectURL(blob);
+            frame.src = _pdfBlobUrl;
+            frame.style.display = '';
+        } catch(e) {
+            document.getElementById('pdfModalSpinner').innerHTML =
+                '<p class="text-white/60 text-sm">Failed to load PDF. <a href="' + url + '&dl=1" class="underline text-blue-300">Download instead</a></p>';
+            return;
+        }
+        document.getElementById('pdfModalSpinner').style.display = 'none';
     }
     function closePdfModal() {
         document.getElementById('pdfViewerModal').classList.add('hidden');
-        document.getElementById('pdfModalFrame').src = '';
+        const frame = document.getElementById('pdfModalFrame');
+        frame.src = '';
+        frame.style.display = '';
+        document.getElementById('pdfModalSpinner').style.display = 'none';
         document.body.style.overflow = '';
+        if (_pdfBlobUrl) { URL.revokeObjectURL(_pdfBlobUrl); _pdfBlobUrl = null; }
     }
 
     // ── Drug autocomplete ──────────────────────────────────────────────────
@@ -1825,7 +1852,10 @@ function completeVisit(visitId) {
         </button>
     </div>
     <!-- iframe viewer — stop propagation so clicking PDF doesn't close modal -->
-    <div class="flex-1 overflow-hidden" onclick="event.stopPropagation()">
+    <div class="flex-1 overflow-hidden relative" onclick="event.stopPropagation()">
+        <div id="pdfModalSpinner" style="display:none; position:absolute; inset:0; align-items:center; justify-content:center; background:rgba(0,0,0,0.4);">
+            <div style="width:36px;height:36px;border:3px solid rgba(255,255,255,0.2);border-top-color:#fff;border-radius:50%;animation:pvSpin 0.7s linear infinite;"></div>
+        </div>
         <iframe id="pdfModalFrame" src="" class="w-full h-full border-0" style="background:#525659;"></iframe>
     </div>
 </div>
