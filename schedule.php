@@ -1371,7 +1371,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeRouteMa
 async function startVisit(visitId, patientId, visitType, visitSubtype, btn) {
     const ok = await pdConfirm({
         message:      'Start this visit?',
-        subtext:      'You will not be able to navigate to any other page until the visit is ended.',
+        subtext:      'You can navigate freely during the visit — a floating chip will appear on every page so you can return here quickly.',
         confirmLabel: 'Start Visit',
         confirmIcon:  'bi bi-play-fill',
         confirmStyle: 'background:linear-gradient(135deg,#2563eb,#0ea5e9);',
