@@ -630,6 +630,18 @@ include __DIR__ . '/../includes/header.php';
                         <i class="bi bi-file-earmark-pdf text-red-500"></i> Upload PDF &amp; Annotate
                         <input type="file" id="pdfAnnotFile" accept="application/pdf" class="sr-only">
                     </label>
+                    <div class="relative no-print">
+                        <button type="button" id="savedPdfPickerBtn"
+                                class="inline-flex items-center gap-2 px-4 py-2 bg-violet-50 hover:bg-violet-100
+                                       border border-violet-200 text-violet-700 font-semibold text-sm rounded-xl transition-all">
+                            <i class="bi bi-cloud-download"></i> From Saved PDFs
+                        </button>
+                        <div id="savedPdfPickerDrop"
+                             class="hidden absolute left-0 mt-1 w-72 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden"
+                             style="z-index:9999; top:100%;">
+                            <div id="savedPdfPickerList" class="max-h-56 overflow-y-auto divide-y divide-slate-100 py-1"></div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- PDF Annotator Panel -->
@@ -1160,9 +1172,77 @@ $extraJs = <<<JSBLOCK
     var PDFJS_URL  = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
     var WORKER_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     var MAX_PAGES  = 4; // slots med_handwriting_2 .. med_handwriting_5
+    var PID_FORM   = <?= (int)$patient_id ?>;
+    var BASE_FORM  = <?= json_encode(BASE_URL) ?>;
 
     var fileEl    = document.getElementById('pdfAnnotFile');
     if (!fileEl) return;
+
+    /* ── From Saved PDFs picker ─────────────────────────────────────── */
+    var pickerBtn  = document.getElementById('savedPdfPickerBtn');
+    var pickerDrop = document.getElementById('savedPdfPickerDrop');
+    var pickerList = document.getElementById('savedPdfPickerList');
+    var _filesLoaded = false;
+
+    function escP(s) { return s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
+
+    function loadSavedFiles() {
+        if (_filesLoaded) return;
+        _filesLoaded = true;
+        pickerList.innerHTML = '<div class="px-4 py-3 text-xs text-slate-400">Loading…</div>';
+        fetch(BASE_FORM + '/api/patient_files.php?patient_id=' + PID_FORM + '&category=medication')
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (!d.ok || !d.files || !d.files.length) {
+                    pickerList.innerHTML = '<div class="px-4 py-3 text-xs text-slate-400 italic">No saved PDFs found.</div>';
+                    return;
+                }
+                // Only show PDFs (not annotated PNGs)
+                var pdfs = d.files.filter(function (f) { return /\.pdf$/i.test(f.original_name); });
+                if (!pdfs.length) {
+                    pickerList.innerHTML = '<div class="px-4 py-3 text-xs text-slate-400 italic">No saved PDFs found.</div>';
+                    return;
+                }
+                pickerList.innerHTML = pdfs.map(function (f) {
+                    return '<button type="button" class="saved-pdf-item w-full text-left px-4 py-2.5 hover:bg-violet-50 transition-colors"' +
+                        ' data-url="' + escP(BASE_FORM + '/api/serve_patient_file.php?id=' + f.id) + '"' +
+                        ' data-name="' + escP(f.original_name) + '">' +
+                        '<div class="flex items-center gap-2.5">' +
+                        '<i class="bi bi-file-earmark-pdf-fill text-red-500 flex-shrink-0"></i>' +
+                        '<div class="min-w-0">' +
+                        '<p class="text-sm font-medium text-slate-700 truncate">' + escP(f.original_name) + '</p>' +
+                        '<p class="text-xs text-slate-400">' + new Date(f.uploaded_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) + '</p>' +
+                        '</div></div></button>';
+                }).join('');
+            })
+            .catch(function () {
+                pickerList.innerHTML = '<div class="px-4 py-3 text-xs text-red-400">Failed to load files.</div>';
+            });
+    }
+
+    if (pickerBtn) {
+        pickerBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var isOpen = !pickerDrop.classList.contains('hidden');
+            if (isOpen) { pickerDrop.classList.add('hidden'); return; }
+            loadSavedFiles();
+            pickerDrop.classList.remove('hidden');
+        });
+        document.addEventListener('click', function () { pickerDrop.classList.add('hidden'); });
+        pickerDrop.addEventListener('click', function (e) { e.stopPropagation(); });
+        pickerList.addEventListener('click', function (e) {
+            var item = e.target.closest('.saved-pdf-item');
+            if (!item) return;
+            pickerDrop.classList.add('hidden');
+            var url  = item.dataset.url;
+            var name = item.dataset.name;
+            // Fetch as ArrayBuffer and feed into the existing openPdf() function
+            fetch(url, { credentials: 'include' })
+                .then(function (r) { return r.arrayBuffer(); })
+                .then(function (buf) { openPdfFromBuffer(buf, name); })
+                .catch(function (err) { alert('Could not load PDF: ' + (err.message || err)); });
+        });
+    }
 
     var panel      = document.getElementById('pdfAnnotPanel');
     var bgCanvas   = document.getElementById('pdfBgCanvas');
@@ -1241,6 +1321,18 @@ $extraJs = <<<JSBLOCK
             clearTimeout(_timeout);
             alert('Could not open PDF: ' + (err.message || err));
         });
+    }
+
+    // Alias so the "From Saved PDFs" picker can open a pre-fetched ArrayBuffer
+    function openPdfFromBuffer(buffer) {
+        if (window.pdfjsLib) {
+            openPdf(buffer);
+        } else {
+            loadScript(PDFJS_URL, function () {
+                window.pdfjsLib.GlobalWorkerOptions.workerSrc = WORKER_URL;
+                openPdf(buffer);
+            });
+        }
     }
 
     function renderPage(num) {
