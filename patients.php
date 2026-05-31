@@ -3,6 +3,9 @@ require_once __DIR__ . '/includes/auth.php';
 require_once __DIR__ . '/includes/db.php';
 requireLogin();
 
+$_isAjax = ($_GET['ajax'] ?? '') === '1';
+if ($_isAjax) ob_start(); // capture any pre-list output so we can discard it later
+
 $pageTitle = 'Patients';
 $activeNav = 'patients';
 
@@ -131,7 +134,7 @@ include __DIR__ . '/includes/header.php';
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
     <div>
         <h2 class="text-2xl font-extrabold text-slate-800">Patients</h2>
-        <p class="text-slate-500 text-sm mt-0.5"><?= number_format($total) ?> patient<?= $total !== 1 ? 's' : '' ?> found</p>
+        <p id="pt-count" class="text-slate-500 text-sm mt-0.5"><?= number_format($total) ?> patient<?= $total !== 1 ? 's' : '' ?> found</p>
     </div>
     <?php if (!isMa()): ?>
     <a href="<?= BASE_URL ?>/patient_add.php"
@@ -235,7 +238,7 @@ foreach ($companies as $coName => $coCfg):
 
 <!-- Search + Filter Bar -->
 <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 mb-5">
-    <form method="GET" class="flex flex-col sm:flex-row gap-3 flex-wrap">
+    <form id="ptForm" method="GET" class="flex flex-col sm:flex-row gap-3 flex-wrap">
         <div class="relative flex-1 min-w-[180px]">
             <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400 pointer-events-none">
                 <i class="bi bi-search text-base"></i>
@@ -270,28 +273,35 @@ foreach ($companies as $coName => $coCfg):
             ];
             foreach ($statusBtns as $sv => $cfg):
                 $cls = ($statusFilter === $sv) ? $cfg['color'] : $cfg['inactive'];
-                $href = BASE_URL . '/patients.php?status=' . $sv . ($q ? '&q='.urlencode($q) : '') . ($filter ? '&filter='.$filter : '') . $maPart;
             ?>
-            <a href="<?= $href ?>" class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all <?= $cls ?>">
+            <button type="button" data-sv="<?= $sv ?>"
+                    data-active="<?= $cfg['color'] ?>" data-inactive="<?= $cfg['inactive'] ?>"
+                    class="pt-status-btn inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all <?= $cls ?>">
                 <?= $cfg['label'] ?>
-            </a>
-            <?php endforeach; ?>
-            <a href="<?= BASE_URL ?>/patients.php?status=<?= $statusFilter ?>&filter=pending<?= $q ? '&q=' . urlencode($q) : '' ?><?= $maPart ?>"
-               class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all
-                      <?= $filter === 'pending' ? 'bg-amber-500 text-white shadow' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' ?>">
-                <i class="bi bi-cloud-arrow-up"></i> Pending Upload
-            </a>
-            <button type="submit"
-                    class="inline-flex items-center gap-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-medium transition-all shadow-sm">
-                Search
             </button>
+            <?php endforeach; ?>
+            <button type="button" id="ptPendingBtn"
+                    data-active="bg-amber-500 text-white shadow"
+                    data-inactive="bg-slate-100 text-slate-700 hover:bg-slate-200"
+                    class="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium transition-all
+                           <?= $filter === 'pending' ? 'bg-amber-500 text-white shadow' : 'bg-slate-100 text-slate-700 hover:bg-slate-200' ?>">
+                <i class="bi bi-cloud-arrow-up"></i> Pending Upload
+            </button>
+            <span id="pt-spinner" style="display:none;" class="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-indigo-500">
+                <svg style="width:14px;height:14px;animation:ptSpin 0.7s linear infinite;" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" stroke-dasharray="40" stroke-dashoffset="10"/></svg>
+                Loading…
+            </span>
         </div>
-        <input type="hidden" name="status" value="<?= h($statusFilter) ?>">
-        <?php if ($filter): ?><input type="hidden" name="filter" value="<?= h($filter) ?>"><?php endif; ?>
+        <input type="hidden" name="status" id="ptStatusInput" value="<?= h($statusFilter) ?>">
+        <input type="hidden" name="filter" id="ptFilterInput" value="<?= h($filter) ?>">
     </form>
 </div>
 
 <!-- Patient List -->
+<?php
+if ($_isAjax) { ob_end_clean(); ob_start(); } // discard pre-list HTML, start fresh buffer
+?>
+<div id="pt-results">
 <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
     <?php if (empty($patients)): ?>
     <div class="flex flex-col items-center justify-center py-20 text-slate-400">
@@ -480,8 +490,139 @@ foreach ($companies as $coName => $coCfg):
     <?php endif; ?>
     <?php endif; ?>
 </div>
+</div><!-- /#pt-results -->
+<?php
+$_listHtml = ob_get_clean();
+if ($_isAjax) {
+    header('Content-Type: application/json');
+    echo json_encode([
+        'html'  => $_listHtml,
+        'count' => number_format($total) . ' patient' . ($total !== 1 ? 's' : '') . ' found',
+    ]);
+    exit;
+}
+echo $_listHtml;
+?>
 
+<style>@keyframes ptSpin { to { transform: rotate(360deg); } }</style>
 <script>
+// ── Async patient search ─────────────────────────────────────
+(function () {
+    var form     = document.getElementById('ptForm');
+    var results  = document.getElementById('pt-results');
+    var countEl  = document.getElementById('pt-count');
+    var spinner  = document.getElementById('pt-spinner');
+    var statusIn = document.getElementById('ptStatusInput');
+    var filterIn = document.getElementById('ptFilterInput');
+    var timer = null, ctrl = null;
+
+    function getQS(pg) {
+        var p = new URLSearchParams(new FormData(form));
+        if (pg > 1) p.set('page', pg); else p.delete('page');
+        return p;
+    }
+
+    function setActiveStatus(sv) {
+        document.querySelectorAll('.pt-status-btn').forEach(function(b) {
+            var isActive = b.dataset.sv === sv;
+            // strip all classes from data attrs, re-apply
+            b.className = b.className
+                .replace(new RegExp('(' + b.dataset.active.replace(/ /g,'|') + ')', 'g'), '')
+                .replace(new RegExp('(' + b.dataset.inactive.replace(/ /g,'|') + ')', 'g'), '')
+                .trim();
+            b.className += ' ' + (isActive ? b.dataset.active : b.dataset.inactive);
+        });
+    }
+
+    async function load(pg) {
+        pg = pg || 1;
+        if (ctrl) ctrl.abort();
+        ctrl = new AbortController();
+        results.style.opacity = '0.45';
+        results.style.pointerEvents = 'none';
+        if (spinner) spinner.style.display = 'inline-flex';
+        try {
+            var qs = getQS(pg);
+            qs.set('ajax', '1');
+            var res = await fetch('?' + qs.toString(), { signal: ctrl.signal });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            var d = await res.json();
+            results.innerHTML = d.html;
+            if (countEl) countEl.textContent = d.count;
+            // sync URL
+            var cleanQS = getQS(pg);
+            history.pushState({}, '', cleanQS.toString() ? '?' + cleanQS.toString() : location.pathname);
+            wirePagination();
+        } catch(e) {
+            if (e.name !== 'AbortError') console.warn('Patient search error:', e);
+        } finally {
+            results.style.opacity = '';
+            results.style.pointerEvents = '';
+            if (spinner) spinner.style.display = 'none';
+        }
+    }
+
+    function wirePagination() {
+        results.querySelectorAll('a[href*="page="]').forEach(function(a) {
+            a.addEventListener('click', function(e) {
+                e.preventDefault();
+                var m = a.href.match(/[?&]page=(\d+)/);
+                if (m) { load(parseInt(m[1], 10)); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+            });
+        });
+    }
+
+    // Status buttons
+    document.querySelectorAll('.pt-status-btn').forEach(function(b) {
+        b.addEventListener('click', function() {
+            statusIn.value = b.dataset.sv;
+            filterIn.value = '';
+            // reset pending btn style
+            var pb = document.getElementById('ptPendingBtn');
+            if (pb) { pb.className = pb.className.replace(pb.dataset.active, pb.dataset.inactive); }
+            setActiveStatus(b.dataset.sv);
+            clearTimeout(timer); load();
+        });
+    });
+
+    // Pending Upload toggle
+    var pendingBtn = document.getElementById('ptPendingBtn');
+    if (pendingBtn) {
+        pendingBtn.addEventListener('click', function() {
+            var isOn = filterIn.value === 'pending';
+            filterIn.value = isOn ? '' : 'pending';
+            pendingBtn.className = pendingBtn.className
+                .replace(isOn ? pendingBtn.dataset.active : pendingBtn.dataset.inactive, '')
+                .trim() + ' ' + (isOn ? pendingBtn.dataset.inactive : pendingBtn.dataset.active);
+            clearTimeout(timer); load();
+        });
+    }
+
+    // Text search — debounced 400ms
+    var qInput = form.querySelector('input[name="q"]');
+    if (qInput) qInput.addEventListener('input', function() { clearTimeout(timer); timer = setTimeout(load, 400); });
+
+    // MA select — instant
+    var maSelect = form.querySelector('select[name="ma"]');
+    if (maSelect) maSelect.addEventListener('change', function() { clearTimeout(timer); load(); });
+
+    // Block native form submit
+    form.addEventListener('submit', function(e) { e.preventDefault(); clearTimeout(timer); load(); });
+
+    // Back/forward
+    window.addEventListener('popstate', function() {
+        var p = new URLSearchParams(location.search);
+        if (qInput) qInput.value = p.get('q') || '';
+        statusIn.value = p.get('status') || 'active';
+        filterIn.value = p.get('filter') || '';
+        if (maSelect) maSelect.value = p.get('ma') || '';
+        setActiveStatus(statusIn.value);
+        load(+(p.get('page') || 1));
+    });
+
+    wirePagination();
+})();
+
 (function () {
     var KEY = 'pats_card_collapsed';
     var state = {};
