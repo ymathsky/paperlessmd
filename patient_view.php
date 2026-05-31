@@ -359,20 +359,20 @@ if ($activeTab === 'meds') {
     // ── PDF Viewer modal helpers ──────────────────────────────────────────────
     var _pdfBlobUrl = null;
     async function openPdfModal(url, name) {
-        const modal  = document.getElementById('pdfViewerModal');
-        const frame  = document.getElementById('pdfModalFrame');
-        const title  = document.getElementById('pdfModalTitle');
-        const dlBtn  = document.getElementById('pdfModalDownload');
+        const modal    = document.getElementById('pdfViewerModal');
+        const frame    = document.getElementById('pdfModalFrame');
+        const title    = document.getElementById('pdfModalTitle');
+        const dlBtn    = document.getElementById('pdfModalDownload');
+        const spinner  = document.getElementById('pdfModalSpinner');
+        if (!modal || !frame || !spinner) return;
         title.textContent = name || 'Document';
         dlBtn.href     = url + '&dl=1';
         dlBtn.download = name || 'document.pdf';
         frame.src = '';
-        // Show modal immediately with a loading indicator
         frame.style.display = 'none';
-        document.getElementById('pdfModalSpinner').style.display = 'flex';
+        spinner.style.display = 'flex';
         modal.classList.remove('hidden');
         document.body.style.overflow = 'hidden';
-        // Fetch as blob so browser always renders inline (never downloads)
         try {
             const resp = await fetch(url, {credentials: 'same-origin'});
             if (!resp.ok) throw new Error('HTTP ' + resp.status);
@@ -381,19 +381,19 @@ if ($activeTab === 'meds') {
             _pdfBlobUrl = URL.createObjectURL(blob);
             frame.src = _pdfBlobUrl;
             frame.style.display = '';
+            spinner.style.display = 'none';
         } catch(e) {
-            document.getElementById('pdfModalSpinner').innerHTML =
-                '<p class="text-white/60 text-sm">Failed to load PDF. <a href="' + url + '&dl=1" class="underline text-blue-300">Download instead</a></p>';
-            return;
+            spinner.innerHTML = '<p class="text-white/60 text-sm px-6 text-center">Failed to load PDF.<br><a href="' + url + '&dl=1" class="underline text-blue-300 mt-1 inline-block">Download instead</a></p>';
         }
-        document.getElementById('pdfModalSpinner').style.display = 'none';
     }
     function closePdfModal() {
-        document.getElementById('pdfViewerModal').classList.add('hidden');
-        const frame = document.getElementById('pdfModalFrame');
-        frame.src = '';
-        frame.style.display = '';
-        document.getElementById('pdfModalSpinner').style.display = 'none';
+        const modal   = document.getElementById('pdfViewerModal');
+        const frame   = document.getElementById('pdfModalFrame');
+        const spinner = document.getElementById('pdfModalSpinner');
+        if (!modal) return;
+        modal.classList.add('hidden');
+        if (frame)   { frame.src = ''; frame.style.display = ''; }
+        if (spinner) { spinner.style.display = 'none'; }
         document.body.style.overflow = '';
         if (_pdfBlobUrl) { URL.revokeObjectURL(_pdfBlobUrl); _pdfBlobUrl = null; }
     }
@@ -2882,6 +2882,33 @@ if (chkAllEl) chkAllEl.addEventListener('change', function () {
     <?php endif; ?>
 
 </div><!-- /meds tab -->
+
+<!-- PDF Viewer Modal (inside meds tab so it renders in partial requests too) -->
+<div id="pdfViewerModal"
+     class="hidden fixed inset-0 flex flex-col no-print"
+     style="z-index:99990; background:rgba(0,0,0,0.82); backdrop-filter:blur(4px);"
+     onclick="closePdfModal()">
+    <div class="flex items-center gap-3 px-4 py-3 border-b border-white/10 flex-shrink-0"
+         style="background:rgba(15,23,42,0.95);"
+         onclick="event.stopPropagation()">
+        <i class="bi bi-file-earmark-pdf-fill text-red-400 text-lg"></i>
+        <span id="pdfModalTitle" class="text-sm font-semibold text-white truncate flex-1"></span>
+        <a id="pdfModalDownload" href="#" download
+           class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-medium rounded-lg transition-colors">
+            <i class="bi bi-download"></i> Download
+        </a>
+        <button onclick="closePdfModal()"
+                class="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors ml-1" title="Close">
+            <i class="bi bi-x-lg text-sm"></i>
+        </button>
+    </div>
+    <div class="flex-1 overflow-hidden relative" onclick="event.stopPropagation()">
+        <div id="pdfModalSpinner" style="display:none; position:absolute; inset:0; align-items:center; justify-content:center; background:rgba(0,0,0,0.4);">
+            <div style="width:36px;height:36px;border:3px solid rgba(255,255,255,0.2);border-top-color:#fff;border-radius:50%;animation:pvSpin 0.7s linear infinite;"></div>
+        </div>
+        <iframe id="pdfModalFrame" src="" class="w-full h-full border-0" style="background:#525659;"></iframe>
+    </div>
+</div>
 
 <!-- Photos Tab -->
 <?php elseif ($activeTab === 'photos'): ?>
