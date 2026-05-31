@@ -2,11 +2,11 @@
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/db.php';
 requireLogin();
-if (!isAdmin() && !isMa()) {
+if (!isAdmin() && !isMa() && !isPcc()) {
     header('Location: ' . BASE_URL . '/dashboard.php');
     exit;
 }
-$_isMaView = isMa();
+$_isMaView = isMa() || isPcc();
 
 /* ── Form type labels ─────────────────────────────────────── */
 $formLabels = [

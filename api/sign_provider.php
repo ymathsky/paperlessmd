@@ -45,8 +45,8 @@ if (!$form) {
     exit;
 }
 
-// Only admins/MAs can add provider signature; form must already be signed by patient
-if (!isAdmin() && !\isMa()) {
+// Only admins/MAs/PCCs can add provider signature; form must already be signed by patient
+if (!isAdmin() && !\isMa() && !isPcc()) {
     http_response_code(403);
     echo json_encode(['ok' => false, 'error' => 'Not authorized']);
     exit;

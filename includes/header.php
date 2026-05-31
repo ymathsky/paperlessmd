@@ -162,8 +162,8 @@ if (!empty($_SESSION['user_id'])) {
             <span id="notifBadge" class="hidden bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none min-w-[18px] text-center">0</span>
         </button>
 
-        <?php if (isMa()): ?>
-        <!-- MA quick links -->
+        <?php if (isMa() || isPcc()): ?>
+        <!-- MA / PCC quick links -->
         <a href="<?= BASE_URL ?>/admin/all_forms.php"
            class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 mt-0.5
                   <?= ($activeNav ?? '') === 'all_forms' ? 'bg-white/20 text-white shadow-sm' : 'text-blue-200 hover:bg-white/10 hover:text-white' ?>">

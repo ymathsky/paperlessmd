@@ -20,7 +20,7 @@ $signature  = $_POST['patient_signature'] ?? '';
 $maSig      = $_POST['ma_signature'] ?? '';
 $poaName    = trim($_POST['poa_name'] ?? '');
 $poaRel     = trim($_POST['poa_relationship'] ?? '');
-$_editOverride = (isAdmin() || isMa()) && ($_POST['edit_override'] ?? '') === '1';
+$_editOverride = (isAdmin() || isMa() || isPcc()) && ($_POST['edit_override'] ?? '') === '1';
 // Missed visit: when missed_visit_reason is set, vitals and signatures are not required.
 $isMissedVisit = ($formType === 'vital_cs' && !empty(trim($_POST['missed_visit_reason'] ?? '')));
 // vital_cs is draft only when signatures are absent (in-progress visit); once both sigs are
