@@ -247,17 +247,27 @@ if ($activeTab === 'meds') {
         const fileInput = document.getElementById('pfMedFileInput');
         const statusEl  = document.getElementById('pfMedStatus');
         if (!fileInput) return;
+
+        function setStatus(type, html) {
+            const colors = {
+                loading: 'bg-blue-50 text-blue-700',
+                success: 'bg-emerald-50 text-emerald-700',
+                warn:    'bg-amber-50 text-amber-700',
+                error:   'bg-red-50 text-red-700',
+            };
+            statusEl.className = 'mt-3 flex items-start gap-2 text-xs rounded-xl px-4 py-3 ' + (colors[type] || colors.loading);
+            statusEl.innerHTML = html;
+            statusEl.classList.remove('hidden');
+        }
+
         fileInput.addEventListener('change', async function() {
             const file = this.files[0];
             if (!file) return;
             this.value = '';
             const btn = document.getElementById('importPfMedBtn');
             btn.disabled = true;
-            btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Importing…';
-            statusEl.style.display = 'block';
-            statusEl.style.background = '#f0f9ff';
-            statusEl.style.color = '#0369a1';
-            statusEl.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Parsing PDF…';
+            btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Parsing…';
+            setStatus('loading', '<i class="bi bi-hourglass-split"></i> Extracting medications from PDF…');
             try {
                 const fd = new FormData();
                 fd.append('pdf', file);
@@ -267,30 +277,29 @@ if ($activeTab === 'meds') {
                 const d = await r.json();
                 if (!d.ok) throw new Error(d.error || 'Parse failed');
                 if (!d.meds || !d.meds.length) {
-                    statusEl.style.background = '#fef9c3';
-                    statusEl.style.color = '#854d0e';
-                    statusEl.innerHTML = '<i class="bi bi-exclamation-triangle me-1"></i> No medications found in PDF.';
+                    setStatus('warn', '<i class="bi bi-exclamation-triangle-fill"></i> No medications found in this PDF. Make sure it contains an active medications section.');
                     btn.disabled = false;
-                    btn.innerHTML = '<i class="bi bi-file-earmark-arrow-up"></i> Import from PF';
+                    btn.innerHTML = '<i class="bi bi-upload"></i> Upload PDF';
                     return;
                 }
-                // Add each med via the existing API
+                // Add each med and insert DOM row immediately
                 let added = 0, skipped = 0;
                 for (const med of d.meds) {
                     const res = await medApi({action:'add', med_name: med.name, med_frequency: med.frequency || ''});
-                    if (res.ok) added++; else skipped++;
+                    if (res.ok) { appendMedRow(res.id, med.name, med.frequency || ''); added++; }
+                    else skipped++;
                 }
-                statusEl.style.background = '#f0fdf4';
-                statusEl.style.color = '#15803d';
-                statusEl.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> Imported <strong>' + added + '</strong> medication' + (added !== 1 ? 's' : '') +
-                    (skipped ? ' (' + skipped + ' skipped/duplicate)' : '') + ' from PF PDF.';
-                setTimeout(() => location.reload(), 1200);
-            } catch(err) {
-                statusEl.style.background = '#fef2f2';
-                statusEl.style.color = '#dc2626';
-                statusEl.innerHTML = '<i class="bi bi-x-circle-fill me-1"></i> ' + (err.message || 'Import failed');
                 btn.disabled = false;
-                btn.innerHTML = '<i class="bi bi-file-earmark-arrow-up"></i> Import from PF';
+                btn.innerHTML = '<i class="bi bi-upload"></i> Upload PDF';
+                setStatus('success',
+                    '<i class="bi bi-check-circle-fill"></i> <span>Imported <strong>' + added + '</strong> medication' + (added !== 1 ? 's' : '') +
+                    (skipped ? ' &mdash; <strong>' + skipped + '</strong> already in list (skipped)' : '') +
+                    '. <span class="font-semibold">These will appear on all future Visit Consent forms.</span></span>'
+                );
+            } catch(err) {
+                setStatus('error', '<i class="bi bi-x-circle-fill"></i> ' + esc(err.message || 'Import failed'));
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-upload"></i> Upload PDF';
             }
         });
     })();
@@ -2501,21 +2510,41 @@ if (chkAllEl) chkAllEl.addEventListener('change', function () {
 <?php elseif ($activeTab === 'meds'): ?>
 <div class="space-y-5">
 
+    <!-- PDF import card -->
+    <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
+        <div class="flex items-start gap-4">
+            <div class="w-10 h-10 rounded-xl bg-blue-50 grid place-items-center flex-shrink-0 mt-0.5">
+                <i class="bi bi-file-earmark-medical-fill text-blue-600 text-lg"></i>
+            </div>
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-0.5">
+                    <h4 class="text-sm font-bold text-slate-700">Import Medications from PDF</h4>
+                    <span class="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full">
+                        <i class="bi bi-arrow-repeat"></i> Syncs to Visit Consent
+                    </span>
+                </div>
+                <p class="text-xs text-slate-400 mb-3">Upload a Practice Fusion medication list or any structured medication PDF. Extracted medications are added to this patient&rsquo;s profile and will automatically appear on future Visit Consent forms.</p>
+                <div class="flex flex-wrap items-center gap-3">
+                    <button id="importPfMedBtn" onclick="document.getElementById('pfMedFileInput').click()"
+                            class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 active:scale-95
+                                   text-white text-xs font-semibold rounded-xl transition-all shadow-sm">
+                        <i class="bi bi-upload"></i> Upload PDF
+                    </button>
+                    <input type="file" id="pfMedFileInput" accept="application/pdf,.pdf" style="display:none;">
+                    <span class="text-xs text-slate-400">Accepts Practice Fusion, EMR exports &amp; any structured medication PDF &mdash; max 20 MB</span>
+                </div>
+                <div id="pfMedStatus" class="hidden mt-3 flex items-start gap-2 text-xs rounded-xl px-4 py-3"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- Add medication card -->
     <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
         <div class="flex items-center justify-between mb-4">
             <h4 class="text-sm font-bold text-slate-700 flex items-center gap-2">
                 <i class="bi bi-plus-circle-fill text-emerald-600"></i> Add Medication
             </h4>
-            <button id="importPfMedBtn" onclick="document.getElementById('pfMedFileInput').click()"
-                    style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;font-size:12px;font-weight:600;
-                           background:#059669;color:#fff;border:none;border-radius:8px;cursor:pointer;transition:background 0.15s;"
-                    onmouseover="this.style.background='#047857'" onmouseout="this.style.background='#059669'">
-                <i class="bi bi-file-earmark-arrow-up"></i> Import from PF
-            </button>
-            <input type="file" id="pfMedFileInput" accept="application/pdf,.pdf" style="display:none;">
         </div>
-        <div id="pfMedStatus" style="display:none;padding:7px 12px;border-radius:8px;font-size:12px;margin-bottom:10px;"></div>
 
         <!-- Recently used chips -->
         <div id="recentMedChips" class="hidden mb-3">
