@@ -34,7 +34,10 @@ if (!file_exists($path)) {
 $safeName = preg_replace('/[^\w\.\-]/', '_', $file['original_name']);
 $disposition = isset($_GET['dl']) ? 'attachment' : 'inline';
 
-header('Content-Type: application/pdf');
+$finfo    = new finfo(FILEINFO_MIME_TYPE);
+$mimeType = $finfo->file($path) ?: 'application/octet-stream';
+
+header('Content-Type: ' . $mimeType);
 header('Content-Disposition: ' . $disposition . '; filename="' . $safeName . '"');
 header('Content-Length: ' . filesize($path));
 header('Cache-Control: private, max-age=3600');

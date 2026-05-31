@@ -62,12 +62,12 @@ if ($file['size'] > $maxSize) {
     exit;
 }
 
-// Accept PDFs only
+// Accept PDFs and PNGs (annotated pages)
 $finfo = new finfo(FILEINFO_MIME_TYPE);
 $mime  = $finfo->file($file['tmp_name']);
-$allowedMimes = ['application/pdf', 'application/x-pdf'];
+$allowedMimes = ['application/pdf', 'application/x-pdf', 'image/png'];
 if (!in_array($mime, $allowedMimes, true)) {
-    echo json_encode(['ok' => false, 'error' => 'Only PDF files are accepted']);
+    echo json_encode(['ok' => false, 'error' => 'Only PDF or PNG files are accepted']);
     exit;
 }
 

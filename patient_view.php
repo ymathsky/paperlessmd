@@ -278,6 +278,9 @@ if ($activeTab === 'meds') {
                     <button type="button" class="view-pdf-btn p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="View">
                         <i class="bi bi-eye text-sm"></i>
                     </button>
+                    <button type="button" class="annot-pdf-btn p-2 text-indigo-500 hover:bg-indigo-50 rounded-lg transition-colors" title="Annotate">
+                        <i class="bi bi-pencil text-sm"></i>
+                    </button>
                     <a href="${serveUrl}" download="${esc(f.original_name)}"
                        class="p-2 text-slate-400 hover:bg-slate-100 rounded-lg transition-colors" title="Download">
                         <i class="bi bi-download text-sm"></i>
@@ -294,6 +297,9 @@ if ($activeTab === 'meds') {
             .then(r => r.json())
             .then(d => { if (d.ok) renderFiles(d.files); })
             .catch(() => {});
+
+        // Make renderFiles accessible to annotation save
+        window._renderMedFiles = renderFiles;
 
         // Upload handler
         fileInput.addEventListener('change', async function () {
@@ -354,6 +360,15 @@ if ($activeTab === 'meds') {
                 listEl.innerHTML = '<p class="text-xs text-slate-400 italic">No PDFs uploaded yet.</p>';
             }
         });
+
+        // Annotate handler — fetch PDF bytes → open annotation modal
+        listEl.addEventListener('click', function (e) {
+            const btn = e.target.closest('.annot-pdf-btn');
+            if (!btn) return;
+            const row = btn.closest('[data-file-id]');
+            if (!row) return;
+            window.openAnnotModal(row.dataset.url, row.dataset.name, parseInt(row.dataset.fileId));
+        });
     })();
 
     // ── PDF Viewer modal helpers ──────────────────────────────────────────────
@@ -368,18 +383,17 @@ if ($activeTab === 'meds') {
         title.textContent = name || 'Document';
         dlBtn.href     = url + '&dl=1';
         dlBtn.download = name || 'document.pdf';
-        // Show spinner, hide embed while loading
+        frame.removeAttribute('src');
         frame.style.display = 'none';
-        frame.src = '';
         spinner.style.display = 'flex';
         modal.classList.remove('hidden');
         document.body.style.overflow = 'hidden';
-        // Set src directly — embed tag + Content-Disposition:inline renders inline in Chrome
-        frame.onload = function() {
-            spinner.style.display = 'none';
+        // embed tag doesn't fire onload reliably — show after brief delay
+        setTimeout(function() {
+            frame.src = url;
             frame.style.display = '';
-        };
-        frame.src = url;
+            spinner.style.display = 'none';
+        }, 200);
     };
     window.closePdfModal = function closePdfModal() {
         const modal   = document.getElementById('pdfViewerModal');
@@ -813,6 +827,226 @@ if ($activeTab === 'meds') {
     function esc(s) {
         return s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : '';
     }
+
+    // Expose renderFiles so annotation save can refresh the list
+    window._renderMedFiles = null;
+
+    // ── PDF Annotation modal ──────────────────────────────────────────────────
+    (function () {
+        var PDFJS_URL  = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+        var WORKER_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        var modal       = document.getElementById('pdfAnnotModal');
+        var bgCanvas    = document.getElementById('paBgCanvas');
+        var drawCanvas  = document.getElementById('paDrawCanvas');
+        var canvasWrap  = document.getElementById('paCanvasWrap');
+        var curPageEl   = document.getElementById('paCurPage');
+        var totPagesEl  = document.getElementById('paTotPages');
+        var titleEl     = document.getElementById('paTitleEl');
+        var prevBtn     = document.getElementById('paPrevBtn');
+        var nextBtn     = document.getElementById('paNextBtn');
+        var undoBtn     = document.getElementById('paUndoBtn');
+        var clearBtn    = document.getElementById('paClearBtn');
+        var saveBtn     = document.getElementById('paSaveBtn');
+        var cancelBtn   = document.getElementById('paCancelBtn');
+        var statusEl    = document.getElementById('paSaveStatus');
+        var penBtns     = document.querySelectorAll('.pa-pen-btn');
+        var colBtns     = document.querySelectorAll('.pa-col-btn');
+        if (!modal || !bgCanvas) return;
+
+        var pdfDoc = null, curPage = 1, pad = null, pageDrawings = {};
+        var minW = 0.8, maxW = 1.5, penColor = '#0f172a';
+        var _sourceUrl = '', _sourceName = '';
+
+        function loadPdfJs(cb) {
+            if (window.pdfjsLib) { cb(); return; }
+            var s = document.createElement('script');
+            s.src = PDFJS_URL;
+            s.onload = function () { window.pdfjsLib.GlobalWorkerOptions.workerSrc = WORKER_URL; cb(); };
+            s.onerror = function () { alert('Failed to load PDF renderer.'); };
+            document.head.appendChild(s);
+        }
+
+        window.openAnnotModal = function (url, name) {
+            _sourceUrl = url; _sourceName = name || 'document.pdf';
+            titleEl.textContent = _sourceName;
+            pageDrawings = {}; pdfDoc = null;
+            statusEl.classList.add('hidden');
+            modal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Loading…';
+            fetch(url, { credentials: 'include' })
+                .then(function (r) { return r.arrayBuffer(); })
+                .then(function (buf) {
+                    loadPdfJs(function () {
+                        pdfjsLib.getDocument({ data: buf }).promise.then(function (doc) {
+                            pdfDoc = doc; curPage = 1;
+                            totPagesEl.textContent = doc.numPages;
+                            renderPage(1);
+                            saveBtn.disabled = false;
+                            saveBtn.innerHTML = '<i class="bi bi-check2-circle"></i> Save Annotated';
+                        }).catch(function (err) {
+                            alert('Could not open PDF: ' + (err.message || err));
+                            closeAnnotModal();
+                        });
+                    });
+                })
+                .catch(function (err) {
+                    alert('Could not fetch PDF: ' + (err.message || err));
+                    closeAnnotModal();
+                });
+        };
+
+        function closeAnnotModal() {
+            modal.classList.add('hidden');
+            document.body.style.overflow = '';
+            pdfDoc = null; pageDrawings = {};
+            if (pad) { pad.off(); pad = null; }
+        }
+
+        function renderPage(num) {
+            pdfDoc.getPage(num).then(function (page) {
+                var wrapW = canvasWrap.clientWidth || 700;
+                var vp0   = page.getViewport({ scale: 1 });
+                var scale = Math.min((wrapW - 16) / vp0.width, 2.5);
+                var vp    = page.getViewport({ scale: scale });
+                var dpr   = window.devicePixelRatio || 1;
+                var cssW  = Math.floor(vp.width), cssH = Math.floor(vp.height);
+                bgCanvas.width = cssW * dpr; bgCanvas.height = cssH * dpr;
+                bgCanvas.style.width = cssW + 'px'; bgCanvas.style.height = cssH + 'px';
+                var bgCtx = bgCanvas.getContext('2d');
+                bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                page.render({ canvasContext: bgCtx, viewport: vp }).promise.then(function () {
+                    drawCanvas.width = cssW * dpr; drawCanvas.height = cssH * dpr;
+                    drawCanvas.style.width = cssW + 'px'; drawCanvas.style.height = cssH + 'px';
+                    var drawCtx = drawCanvas.getContext('2d');
+                    drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+                    if (pad) { pad.off(); pad = null; }
+                    pad = new SignaturePad(drawCanvas, { penColor: penColor, minWidth: minW, maxWidth: maxW, backgroundColor: 'rgba(0,0,0,0)' });
+                    if (pageDrawings[num]) {
+                        var img = new Image();
+                        img.onload = function () { drawCtx.drawImage(img, 0, 0, drawCanvas.width, drawCanvas.height); };
+                        img.src = pageDrawings[num];
+                    }
+                    curPageEl.textContent = num;
+                    prevBtn.disabled = num <= 1;
+                    nextBtn.disabled = num >= pdfDoc.numPages;
+                    canvasWrap.scrollTop = 0;
+                });
+            });
+        }
+
+        function captureDrawing() {
+            pageDrawings[curPage] = (pad && !pad.isEmpty()) ? drawCanvas.toDataURL('image/png') : null;
+        }
+
+        prevBtn.addEventListener('click', function () { if (curPage <= 1) return; captureDrawing(); curPage--; renderPage(curPage); });
+        nextBtn.addEventListener('click', function () { if (!pdfDoc || curPage >= pdfDoc.numPages) return; captureDrawing(); curPage++; renderPage(curPage); });
+        undoBtn.addEventListener('click', function () { if (!pad) return; var d = pad.toData(); if (d.length) { d.pop(); pad.fromData(d); } });
+        clearBtn.addEventListener('click', function () { if (pad) pad.clear(); });
+        cancelBtn.addEventListener('click', closeAnnotModal);
+
+        penBtns.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                penBtns.forEach(function (b) { b.style.borderColor = 'transparent'; });
+                btn.style.borderColor = '#ef4444';
+                minW = parseFloat(btn.dataset.min); maxW = parseFloat(btn.dataset.max);
+                if (pad) { pad.minWidth = minW; pad.maxWidth = maxW; }
+            });
+        });
+        colBtns.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                colBtns.forEach(function (b) { b.style.borderColor = 'transparent'; });
+                btn.style.borderColor = '#fff';
+                penColor = btn.dataset.color;
+                if (pad) { pad.penColor = penColor; }
+            });
+        });
+
+        saveBtn.addEventListener('click', function () {
+            if (!pdfDoc) return;
+            captureDrawing();
+            var total   = pdfDoc.numPages;
+            var results = new Array(total).fill(null);
+            var done    = 0;
+            var wrapW   = canvasWrap.clientWidth || 700;
+            saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
+
+            function onAllDone(pngs) {
+                var baseName = _sourceName.replace(/\.pdf$/i, '');
+                var toUpload = pngs.map(function (p, i) { return { png: p, page: i + 1 }; }).filter(function (x) { return x.png; });
+                if (!toUpload.length) {
+                    saveBtn.disabled = false; saveBtn.innerHTML = '<i class="bi bi-check2-circle"></i> Save Annotated';
+                    statusEl.textContent = 'No annotations drawn.'; statusEl.classList.remove('hidden');
+                    return;
+                }
+                var uploaded = 0;
+                toUpload.forEach(function (item) {
+                    var byteStr = atob(item.png.split(',')[1]);
+                    var ab = new ArrayBuffer(byteStr.length); var ia = new Uint8Array(ab);
+                    for (var i = 0; i < byteStr.length; i++) ia[i] = byteStr.charCodeAt(i);
+                    var blob = new Blob([ab], { type: 'image/png' });
+                    var fname = baseName + (total > 1 ? ' (annotated p' + item.page + ')' : ' (annotated)') + '.png';
+                    var fd = new FormData();
+                    fd.append('file', blob, fname);
+                    fd.append('patient_id', PID);
+                    fd.append('category', 'medication');
+                    fd.append('csrf', CSRF);
+                    fetch(BASE + '/api/upload_patient_file.php', { method: 'POST', body: fd })
+                        .then(function (r) { return r.json(); })
+                        .then(function () {
+                            uploaded++;
+                            if (uploaded === toUpload.length) {
+                                fetch(BASE + '/api/patient_files.php?patient_id=' + PID + '&category=medication')
+                                    .then(function (r) { return r.json(); })
+                                    .then(function (d) { if (d.ok && window._renderMedFiles) window._renderMedFiles(d.files); });
+                                closeAnnotModal();
+                            }
+                        })
+                        .catch(function () {
+                            uploaded++;
+                            if (uploaded === toUpload.length) {
+                                saveBtn.disabled = false; saveBtn.innerHTML = '<i class="bi bi-check2-circle"></i> Save Annotated';
+                                statusEl.textContent = 'Some pages failed to upload.'; statusEl.classList.remove('hidden');
+                            }
+                        });
+                });
+            }
+
+            for (var n = 1; n <= total; n++) {
+                (function (pn) {
+                    pdfDoc.getPage(pn).then(function (page) {
+                        var vp0 = page.getViewport({ scale: 1 });
+                        var scale = Math.min((wrapW - 16) / vp0.width, 2.5);
+                        var vp  = page.getViewport({ scale: scale });
+                        var dpr = window.devicePixelRatio || 1;
+                        var cssW = Math.floor(vp.width), cssH = Math.floor(vp.height);
+                        var off = document.createElement('canvas');
+                        off.width = cssW * dpr; off.height = cssH * dpr;
+                        var ctx = off.getContext('2d');
+                        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                        page.render({ canvasContext: ctx, viewport: vp }).promise.then(function () {
+                            var drawing = pageDrawings[pn];
+                            if (drawing) {
+                                var img = new Image();
+                                img.onload = function () {
+                                    ctx.drawImage(img, 0, 0, cssW, cssH);
+                                    results[pn - 1] = off.toDataURL('image/png'); done++;
+                                    if (done === total) onAllDone(results);
+                                };
+                                img.src = drawing;
+                            } else {
+                                results[pn - 1] = null; done++;
+                                if (done === total) onAllDone(results);
+                            }
+                        });
+                    });
+                })(n);
+            }
+        });
+    })();
+
 })();
 </script>
 <?php
@@ -2850,6 +3084,67 @@ if (chkAllEl) chkAllEl.addEventListener('change', function () {
 
 </div><!-- /meds tab -->
 
+<!-- PDF Annotation Modal -->
+<div id="pdfAnnotModal"
+     class="hidden fixed inset-0 flex flex-col no-print"
+     style="z-index:99995; background:rgba(0,0,0,0.92);">
+    <!-- Header toolbar -->
+    <div class="flex items-center gap-2 px-3 py-2 border-b border-white/10 flex-shrink-0"
+         style="background:rgba(15,23,42,0.97);">
+        <!-- Pen sizes -->
+        <button type="button" class="pa-pen-btn w-5 h-5 rounded-full border-2 border-red-500" style="background:#0f172a;" data-min="0.8" data-max="1.5" title="Fine"></button>
+        <button type="button" class="pa-pen-btn w-6 h-6 rounded-full border-2 border-transparent hover:border-red-400" style="background:#0f172a;" data-min="1.5" data-max="3" title="Medium"></button>
+        <button type="button" class="pa-pen-btn w-7 h-7 rounded-full border-2 border-transparent hover:border-red-400" style="background:#0f172a;" data-min="3" data-max="6" title="Thick"></button>
+        <div style="width:1px;height:20px;background:rgba(255,255,255,0.15);margin:0 4px;"></div>
+        <!-- Pen colors -->
+        <button type="button" class="pa-col-btn w-5 h-5 rounded-full border-2 border-white" style="background:#0f172a;" data-color="#0f172a" title="Black"></button>
+        <button type="button" class="pa-col-btn w-5 h-5 rounded-full border-2 border-transparent" style="background:#dc2626;" data-color="#dc2626" title="Red"></button>
+        <button type="button" class="pa-col-btn w-5 h-5 rounded-full border-2 border-transparent" style="background:#2563eb;" data-color="#2563eb" title="Blue"></button>
+        <button type="button" class="pa-col-btn w-5 h-5 rounded-full border-2 border-transparent" style="background:#16a34a;" data-color="#16a34a" title="Green"></button>
+        <div style="width:1px;height:20px;background:rgba(255,255,255,0.15);margin:0 4px;"></div>
+        <button type="button" id="paUndoBtn"
+                class="px-2.5 py-1 text-xs bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors">
+            <i class="bi bi-arrow-counterclockwise"></i> Undo
+        </button>
+        <button type="button" id="paClearBtn"
+                class="px-2.5 py-1 text-xs bg-red-900/50 hover:bg-red-800/60 text-red-300 rounded-lg transition-colors">
+            <i class="bi bi-eraser"></i> Clear
+        </button>
+        <div style="width:1px;height:20px;background:rgba(255,255,255,0.15);margin:0 4px;"></div>
+        <!-- Page nav -->
+        <button type="button" id="paPrevBtn"
+                class="w-7 h-7 flex items-center justify-center bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+            <i class="bi bi-chevron-left text-xs"></i>
+        </button>
+        <span class="text-xs text-white/70 whitespace-nowrap">
+            Page <span id="paCurPage">1</span>/<span id="paTotPages">1</span>
+        </span>
+        <button type="button" id="paNextBtn"
+                class="w-7 h-7 flex items-center justify-center bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+            <i class="bi bi-chevron-right text-xs"></i>
+        </button>
+        <span id="paTitleEl" class="text-xs text-white/50 truncate ml-2 flex-1"></span>
+        <!-- Save / Cancel -->
+        <button type="button" id="paCancelBtn"
+                class="px-3 py-1.5 text-xs text-white/60 hover:text-white border border-white/20 rounded-lg transition-colors ml-1">
+            Cancel
+        </button>
+        <button type="button" id="paSaveBtn"
+                class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition-colors shadow-sm">
+            <i class="bi bi-check2-circle"></i> Save Annotated
+        </button>
+    </div>
+    <!-- Canvas area -->
+    <div id="paCanvasWrap" class="flex-1 overflow-auto" style="background:#1e293b;">
+        <div id="paCanvasContainer" class="relative inline-block mx-auto" style="touch-action:none;cursor:crosshair;display:block;">
+            <canvas id="paBgCanvas"></canvas>
+            <canvas id="paDrawCanvas" style="position:absolute;top:0;left:0;touch-action:none;"></canvas>
+        </div>
+    </div>
+    <!-- Status bar -->
+    <div id="paSaveStatus" class="hidden text-center text-xs py-1 text-white/60" style="background:rgba(15,23,42,0.9);"></div>
+</div>
+
 <!-- PDF Viewer Modal (inside meds tab so it renders in partial requests too) -->
 <div id="pdfViewerModal"
      class="hidden fixed inset-0 flex flex-col no-print"
@@ -2873,7 +3168,7 @@ if (chkAllEl) chkAllEl.addEventListener('change', function () {
         <div id="pdfModalSpinner" style="display:flex; position:absolute; inset:0; align-items:center; justify-content:center; z-index:1;">
             <div style="width:36px;height:36px;border:3px solid rgba(255,255,255,0.2);border-top-color:#fff;border-radius:50%;animation:pvSpin 0.7s linear infinite;"></div>
         </div>
-        <iframe id="pdfModalFrame" src="" class="w-full h-full border-0" style="background:#525659; display:none;"></iframe>
+        <embed id="pdfModalFrame" src="" type="application/pdf" class="w-full h-full" style="background:#525659; display:none;">
     </div>
 </div>
 
