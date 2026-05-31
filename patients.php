@@ -176,8 +176,9 @@ foreach ($companies as $coName => $coCfg):
     $activeRatio = $row['total'] > 0 ? round(($row['active'] / $row['total']) * 100) : 0;
 ?>
 <div class="bg-white rounded-2xl border <?= $c['card'] ?> shadow-sm p-5">
-    <!-- Company header -->
-    <div class="flex items-center gap-3 mb-4 pb-3 border-b border-slate-100">
+    <!-- Company header (click to toggle) -->
+    <div class="flex items-center gap-3 pb-3 border-b border-slate-100 cursor-pointer select-none"
+         onclick="afToggle('<?= h(base64_encode($coName)) ?>', this)">
         <div class="w-9 h-9 rounded-xl <?= $c['icon'] ?> grid place-items-center text-white flex-shrink-0 shadow-sm">
             <i class="bi <?= $coCfg['icon'] ?> text-base"></i>
         </div>
@@ -186,42 +187,46 @@ foreach ($companies as $coName => $coCfg):
             <p class="text-xs text-slate-400"><?= $coName ?></p>
         </div>
         <span class="ml-auto text-2xl font-extrabold <?= $c['stat'] ?>"><?= $row['total'] ?></span>
+        <i class="bi bi-chevron-down text-slate-400 text-sm af-chevron transition-transform" style="margin-left:6px;"></i>
     </div>
 
-    <!-- Status breakdown -->
-    <div class="flex gap-2 flex-wrap mb-4">
-        <a href="<?= BASE_URL ?>/patients.php?status=active" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold <?= $c['badge_active'] ?> hover:opacity-80 transition">
-            <i class="bi bi-circle-fill text-[8px]"></i> <?= $row['active'] ?> Active
-        </a>
-        <a href="<?= BASE_URL ?>/patients.php?status=inactive" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold <?= $c['badge_inactive'] ?> hover:opacity-80 transition">
-            <i class="bi bi-circle-fill text-[8px]"></i> <?= $row['inactive'] ?> Inactive
-        </a>
-        <a href="<?= BASE_URL ?>/patients.php?status=discharged" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold <?= $c['badge_dis'] ?> hover:opacity-80 transition">
-            <i class="bi bi-circle-fill text-[8px]"></i> <?= $row['discharged'] ?> Discharged
-        </a>
-    </div>
+    <!-- Collapsible body -->
+    <div class="af-body" style="overflow:hidden;transition:max-height 0.25s ease,opacity 0.2s ease;">
+        <!-- Status breakdown -->
+        <div class="flex gap-2 flex-wrap mb-4 mt-4">
+            <a href="<?= BASE_URL ?>/patients.php?status=active" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold <?= $c['badge_active'] ?> hover:opacity-80 transition">
+                <i class="bi bi-circle-fill text-[8px]"></i> <?= $row['active'] ?> Active
+            </a>
+            <a href="<?= BASE_URL ?>/patients.php?status=inactive" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold <?= $c['badge_inactive'] ?> hover:opacity-80 transition">
+                <i class="bi bi-circle-fill text-[8px]"></i> <?= $row['inactive'] ?> Inactive
+            </a>
+            <a href="<?= BASE_URL ?>/patients.php?status=discharged" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold <?= $c['badge_dis'] ?> hover:opacity-80 transition">
+                <i class="bi bi-circle-fill text-[8px]"></i> <?= $row['discharged'] ?> Discharged
+            </a>
+        </div>
 
-    <!-- Activity bar -->
-    <?php if ($row['total'] > 0): ?>
-    <div class="mb-4">
-        <div class="flex justify-between text-xs text-slate-500 mb-1">
-            <span>Active rate</span><span><?= $activeRatio ?>%</span>
+        <!-- Activity bar -->
+        <?php if ($row['total'] > 0): ?>
+        <div class="mb-4">
+            <div class="flex justify-between text-xs text-slate-500 mb-1">
+                <span>Active rate</span><span><?= $activeRatio ?>%</span>
+            </div>
+            <div class="w-full bg-slate-100 rounded-full h-2">
+                <div class="<?= $c['bar'] ?> h-2 rounded-full transition-all" style="width:<?= $activeRatio ?>%"></div>
+            </div>
         </div>
-        <div class="w-full bg-slate-100 rounded-full h-2">
-            <div class="<?= $c['bar'] ?> h-2 rounded-full transition-all" style="width:<?= $activeRatio ?>%"></div>
-        </div>
-    </div>
-    <?php endif; ?>
+        <?php endif; ?>
 
-    <!-- Forms / Photos -->
-    <div class="grid grid-cols-2 gap-3">
-        <div class="bg-slate-50 rounded-xl p-3 text-center border border-slate-100">
-            <p class="text-xl font-extrabold text-slate-700"><?= number_format($row['forms']) ?></p>
-            <p class="text-xs text-slate-400 mt-0.5">Total Forms</p>
-        </div>
-        <div class="bg-slate-50 rounded-xl p-3 text-center border border-slate-100">
-            <p class="text-xl font-extrabold text-violet-600"><?= number_format($row['photos']) ?></p>
-            <p class="text-xs text-slate-400 mt-0.5">Photos</p>
+        <!-- Forms / Photos -->
+        <div class="grid grid-cols-2 gap-3">
+            <div class="bg-slate-50 rounded-xl p-3 text-center border border-slate-100">
+                <p class="text-xl font-extrabold text-slate-700"><?= number_format($row['forms']) ?></p>
+                <p class="text-xs text-slate-400 mt-0.5">Total Forms</p>
+            </div>
+            <div class="bg-slate-50 rounded-xl p-3 text-center border border-slate-100">
+                <p class="text-xl font-extrabold text-violet-600"><?= number_format($row['photos']) ?></p>
+                <p class="text-xs text-slate-400 mt-0.5">Photos</p>
+            </div>
         </div>
     </div>
 </div>
@@ -475,5 +480,53 @@ foreach ($companies as $coName => $coCfg):
     <?php endif; ?>
     <?php endif; ?>
 </div>
+
+<script>
+(function () {
+    var KEY = 'pats_card_collapsed';
+    var state = {};
+    try { state = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch(e) {}
+
+    function getBody(hdr) { return hdr.closest('.bg-white').querySelector('.af-body'); }
+    function getChev(hdr) { return hdr.querySelector('.af-chevron'); }
+
+    function applyState(key, hdr, animate) {
+        var body  = getBody(hdr);
+        var chev  = getChev(hdr);
+        var isCollapsed = !!state[key];
+        if (isCollapsed) {
+            body.style.maxHeight = '0';
+            body.style.opacity   = '0';
+            chev.style.transform = 'rotate(-90deg)';
+            if (!animate) body.style.transition = 'none';
+        } else {
+            body.style.maxHeight = body.scrollHeight + 'px';
+            body.style.opacity   = '1';
+            chev.style.transform = 'rotate(0deg)';
+        }
+        // re-enable transition after instant init
+        if (!animate) requestAnimationFrame(function() {
+            body.style.transition = '';
+        });
+    }
+
+    window.afToggle = function(key, hdr) {
+        state[key] = !state[key];
+        try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e) {}
+        applyState(key, hdr, true);
+        // reset maxHeight when expanding so it fits content
+        if (!state[key]) {
+            var body = getBody(hdr);
+            body.style.maxHeight = body.scrollHeight + 'px';
+        }
+    };
+
+    // Init all cards on load without animation
+    document.querySelectorAll('[onclick^="afToggle"]').forEach(function(hdr) {
+        var m = hdr.getAttribute('onclick').match(/afToggle\('([^']+)'/);
+        if (m) applyState(m[1], hdr, false);
+    });
+})();
+</script>
 
 <?php include __DIR__ . '/includes/footer.php'; ?>
