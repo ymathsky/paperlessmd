@@ -521,10 +521,13 @@ foreach ($companies as $coName => $coCfg):
         }
     };
 
-    // Init all cards on load without animation
+    // Init all cards on load — collapsed by default unless user has explicitly expanded them
     document.querySelectorAll('[onclick^="afToggle"]').forEach(function(hdr) {
         var m = hdr.getAttribute('onclick').match(/afToggle\('([^']+)'/);
-        if (m) applyState(m[1], hdr, false);
+        if (!m) return;
+        var key = m[1];
+        if (!(key in state)) state[key] = true; // default: collapsed
+        applyState(key, hdr, false);
     });
 })();
 </script>
