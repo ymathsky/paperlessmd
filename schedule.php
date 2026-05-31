@@ -589,13 +589,19 @@ $renderVisitCard = function(array $v, int $idx, bool $showMaName) use ($statusDe
                 </button>
                 <?php endif; ?>
                 <?php elseif ($v['status'] === 'missed'): ?>
+                <span style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;
+                             padding:13px 20px;background:rgba(239,68,68,0.10);color:#fca5a5;
+                             border:1px solid rgba(239,68,68,0.2);border-radius:50px;font-size:15px;font-weight:800;">
+                    <i class="bi bi-x-circle-fill"></i> Visit Missed
+                </span>
+                <?php if (isAdmin()): ?>
                 <button onclick="updateStatus(<?= $v['id'] ?>, 'pending')"
-                        style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;
-                               padding:13px 20px;background:rgba(148,163,184,0.12);color:#cbd5e1;
-                               border:1px solid rgba(148,163,184,0.25);border-radius:50px;
-                               font-size:15px;font-weight:800;cursor:pointer;transition:all 0.15s;">
-                    <i class="bi bi-arrow-counterclockwise"></i> Mark as Pending
+                        style="display:flex;align-items:center;gap:6px;padding:13px 14px;background:rgba(148,163,184,0.12);
+                               color:#cbd5e1;border:1px solid rgba(148,163,184,0.25);border-radius:50px;
+                               font-size:13px;font-weight:700;cursor:pointer;transition:all 0.15s;flex-shrink:0;">
+                    <i class="bi bi-arrow-counterclockwise"></i> Undo
                 </button>
+                <?php endif; ?>
                 <?php endif; ?>
 
                 <a href="<?= BASE_URL ?>/patient_view.php?id=<?= $v['patient_id'] ?>"
@@ -607,7 +613,8 @@ $renderVisitCard = function(array $v, int $idx, bool $showMaName) use ($statusDe
             </div>
         </div>
 
-        <!-- ── Status switcher ── -->
+        <!-- ── Status switcher (admin only) ── -->
+        <?php if (isAdmin()): ?>
         <div style="background:#0f172a;border-top:1px solid rgba(255,255,255,0.07);padding:10px 16px;
                     display:flex;align-items:center;gap:8px;overflow-x:auto;" class="hide-scrollbar no-print">
             <?php
@@ -633,6 +640,7 @@ $renderVisitCard = function(array $v, int $idx, bool $showMaName) use ($statusDe
             </button>
             <?php endforeach; ?>
         </div>
+        <?php endif; // isAdmin ?>
 
         <!-- Quick Note Expansion -->
         <div style="background:#0f172a;border-top:1px solid rgba(255,255,255,0.07);" class="no-print">

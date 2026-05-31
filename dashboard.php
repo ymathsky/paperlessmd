@@ -717,18 +717,22 @@ if (!$isRoutePartial) include __DIR__ . '/includes/header.php';
                     <i class="bi bi-compass-fill"></i> Navigate
                 </button>
                 <?php elseif ($sv['status'] === 'en_route'): ?>
+                <?php if (isAdmin()): ?>
                 <button onclick="dashResetVisit(<?= $sv['id'] ?>, this)"
                         class="flex items-center gap-1 px-2.5 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-xl text-xs font-semibold hover:bg-amber-100 active:scale-95 transition-all whitespace-nowrap">
                     <i class="bi bi-arrow-counterclockwise"></i> Reset
                 </button>
+                <?php endif; ?>
                 <?php elseif ($sv['status'] === 'completed'): ?>
                 <span class="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl text-xs font-semibold">
                     <i class="bi bi-check-circle-fill"></i> Done
                 </span>
+                <?php if (isAdmin()): ?>
                 <button onclick="dashUndoEndVisit(<?= $sv['id'] ?>, this)"
                         class="flex items-center gap-1 px-2.5 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-xl text-xs font-semibold hover:bg-amber-100 active:scale-95 transition-all whitespace-nowrap">
                     <i class="bi bi-arrow-counterclockwise"></i> Undo End
                 </button>
+                <?php endif; ?>
                 <?php endif; ?>
             </div>
         </div>
