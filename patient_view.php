@@ -358,7 +358,7 @@ if ($activeTab === 'meds') {
 
     // ── PDF Viewer modal helpers ──────────────────────────────────────────────
     var _pdfBlobUrl = null;
-    window.openPdfModal = async function openPdfModal(url, name) {
+    window.openPdfModal = function openPdfModal(url, name) {
         const modal    = document.getElementById('pdfViewerModal');
         const frame    = document.getElementById('pdfModalFrame');
         const title    = document.getElementById('pdfModalTitle');
@@ -368,23 +368,18 @@ if ($activeTab === 'meds') {
         title.textContent = name || 'Document';
         dlBtn.href     = url + '&dl=1';
         dlBtn.download = name || 'document.pdf';
-        frame.src = '';
+        // Show spinner, hide embed while loading
         frame.style.display = 'none';
+        frame.src = '';
         spinner.style.display = 'flex';
         modal.classList.remove('hidden');
         document.body.style.overflow = 'hidden';
-        try {
-            const resp = await fetch(url, {credentials: 'same-origin'});
-            if (!resp.ok) throw new Error('HTTP ' + resp.status);
-            const blob = await resp.blob();
-            if (_pdfBlobUrl) URL.revokeObjectURL(_pdfBlobUrl);
-            _pdfBlobUrl = URL.createObjectURL(blob);
-            frame.src = _pdfBlobUrl;
-            frame.style.display = '';
+        // Set src directly — embed tag + Content-Disposition:inline renders inline in Chrome
+        frame.onload = function() {
             spinner.style.display = 'none';
-        } catch(e) {
-            spinner.innerHTML = '<p class="text-white/60 text-sm px-6 text-center">Failed to load PDF.<br><a href="' + url + '&dl=1" class="underline text-blue-300 mt-1 inline-block">Download instead</a></p>';
-        }
+            frame.style.display = '';
+        };
+        frame.src = url;
     };
     window.closePdfModal = function closePdfModal() {
         const modal   = document.getElementById('pdfViewerModal');
@@ -392,10 +387,9 @@ if ($activeTab === 'meds') {
         const spinner = document.getElementById('pdfModalSpinner');
         if (!modal) return;
         modal.classList.add('hidden');
-        if (frame)   { frame.src = ''; frame.style.display = ''; }
-        if (spinner) { spinner.style.display = 'none'; }
+        if (frame)   { frame.src = ''; frame.style.display = 'none'; }
+        if (spinner) { spinner.style.display = 'flex'; }
         document.body.style.overflow = '';
-        if (_pdfBlobUrl) { URL.revokeObjectURL(_pdfBlobUrl); _pdfBlobUrl = null; }
     };
 
     // ── Drug autocomplete ──────────────────────────────────────────────────
@@ -1832,33 +1826,6 @@ function completeVisit(visitId) {
     <?php endif; ?>
 </div>
 
-<!-- ── PDF Viewer Modal ───────────────────────────────────────────────────── -->
-<div id="pdfViewerModal"
-     class="hidden fixed inset-0 flex flex-col no-print"
-     style="z-index:99990; background:rgba(0,0,0,0.82); backdrop-filter:blur(4px);"
-     onclick="closePdfModal()">
-    <div class="flex items-center gap-3 px-4 py-3 border-b border-white/10 flex-shrink-0"
-         style="background:rgba(15,23,42,0.95);"
-         onclick="event.stopPropagation()">
-        <i class="bi bi-file-earmark-pdf-fill text-red-400 text-lg"></i>
-        <span id="pdfModalTitle" class="text-sm font-semibold text-white truncate flex-1"></span>
-        <a id="pdfModalDownload" href="#" download
-           class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white text-xs font-medium rounded-lg transition-colors">
-            <i class="bi bi-download"></i> Download
-        </a>
-        <button onclick="closePdfModal()"
-                class="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors ml-1" title="Close">
-            <i class="bi bi-x-lg text-sm"></i>
-        </button>
-    </div>
-    <!-- iframe viewer — stop propagation so clicking PDF doesn't close modal -->
-    <div class="flex-1 overflow-hidden relative" onclick="event.stopPropagation()">
-        <div id="pdfModalSpinner" style="display:none; position:absolute; inset:0; align-items:center; justify-content:center; background:rgba(0,0,0,0.4);">
-            <div style="width:36px;height:36px;border:3px solid rgba(255,255,255,0.2);border-top-color:#fff;border-radius:50%;animation:pvSpin 0.7s linear infinite;"></div>
-        </div>
-        <iframe id="pdfModalFrame" src="" class="w-full h-full border-0" style="background:#525659;"></iframe>
-    </div>
-</div>
 
 <!-- ── Document Viewer Modal ──────────────────────────────────────────────── -->
 <div id="docViewerModal"
@@ -2902,11 +2869,11 @@ if (chkAllEl) chkAllEl.addEventListener('change', function () {
             <i class="bi bi-x-lg text-sm"></i>
         </button>
     </div>
-    <div class="flex-1 overflow-hidden relative" onclick="event.stopPropagation()">
-        <div id="pdfModalSpinner" style="display:none; position:absolute; inset:0; align-items:center; justify-content:center; background:rgba(0,0,0,0.4);">
+    <div class="flex-1 overflow-hidden relative" onclick="event.stopPropagation()" style="background:#1e293b;">
+        <div id="pdfModalSpinner" style="display:flex; position:absolute; inset:0; align-items:center; justify-content:center; z-index:1;">
             <div style="width:36px;height:36px;border:3px solid rgba(255,255,255,0.2);border-top-color:#fff;border-radius:50%;animation:pvSpin 0.7s linear infinite;"></div>
         </div>
-        <iframe id="pdfModalFrame" src="" class="w-full h-full border-0" style="background:#525659;"></iframe>
+        <iframe id="pdfModalFrame" src="" class="w-full h-full border-0" style="background:#525659; display:none;"></iframe>
     </div>
 </div>
 
