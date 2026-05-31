@@ -292,108 +292,156 @@ include __DIR__ . '/../includes/header.php';
     </span>
 </div>
 
-<!-- Table -->
-<div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+<?php
+/* ── Form type color map ──────────────────────────────────── */
+$formTypeColors = [
+    'vital_cs'               => ['bg'=>'#eff6ff','color'=>'#2563eb','border'=>'#bfdbfe'],
+    'new_patient'            => ['bg'=>'#f0fdf4','color'=>'#16a34a','border'=>'#bbf7d0'],
+    'new_patient_pocket'     => ['bg'=>'#f0fdf4','color'=>'#16a34a','border'=>'#bbf7d0'],
+    'new_patient_pocket_pc'  => ['bg'=>'#f0fdf4','color'=>'#15803d','border'=>'#bbf7d0'],
+    'abn'                    => ['bg'=>'#fef3c7','color'=>'#d97706','border'=>'#fde68a'],
+    'pf_signup'              => ['bg'=>'#f5f3ff','color'=>'#7c3aed','border'=>'#ddd6fe'],
+    'ccm_consent'            => ['bg'=>'#fdf4ff','color'=>'#a21caf','border'=>'#f0abfc'],
+    'wound_care_consent'     => ['bg'=>'#fff7ed','color'=>'#c2410c','border'=>'#fed7aa'],
+    'informed_consent_wound' => ['bg'=>'#fff7ed','color'=>'#c2410c','border'=>'#fed7aa'],
+    'rpm_consent'            => ['bg'=>'#ecfdf5','color'=>'#047857','border'=>'#a7f3d0'],
+    'medicare_awv'           => ['bg'=>'#f0f9ff','color'=>'#0369a1','border'=>'#bae6fd'],
+    'cognitive_wellness'     => ['bg'=>'#fff1f2','color'=>'#be123c','border'=>'#fecdd3'],
+    'il_disclosure'          => ['bg'=>'#f8fafc','color'=>'#475569','border'=>'#cbd5e1'],
+];
+$statusIcons = [
+    'draft'    => ['icon'=>'bi-pencil-fill',        'bg'=>'#f1f5f9','color'=>'#64748b','border'=>'#e2e8f0'],
+    'signed'   => ['icon'=>'bi-pen-fill',            'bg'=>'#eff6ff','color'=>'#2563eb','border'=>'#bfdbfe'],
+    'uploaded' => ['icon'=>'bi-cloud-check-fill',    'bg'=>'#f0fdf4','color'=>'#16a34a','border'=>'#bbf7d0'],
+];
+?>
+
+<!-- Cards list -->
+<div class="flex flex-col gap-3">
 <?php if (empty($rows)): ?>
-    <div class="flex flex-col items-center justify-center py-20 text-slate-400">
+    <div class="flex flex-col items-center justify-center py-20 text-slate-400 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700">
         <i class="bi bi-folder2-open text-5xl mb-3 opacity-30"></i>
         <p class="font-medium">No forms match your filters</p>
     </div>
 <?php else: ?>
-    <div class="overflow-x-auto">
-    <table class="w-full text-sm">
-        <thead>
-            <tr class="border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40">
-                <th class="text-left px-4 py-3 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Date</th>
-                <th class="text-left px-4 py-3 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Patient</th>
-                <th class="text-left px-4 py-3 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Form Type</th>
-                <th class="text-left px-4 py-3 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Collected By</th>
-                <th class="text-left px-4 py-3 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Provider</th>
-                <th class="text-left px-4 py-3 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Status</th>
-                <th class="text-left px-4 py-3 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Signatures</th>
-                <th class="px-4 py-3"></th>
-            </tr>
-        </thead>
-        <tbody class="divide-y divide-slate-100 dark:divide-slate-700">
-        <?php foreach ($rows as $r):
-            $sc  = $statusLabels[$r['status']] ?? $statusLabels['draft'];
-            $lbl = $formLabels[$r['form_type']] ?? $r['form_type'];
-            $dt  = new DateTime($r['created_at']);
-            $isToday = $dt->format('Y-m-d') === date('Y-m-d');
-        ?>
-        <tr class="hover:bg-slate-50 dark:hover:bg-slate-700/40 transition-colors">
-            <!-- Date -->
-            <td class="px-4 py-3 whitespace-nowrap">
-                <div class="font-medium text-slate-800 dark:text-slate-200">
-                    <?= $dt->format('M j, Y') ?>
-                </div>
-                <?php if ($isToday): ?>
-                <div class="text-xs text-emerald-600 font-semibold">Today</div>
-                <?php else: ?>
-                <div class="text-xs text-slate-400"><?= $dt->format('g:i a') ?></div>
-                <?php endif; ?>
-            </td>
-            <!-- Patient -->
-            <td class="px-4 py-3">
+<?php foreach ($rows as $r):
+    $sc   = $statusIcons[$r['status']] ?? $statusIcons['draft'];
+    $lbl  = $formLabels[$r['form_type']] ?? $r['form_type'];
+    $tc   = $formTypeColors[$r['form_type']] ?? ['bg'=>'#f8fafc','color'=>'#475569','border'=>'#e2e8f0'];
+    $dt   = new DateTime($r['created_at']);
+    $isToday = $dt->format('Y-m-d') === date('Y-m-d');
+    $dateStr  = $isToday ? 'Today' : $dt->format('M j, Y');
+    $timeStr  = $dt->format('g:i a');
+?>
+<div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:16px 18px;
+            display:flex;align-items:center;gap:14px;transition:box-shadow 0.15s;"
+     class="dark-form-card">
+
+    <!-- Date block -->
+    <div style="min-width:54px;text-align:center;flex-shrink:0;">
+        <div style="font-size:18px;font-weight:800;line-height:1;color:#1e293b;">
+            <?= $dt->format('j') ?>
+        </div>
+        <div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;margin-top:1px;">
+            <?= $dt->format('M') ?>
+        </div>
+        <div style="font-size:10px;color:#94a3b8;margin-top:2px;"><?= $timeStr ?></div>
+        <?php if ($isToday): ?>
+        <div style="font-size:9px;font-weight:800;color:#16a34a;margin-top:3px;text-transform:uppercase;letter-spacing:0.04em;">Today</div>
+        <?php endif; ?>
+    </div>
+
+    <!-- Divider -->
+    <div style="width:1px;align-self:stretch;background:#e2e8f0;flex-shrink:0;"></div>
+
+    <!-- Main content -->
+    <div style="flex:1;min-width:0;">
+        <!-- Top row: patient + status -->
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+            <div style="min-width:0;">
                 <a href="<?= BASE_URL ?>/patient_view.php?id=<?= (int)$r['patient_id'] ?>"
-                   class="font-semibold text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
+                   style="font-size:15px;font-weight:700;color:#2563eb;text-decoration:none;
+                          white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;max-width:200px;">
                     <?= h($r['first_name'] . ' ' . $r['last_name']) ?>
                 </a>
                 <?php if ($r['dob']): ?>
-                <div class="text-xs text-slate-400">DOB: <?= h(date('m/d/Y', strtotime($r['dob']))) ?></div>
-                <?php endif; ?>
-            </td>
-            <!-- Form type -->
-            <td class="px-4 py-3">
-                <span class="text-slate-700 dark:text-slate-300 font-medium"><?= h($lbl) ?></span>
-            </td>
-            <!-- MA -->
-            <td class="px-4 py-3 text-slate-600 dark:text-slate-400">
-                <?= h($r['ma_name'] ?? '—') ?>
-            </td>
-            <!-- Provider -->
-            <td class="px-4 py-3 text-slate-600 dark:text-slate-400">
-                <?= $r['provider_name'] ? h($r['provider_name']) : '<span class="text-slate-300 dark:text-slate-600">—</span>' ?>
-            </td>
-            <!-- Status -->
-            <td class="px-4 py-3">
-                <span class="<?= $sc['bg'] ?> <?= $sc['text'] ?> text-xs font-bold px-2.5 py-1 rounded-full">
-                    <?= $sc['label'] ?>
-                </span>
-            </td>
-            <!-- Signatures -->
-            <td class="px-4 py-3">
-                <div class="flex items-center gap-1.5">
-                    <span title="Patient signature"
-                          class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full
-                                 <?= $r['has_patient_sig'] ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-slate-100 text-slate-400 dark:bg-slate-700 dark:text-slate-500' ?>">
-                        <i class="bi bi-person-fill text-[10px]"></i>
-                        <?= $r['has_patient_sig'] ? 'Pt' : 'Pt' ?>
-                    </span>
-                    <span title="Provider signature"
-                          class="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full
-                                 <?= $r['has_provider_sig'] ? 'bg-violet-50 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400' : 'bg-slate-100 text-slate-400 dark:bg-slate-700 dark:text-slate-500' ?>">
-                        <i class="bi bi-person-badge-fill text-[10px]"></i>
-                        MD
-                    </span>
+                <div style="font-size:11px;color:#94a3b8;margin-top:1px;">
+                    DOB: <?= h(date('m/d/Y', strtotime($r['dob']))) ?>
                 </div>
-            </td>
-            <!-- Actions -->
-            <td class="px-4 py-3 text-right whitespace-nowrap">
-                <a href="<?= BASE_URL ?>/view_document.php?id=<?= (int)$r['id'] ?>"
-                   class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold
-                          bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-400
-                          rounded-lg transition-colors">
-                    <i class="bi bi-eye-fill"></i> View
-                </a>
-            </td>
-        </tr>
-        <?php endforeach; ?>
-        </tbody>
-    </table>
+                <?php endif; ?>
+            </div>
+            <!-- Status badge -->
+            <span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;
+                         font-size:11px;font-weight:700;flex-shrink:0;
+                         background:<?= $sc['bg'] ?>;color:<?= $sc['color'] ?>;border:1px solid <?= $sc['border'] ?>;">
+                <i class="bi <?= $sc['icon'] ?>" style="font-size:10px;"></i>
+                <?= ucfirst($r['status']) ?>
+            </span>
+        </div>
+
+        <!-- Form type pill -->
+        <div style="margin-top:8px;">
+            <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;
+                         font-size:11px;font-weight:700;
+                         background:<?= $tc['bg'] ?>;color:<?= $tc['color'] ?>;border:1px solid <?= $tc['border'] ?>;">
+                <i class="bi bi-file-earmark-text" style="font-size:10px;"></i>
+                <?= h($lbl) ?>
+            </span>
+        </div>
+
+        <!-- Bottom row: collected by, provider, sigs -->
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-top:9px;">
+            <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:#64748b;">
+                <i class="bi bi-person-fill" style="font-size:11px;color:#94a3b8;"></i>
+                <span><?= h($r['ma_name'] ?? 'Unassigned') ?></span>
+            </div>
+            <?php if ($r['provider_name']): ?>
+            <div style="display:flex;align-items:center;gap:5px;font-size:12px;color:#64748b;">
+                <i class="bi bi-person-badge-fill" style="font-size:11px;color:#94a3b8;"></i>
+                <span><?= h($r['provider_name']) ?></span>
+            </div>
+            <?php endif; ?>
+            <!-- Signature dots -->
+            <div style="display:flex;align-items:center;gap:5px;">
+                <span title="Patient signature"
+                      style="display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;
+                             padding:2px 7px;border-radius:12px;
+                             <?= $r['has_patient_sig'] ? 'background:#eff6ff;color:#2563eb;border:1px solid #bfdbfe;' : 'background:#f8fafc;color:#94a3b8;border:1px solid #e2e8f0;' ?>">
+                    <i class="bi bi-pen" style="font-size:9px;"></i> Pt
+                </span>
+                <span title="Provider signature"
+                      style="display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:600;
+                             padding:2px 7px;border-radius:12px;
+                             <?= $r['has_provider_sig'] ? 'background:#f5f3ff;color:#7c3aed;border:1px solid #ddd6fe;' : 'background:#f8fafc;color:#94a3b8;border:1px solid #e2e8f0;' ?>">
+                    <i class="bi bi-pen" style="font-size:9px;"></i> MD
+                </span>
+            </div>
+        </div>
     </div>
+
+    <!-- View button -->
+    <a href="<?= BASE_URL ?>/view_document.php?id=<?= (int)$r['id'] ?>"
+       style="flex-shrink:0;display:inline-flex;align-items:center;gap:6px;padding:9px 16px;
+              background:#6366f1;color:#fff;border-radius:12px;font-size:13px;font-weight:700;
+              text-decoration:none;transition:background 0.15s;white-space:nowrap;">
+        <i class="bi bi-eye-fill" style="font-size:12px;"></i> View
+    </a>
+</div>
+<?php endforeach; ?>
 <?php endif; ?>
 </div>
+
+<style>
+.dark-form-card { background: #fff; }
+.dark .dark-form-card {
+    background: #1e293b !important;
+    border-color: rgba(255,255,255,0.08) !important;
+}
+.dark .dark-form-card a[href*="patient_view"] { color: #60a5fa !important; }
+.dark .dark-form-card div[style*="color:#1e293b"] { color: #f1f5f9 !important; }
+.dark .dark-form-card div[style*="color:#64748b"] { color: #94a3b8 !important; }
+.dark .dark-form-card div[style*="width:1px"] { background: rgba(255,255,255,0.08) !important; }
+</style>
 
 <!-- Pagination -->
 <?php if ($totalPages > 1): ?>
