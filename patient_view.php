@@ -1806,10 +1806,12 @@ function completeVisit(visitId) {
 
 <!-- ── PDF Viewer Modal ───────────────────────────────────────────────────── -->
 <div id="pdfViewerModal"
-     class="hidden fixed inset-0 z-[60] flex flex-col bg-black/80 backdrop-blur-sm no-print"
-     style="animation: none;">
-    <!-- Header bar -->
-    <div class="flex items-center gap-3 px-4 py-3 bg-slate-900/90 border-b border-white/10 flex-shrink-0">
+     class="hidden fixed inset-0 flex flex-col no-print"
+     style="z-index:99990; background:rgba(0,0,0,0.82); backdrop-filter:blur(4px);"
+     onclick="closePdfModal()">
+    <div class="flex items-center gap-3 px-4 py-3 border-b border-white/10 flex-shrink-0"
+         style="background:rgba(15,23,42,0.95);"
+         onclick="event.stopPropagation()">
         <i class="bi bi-file-earmark-pdf-fill text-red-400 text-lg"></i>
         <span id="pdfModalTitle" class="text-sm font-semibold text-white truncate flex-1"></span>
         <a id="pdfModalDownload" href="#" download
@@ -1821,12 +1823,10 @@ function completeVisit(visitId) {
             <i class="bi bi-x-lg text-sm"></i>
         </button>
     </div>
-    <!-- iframe viewer -->
-    <div class="flex-1 overflow-hidden relative">
+    <!-- iframe viewer — stop propagation so clicking PDF doesn't close modal -->
+    <div class="flex-1 overflow-hidden" onclick="event.stopPropagation()">
         <iframe id="pdfModalFrame" src="" class="w-full h-full border-0" style="background:#525659;"></iframe>
     </div>
-    <!-- Tap outside overlay (behind header but clickable on sides) -->
-    <div class="absolute inset-0 -z-10" onclick="closePdfModal()"></div>
 </div>
 
 <!-- ── Document Viewer Modal ──────────────────────────────────────────────── -->
