@@ -3171,6 +3171,21 @@ if (chkAllEl) chkAllEl.addEventListener('change', function () {
         <embed id="pdfModalFrame" src="" type="application/pdf" class="w-full h-full" style="background:#525659; display:none;">
     </div>
 </div>
+<script>
+// Inline fallback — ensures closePdfModal is always callable when this modal is in the DOM,
+// even if the main meds IIFE hasn't run yet (e.g. service-worker cached page in incognito).
+if (typeof window.closePdfModal !== 'function') {
+    window.closePdfModal = function () {
+        var m = document.getElementById('pdfViewerModal');
+        if (m) m.classList.add('hidden');
+        var f = document.getElementById('pdfModalFrame');
+        if (f) { f.src = ''; f.style.display = 'none'; }
+        var s = document.getElementById('pdfModalSpinner');
+        if (s) s.style.display = 'flex';
+        document.body.style.overflow = '';
+    };
+}
+</script>
 
 <!-- Photos Tab -->
 <?php elseif ($activeTab === 'photos'): ?>
