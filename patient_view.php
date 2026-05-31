@@ -268,7 +268,8 @@ if ($activeTab === 'meds') {
                 const d = new Date(f.uploaded_at);
                 const dateStr = d.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
                 const byStr   = f.uploaded_by_name ? ' by ' + esc(f.uploaded_by_name) : '';
-                return `<div class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl" data-file-id="${f.id}" data-url="${f.url}" data-name="${esc(f.original_name)}">
+                const serveUrl = BASE + '/api/serve_patient_file.php?id=' + f.id;
+                return `<div class="flex items-center gap-3 p-3 bg-slate-50 rounded-xl" data-file-id="${f.id}" data-url="${serveUrl}" data-name="${esc(f.original_name)}">
                     <i class="bi bi-file-earmark-pdf-fill text-red-500 text-xl flex-shrink-0"></i>
                     <div class="min-w-0 flex-1">
                         <p class="text-sm font-medium text-slate-700 truncate">${esc(f.original_name)}</p>
@@ -277,7 +278,7 @@ if ($activeTab === 'meds') {
                     <button type="button" class="view-pdf-btn p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="View">
                         <i class="bi bi-eye text-sm"></i>
                     </button>
-                    <a href="${f.url}" download="${esc(f.original_name)}"
+                    <a href="${serveUrl}" download="${esc(f.original_name)}"
                        class="p-2 text-slate-400 hover:bg-slate-100 rounded-lg transition-colors" title="Download">
                         <i class="bi bi-download text-sm"></i>
                     </a>
@@ -359,7 +360,7 @@ if ($activeTab === 'meds') {
     function openPdfModal(url, name) {
         document.getElementById('pdfModalTitle').textContent = name || 'Document';
         document.getElementById('pdfModalFrame').src = url;
-        document.getElementById('pdfModalDownload').href = url;
+        document.getElementById('pdfModalDownload').href = url + '&dl=1';
         document.getElementById('pdfModalDownload').download = name || 'document.pdf';
         document.getElementById('pdfViewerModal').classList.remove('hidden');
         document.body.style.overflow = 'hidden';
